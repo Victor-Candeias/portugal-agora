@@ -41,14 +41,15 @@ export function ProtecaoCivil() {
   const { data: summary, isLoading: sumLoading } = useAnpcSummary()
 
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
+  const [selectedType, setSelectedType] = useState<string | null>(null)
 
   const total = incidents?.count ?? 0
   const asOf = incidents?.as_of ? formatTime(incidents.as_of) : ''
 
   const allIncidents = incidents?.data ?? []
-  const visibleIncidents = selectedDistrict
-    ? allIncidents.filter(inc => inc.location.district === selectedDistrict)
-    : allIncidents
+  const visibleIncidents = allIncidents
+    .filter(inc => !selectedDistrict || inc.location.district === selectedDistrict)
+    .filter(inc => !selectedType || inc.type === selectedType)
 
   return (
     <div className="space-y-6">
@@ -106,7 +107,7 @@ export function ProtecaoCivil() {
               return (
                 <button
                   key={d.district}
-                  onClick={() => setSelectedDistrict(isSelected ? null : d.district)}
+                  onClick={() => { setSelectedDistrict(isSelected ? null : d.district); setSelectedType(null) }}
                   className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors text-left w-full border ${
                     isSelected
                       ? 'bg-orange-600 border-orange-600 text-white'
@@ -131,15 +132,36 @@ export function ProtecaoCivil() {
       {/* Summary by type */}
       {(summary?.by_type?.length ?? 0) > 0 && (
         <Card>
-          <CardTitle>Por tipo de ocorrência</CardTitle>
+          <div className="flex items-center justify-between mb-3">
+            <CardTitle>Por tipo de ocorrência</CardTitle>
+            {selectedType && (
+              <button
+                onClick={() => setSelectedType(null)}
+                className="text-xs text-slate-600 hover:text-slate-800 font-medium underline"
+              >
+                Mostrar todos
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
-            {summary!.by_type.map(t => (
-              <div key={t.type} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-                <span>{getEmoji(t.type)}</span>
-                <span className="text-sm text-slate-700">{t.type}</span>
-                <span className="text-sm font-bold text-slate-900">{t.count}</span>
-              </div>
-            ))}
+            {summary!.by_type.map(t => {
+              const isSelected = selectedType === t.type
+              return (
+                <button
+                  key={t.type}
+                  onClick={() => { setSelectedType(isSelected ? null : t.type); setSelectedDistrict(null) }}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border transition-colors ${
+                    isSelected
+                      ? 'bg-slate-700 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{getEmoji(t.type)}</span>
+                  <span className={`text-sm ${isSelected ? 'text-white' : 'text-slate-700'}`}>{t.type}</span>
+                  <span className={`text-sm font-bold ${isSelected ? 'text-slate-200' : 'text-slate-900'}`}>{t.count}</span>
+                </button>
+              )
+            })}
           </div>
         </Card>
       )}
@@ -153,6 +175,8 @@ export function ProtecaoCivil() {
           <CardTitle>
             {selectedDistrict
               ? `${visibleIncidents.length} ocorrência${visibleIncidents.length !== 1 ? 's' : ''} em ${selectedDistrict}`
+              : selectedType
+              ? `${visibleIncidents.length} ocorrência${visibleIncidents.length !== 1 ? 's' : ''} · ${selectedType}`
               : `${incidents!.count} ocorrências ativas agora`}
           </CardTitle>
           <div className="divide-y divide-slate-100">
