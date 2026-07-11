@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, Link } from 'react-router-dom'
 import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag } from 'lucide-react'
 import { useAnpcSummary } from '@/hooks/useANPC'
 
@@ -20,7 +20,7 @@ export function Layout() {
       {/* Top alert banner */}
       {total > 0 && (
         <div className="bg-orange-600 text-white text-sm px-4 py-2 text-center font-medium">
-          🚒 {total} ocorrência{total > 1 ? 's' : ''} ativa{total > 1 ? 's' : ''} em Portugal — <a href="/protecao" className="underline">ver detalhes</a>
+          🚒 {total} ocorrência{total > 1 ? 's' : ''} ativa{total > 1 ? 's' : ''} em Portugal — <Link to="/protecao" className="underline">ver detalhes</Link>
         </div>
       )}
 
