@@ -1,0 +1,4 @@
+https://transparencia.sns.gov.pt/api/explore/v2.1/catalog/datasets/atendimentos-por-tipo-de-urgencia-hospitalar-link/records?where=entidade%20like%20%22Santa%20Maria%22&limit=20
+&order_by=tempo%20desc
+https://transparencia.sns.gov.pt/api/explore/v2.1/catalog/datasets/caracterizacao-das-valencias-de-urgencia/records?limit=100
+https://tempos.min-saude.pt/urgencia

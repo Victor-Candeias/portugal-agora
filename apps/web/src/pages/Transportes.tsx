@@ -76,9 +76,12 @@ function formatDate(ts: number) {
 
 // ── Comboios tab ──────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 30
+
 function ComboiosTab() {
   const { data: trains = [], isLoading, isError, refetch, dataUpdatedAt } = useTrains()
   const [serviceFilter, setServiceFilter] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const services = useMemo(
     () => [...new Set(trains.map(t => t.service.designation))].sort(),
@@ -89,6 +92,12 @@ function ComboiosTab() {
     () => serviceFilter ? trains.filter(t => t.service.designation === serviceFilter) : trains,
     [trains, serviceFilter],
   )
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // reset page when filter changes
+  const handleServiceFilter = (s: string | null) => { setServiceFilter(s); setPage(1) }
 
   const delayed    = filtered.filter(t => delayMin(t.delay) > 1).length
   const onTime     = filtered.filter(t => delayMin(t.delay) <= 1).length
@@ -106,7 +115,7 @@ function ComboiosTab() {
       {/* Header + refresh */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          {filtered.length} comboios · atualizado às {updatedAt} · atualiza a cada 30s
+          {filtered.length} comboios · atualizado às {updatedAt} · atualiza a cada 60s
         </p>
         <button onClick={() => refetch()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
           <RefreshCw size={12} /> Atualizar
@@ -134,7 +143,7 @@ function ComboiosTab() {
       {/* Service filter chips */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => setServiceFilter(null)}
+          onClick={() => handleServiceFilter(null)}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
             !serviceFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
@@ -144,7 +153,7 @@ function ComboiosTab() {
         {services.map(s => (
           <button
             key={s}
-            onClick={() => setServiceFilter(serviceFilter === s ? null : s)}
+            onClick={() => handleServiceFilter(serviceFilter === s ? null : s)}
             style={serviceFilter === s ? { backgroundColor: SERVICE_COLORS[s] ?? '#64748b' } : {}}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               serviceFilter === s ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -157,7 +166,7 @@ function ComboiosTab() {
 
       {/* Train list */}
       <div className="space-y-2">
-        {filtered.map(t => (
+        {paginated.map(t => (
           <Card key={`${t.trainNumber}-${t.runDate}`} className="p-4">
             <div className="flex items-center gap-3">
               {/* Train number + service */}
@@ -191,6 +200,37 @@ function ComboiosTab() {
           </Card>
         ))}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-1 flex-wrap">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40"
+          >
+            ‹
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button
+              key={n}
+              onClick={() => setPage(n)}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                n === page ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40"
+          >
+            ›
+          </button>
+        </div>
+      )}
     </div>
   )
 }

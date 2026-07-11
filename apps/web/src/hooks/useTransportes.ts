@@ -30,12 +30,13 @@ export function useTrains() {
     queryKey: ['cp', 'vehicles'],
     queryFn: async (): Promise<Train[]> => {
       const res = await fetch('https://comboios.live/api/vehicles')
-      if (!res.ok) throw new Error('Erro ao carregar comboios')
+      if (!res.ok) throw new Error(`Erro ao carregar comboios (HTTP ${res.status})`)
       const data = await res.json()
       return (data.vehicles as Train[]).sort((a, b) => b.delay - a.delay)
     },
     staleTime: 30 * 1000,
-    refetchInterval: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    retry: 1,
   })
 }
 
