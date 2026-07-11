@@ -105,7 +105,7 @@ export function Hospitais() {
                   onChange={e => setMunicipio(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
                 >
-                  <option value="">Todos os municípios</option>
+                  <option value="">Selecione um município</option>
                   {municipios.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
@@ -126,7 +126,11 @@ export function Hospitais() {
         {isLoading && <LoadingBox />}
         {isError   && <ErrorBox message="Erro ao carregar hospitais SNS." />}
 
-        {!isLoading && !isError && (
+        {!isLoading && !isError && !distrito && (
+          <p className="text-slate-400 text-sm text-center py-8">Selecione um distrito para ver os hospitais.</p>
+        )}
+
+        {!isLoading && !isError && distrito && (
           <>
             <p className="text-xs text-slate-400 mb-3">
               {filtered.length} serviço{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
