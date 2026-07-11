@@ -36,8 +36,8 @@ export interface Hospital {
 }
 
 export interface Atendimento {
-  tempo: string
-  periodoformat2: string
+  tempo: string        // "2026-04"
+  periodoformat2: string // "2026/04/01"
   regiao: string
   instituicao: string
   localizacao_geografica: { lon: number; lat: number }
@@ -56,12 +56,12 @@ async function snsFetch<T>(dataset: string, params: Record<string, string>): Pro
   return json.results as T[]
 }
 
+/** Devolve todos os hospitais agrupados por serviço de urgência */
 export function useHospitaisValencias() {
   return useQuery({
     queryKey: ['sns', 'valencias'],
     queryFn: async () => {
       const raw = await snsFetch<Valencia>('caracterizacao-das-valencias-de-urgencia', { limit: '9999' })
-      // Group by hospital service name
       const map = new Map<string, Hospital>()
       for (const v of raw) {
         const key = v.nome_do_servico_de_urgencia
@@ -93,13 +93,21 @@ export function useHospitaisValencias() {
   })
 }
 
+/** Últimos 12 meses de atendimentos (≈400 registos) */
 export function useHospitaisAtendimentos() {
   return useQuery({
-    queryKey: ['sns', 'atendimentos', 'all'],
-    queryFn: () => snsFetch<Atendimento>(
-      'atendimentos-por-tipo-de-urgencia-hospitalar-link',
-      { limit: '9999', order_by: 'tempo asc' },
-    ),
+    queryKey: ['sns', 'atendimentos', 'recent'],
+    queryFn: async () => {
+      const cutoff = (() => {
+        const d = new Date()
+        d.setFullYear(d.getFullYear() - 1)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      })()
+      return snsFetch<Atendimento>(
+        'atendimentos-por-tipo-de-urgencia-hospitalar-link',
+        { limit: '9999', order_by: 'tempo asc', where: `tempo>="${cutoff}"` },
+      )
+    },
     staleTime: 24 * 60 * 60 * 1000,
   })
 }
