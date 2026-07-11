@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
-import { MapPin, Phone, Mail, Activity, ChevronDown } from 'lucide-react'
+import { MapPin, Phone, Mail, Activity, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { useHospitaisValencias } from '@/hooks/useHospitais'
+
+const PAGE_SIZE = 30
 
 const TIPO_COLOR: Record<string, string> = {
   'Serviço de Urgência Básica':                           'bg-blue-100 text-blue-800',
@@ -23,6 +25,7 @@ export function Hospitais() {
   const [distrito, setDistrito] = useState('')
   const [municipio, setMunicipio] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   const distritos = useMemo(
     () => [...new Set(hospitals.map(h => h.distrito).filter(Boolean))]
@@ -48,6 +51,11 @@ export function Hospitais() {
                      h.localidade.toLowerCase().includes(search.toLowerCase())),
     ), [hospitals, distrito, municipio, search])
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function resetPage() { setPage(1) }
+
   const hasFilter = !!(distrito || municipio || search)
 
   return (
@@ -70,14 +78,17 @@ export function Hospitais() {
         <CardTitle>Filtros</CardTitle>
 
         <div className="space-y-3 mb-5">
-          {/* Pesquisa */}
-          <input
-            type="text"
-            placeholder="Pesquisar por nome ou localidade…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm"
-          />
+          {/* Pesquisa por nome */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Pesquisar hospital</label>
+            <input
+              type="text"
+              placeholder="Nome do hospital ou localidade…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); resetPage() }}
+              className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm"
+            />
+          </div>
 
           {/* Distrito */}
           <div>
@@ -85,7 +96,7 @@ export function Hospitais() {
             <div className="relative">
               <select
                 value={distrito}
-                onChange={e => { setDistrito(e.target.value); setMunicipio('') }}
+                onChange={e => { setDistrito(e.target.value); setMunicipio(''); resetPage() }}
                 className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
               >
                 <option value="">Selecione um distrito</option>
@@ -102,7 +113,7 @@ export function Hospitais() {
               <div className="relative">
                 <select
                   value={municipio}
-                  onChange={e => setMunicipio(e.target.value)}
+                  onChange={e => { setMunicipio(e.target.value); resetPage() }}
                   className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
                 >
                   <option value="">Selecione um município</option>
@@ -115,7 +126,7 @@ export function Hospitais() {
 
           {hasFilter && (
             <button
-              onClick={() => { setDistrito(''); setMunicipio(''); setSearch('') }}
+              onClick={() => { setDistrito(''); setMunicipio(''); setSearch(''); resetPage() }}
               className="text-xs text-slate-400 hover:text-slate-700 underline"
             >
               Limpar filtros
@@ -126,18 +137,21 @@ export function Hospitais() {
         {isLoading && <LoadingBox />}
         {isError   && <ErrorBox message="Erro ao carregar hospitais SNS." />}
 
-        {!isLoading && !isError && !distrito && (
-          <p className="text-slate-400 text-sm text-center py-8">Selecione um distrito para ver os hospitais.</p>
+        {!isLoading && !isError && !distrito && !search && (
+          <p className="text-slate-400 text-sm text-center py-8">Selecione um distrito ou pesquise por nome para ver os hospitais.</p>
         )}
 
-        {!isLoading && !isError && distrito && (
+        {!isLoading && !isError && (distrito || search) && (
           <>
-            <p className="text-xs text-slate-400 mb-3">
-              {filtered.length} serviço{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-slate-400">
+                {filtered.length} serviço{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+                {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[640px] overflow-y-auto pr-1">
-              {filtered.map(h => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {paginated.map(h => (
                 <div key={h.nome} className="border border-slate-100 rounded-lg p-4 hover:border-slate-300 transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <p className="font-semibold text-slate-900 text-sm leading-snug">{h.nome}</p>
@@ -196,6 +210,46 @@ export function Hospitais() {
                 <p className="col-span-2 text-slate-400 text-sm text-center py-8">Nenhum resultado encontrado.</p>
               )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-5">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                  .reduce<(number | '…')[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, i) =>
+                    p === '…'
+                      ? <span key={`ellipsis-${i}`} className="px-1 text-slate-400 text-sm">…</span>
+                      : <button
+                          key={p}
+                          onClick={() => setPage(p as number)}
+                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                            page === p
+                              ? 'bg-blue-600 text-white'
+                              : 'border border-slate-200 hover:bg-slate-50 text-slate-600'
+                          }`}
+                        >{p}</button>
+                  )}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </>
         )}
       </Card>
