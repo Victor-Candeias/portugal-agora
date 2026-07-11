@@ -20,30 +20,35 @@ function tipoLabel(tipo: string) {
 export function Hospitais() {
   const { data: hospitals = [], isLoading, isError } = useHospitaisValencias()
 
-  const [regiao, setRegiao] = useState('')
-  const [localidade, setLocalidade] = useState('')
+  const [distrito, setDistrito] = useState('')
+  const [municipio, setMunicipio] = useState('')
   const [search, setSearch] = useState('')
 
-  const regioes = useMemo(
-    () => [...new Set(hospitals.map(h => h.regiao))].sort((a, b) => a.localeCompare(b, 'pt')),
+  const distritos = useMemo(
+    () => [...new Set(hospitals.map(h => h.distrito).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, 'pt')),
     [hospitals],
   )
-  const localidades = useMemo(
+
+  const municipios = useMemo(
     () => [...new Set(
-      hospitals.filter(h => !regiao || h.regiao === regiao).map(h => h.localidade),
+      hospitals
+        .filter(h => !distrito || h.distrito === distrito)
+        .map(h => h.municipio)
+        .filter(Boolean),
     )].sort((a, b) => a.localeCompare(b, 'pt')),
-    [hospitals, regiao],
+    [hospitals, distrito],
   )
 
   const filtered = useMemo(() =>
     hospitals.filter(h =>
-      (!regiao     || h.regiao     === regiao) &&
-      (!localidade || h.localidade === localidade) &&
-      (!search     || h.nome.toLowerCase().includes(search.toLowerCase()) ||
-                      h.localidade.toLowerCase().includes(search.toLowerCase())),
-    ), [hospitals, regiao, localidade, search])
+      (!distrito  || h.distrito  === distrito) &&
+      (!municipio || h.municipio === municipio) &&
+      (!search    || h.nome.toLowerCase().includes(search.toLowerCase()) ||
+                     h.localidade.toLowerCase().includes(search.toLowerCase())),
+    ), [hospitals, distrito, municipio, search])
 
-  const hasFilter = !!(regiao || localidade || search)
+  const hasFilter = !!(distrito || municipio || search)
 
   return (
     <div className="space-y-6">
@@ -74,34 +79,34 @@ export function Hospitais() {
             className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm"
           />
 
-          {/* Região (Distrito) */}
+          {/* Distrito */}
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Região</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Distrito</label>
             <div className="relative">
               <select
-                value={regiao}
-                onChange={e => { setRegiao(e.target.value); setLocalidade('') }}
+                value={distrito}
+                onChange={e => { setDistrito(e.target.value); setMunicipio('') }}
                 className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
               >
-                <option value="">Todas as regiões</option>
-                {regioes.map(r => <option key={r} value={r}>{r}</option>)}
+                <option value="">Todos os distritos</option>
+                {distritos.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
-          {/* Localidade (Município) — só aparece quando região selecionada */}
-          {regiao && (
+          {/* Município — só aparece quando distrito selecionado */}
+          {distrito && (
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Localidade</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Município</label>
               <div className="relative">
                 <select
-                  value={localidade}
-                  onChange={e => setLocalidade(e.target.value)}
+                  value={municipio}
+                  onChange={e => setMunicipio(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
                 >
-                  <option value="">Todas as localidades</option>
-                  {localidades.map(l => <option key={l} value={l}>{l}</option>)}
+                  <option value="">Todos os municípios</option>
+                  {municipios.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
               </div>
@@ -110,7 +115,7 @@ export function Hospitais() {
 
           {hasFilter && (
             <button
-              onClick={() => { setRegiao(''); setLocalidade(''); setSearch('') }}
+              onClick={() => { setDistrito(''); setMunicipio(''); setSearch('') }}
               className="text-xs text-slate-400 hover:text-slate-700 underline"
             >
               Limpar filtros
@@ -123,7 +128,9 @@ export function Hospitais() {
 
         {!isLoading && !isError && (
           <>
-            <p className="text-xs text-slate-400 mb-3">{filtered.length} serviço{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-slate-400 mb-3">
+              {filtered.length} serviço{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[640px] overflow-y-auto pr-1">
               {filtered.map(h => (
@@ -135,10 +142,15 @@ export function Hospitais() {
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mb-2">
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mb-1">
                     <MapPin size={11} />
                     {h.endereco}, {h.localidade} {h.codigo_postal}
                   </p>
+                  {h.distrito && (
+                    <p className="text-xs text-slate-400 mb-2 pl-4">
+                      {h.municipio}{h.distrito ? ` · ${h.distrito}` : ''}
+                    </p>
+                  )}
 
                   <div className="flex flex-wrap gap-1 mb-2">
                     {h.valencias.map(v => (

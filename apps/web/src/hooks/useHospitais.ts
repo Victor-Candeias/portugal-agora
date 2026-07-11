@@ -24,6 +24,8 @@ export interface Hospital {
   nome: string
   tipo_de_urgencia: string
   regiao: string
+  distrito: string
+  municipio: string
   localidade: string
   endereco: string
   codigo_postal: string
@@ -61,15 +63,22 @@ export function useHospitaisValencias() {
   return useQuery({
     queryKey: ['sns', 'valencias'],
     queryFn: async () => {
-      const raw = await snsFetch<Valencia>('caracterizacao-das-valencias-de-urgencia', { limit: '9999' })
+      const [raw, cpMap] = await Promise.all([
+        snsFetch<Valencia>('caracterizacao-das-valencias-de-urgencia', { limit: '9999' }),
+        fetch(`${import.meta.env.BASE_URL}cp-distrito.json`)
+          .then(r => r.json()) as Promise<Record<string, { distrito: string; municipio: string }>>,
+      ])
       const map = new Map<string, Hospital>()
       for (const v of raw) {
         const key = v.nome_do_servico_de_urgencia
         if (!map.has(key)) {
+          const geo = cpMap[v.codigo_postal] ?? { distrito: '', municipio: '' }
           map.set(key, {
             nome: v.nome_do_servico_de_urgencia,
             tipo_de_urgencia: v.tipo_de_urgencia,
             regiao: v.regiao,
+            distrito: geo.distrito,
+            municipio: geo.municipio,
             localidade: v.localidade,
             endereco: v.endereco,
             codigo_postal: v.codigo_postal,

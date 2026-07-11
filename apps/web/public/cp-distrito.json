@@ -1,0 +1,378 @@
+{
+  "1069-089": {
+    "distrito": "Lisboa",
+    "municipio": "Lisboa"
+  },
+  "1150-199": {
+    "distrito": "Lisboa",
+    "municipio": "Lisboa"
+  },
+  "1169-045": {
+    "distrito": "Lisboa",
+    "municipio": "Lisboa"
+  },
+  "1349-019": {
+    "distrito": "Lisboa",
+    "municipio": "Lisboa"
+  },
+  "1449-005": {
+    "distrito": "Lisboa",
+    "municipio": "Lisboa"
+  },
+  "1649-035": {
+    "distrito": "Lisboa",
+    "municipio": "Lisboa"
+  },
+  "2005-177": {
+    "distrito": "Santarém",
+    "municipio": "Santarém"
+  },
+  "2200-202": {
+    "distrito": "Santarém",
+    "municipio": "Abrantes"
+  },
+  "2304-909": {
+    "distrito": "Santarém",
+    "municipio": "Tomar"
+  },
+  "2350-754": {
+    "distrito": "Santarém",
+    "municipio": "Torres Novas"
+  },
+  "2410-197": {
+    "distrito": "Leiria",
+    "municipio": "Leiria"
+  },
+  "2460-051": {
+    "distrito": "Leiria",
+    "municipio": "Alcobaça"
+  },
+  "2500-176": {
+    "distrito": "Leiria",
+    "municipio": "Caldas da Rainha"
+  },
+  "2520-447": {
+    "distrito": "Leiria",
+    "municipio": "Peniche"
+  },
+  "2560-324": {
+    "distrito": "Lisboa",
+    "municipio": "Torres Vedras"
+  },
+  "2600-009": {
+    "distrito": "Lisboa",
+    "municipio": "Vila Franca de Xira"
+  },
+  "2674-514": {
+    "distrito": "Lisboa",
+    "municipio": "Loures"
+  },
+  "2720-276": {
+    "distrito": "Lisboa",
+    "municipio": "Amadora"
+  },
+  "2725-079": {
+    "distrito": "Lisboa",
+    "municipio": "Algueirão-Mem Martins"
+  },
+  "2755-009": {
+    "distrito": "Lisboa",
+    "municipio": "Cascais"
+  },
+  "2805-267": {
+    "distrito": "Setúbal",
+    "municipio": "Almada"
+  },
+  "2834-003": {
+    "distrito": "Setúbal",
+    "municipio": "Barreiro"
+  },
+  "2870-351": {
+    "distrito": "Setúbal",
+    "municipio": "Montijo"
+  },
+  "2910-446": {
+    "distrito": "Setúbal",
+    "municipio": "Setúbal"
+  },
+  "3000-061": {
+    "distrito": "Coimbra",
+    "municipio": "Coimbra"
+  },
+  "3000-075": {
+    "distrito": "Coimbra",
+    "municipio": "Coimbra"
+  },
+  "3000-602": {
+    "distrito": "Coimbra",
+    "municipio": "Coimbra"
+  },
+  "3030-165": {
+    "distrito": "Coimbra",
+    "municipio": "Coimbra"
+  },
+  "3046-853": {
+    "distrito": "Coimbra",
+    "municipio": "Coimbra"
+  },
+  "3094-001": {
+    "distrito": "Coimbra",
+    "municipio": "Figueira da Foz"
+  },
+  "3100-462": {
+    "distrito": "Leiria",
+    "municipio": "Pombal"
+  },
+  "3300-063": {
+    "distrito": "Coimbra",
+    "municipio": "Arganil"
+  },
+  "3460-525": {
+    "distrito": "Viseu",
+    "municipio": "Tondela"
+  },
+  "3504-509": {
+    "distrito": "Viseu",
+    "municipio": "Viseu"
+  },
+  "3620-371": {
+    "distrito": "Viseu",
+    "municipio": "Moimenta da Beira"
+  },
+  "3660-511": {
+    "distrito": "Viseu",
+    "municipio": "São Pedro do Sul"
+  },
+  "3700-190": {
+    "distrito": "Aveiro",
+    "municipio": "São João da Madeira"
+  },
+  "3720-275": {
+    "distrito": "Aveiro",
+    "municipio": "Oliveira de Azeméis"
+  },
+  "3750-130": {
+    "distrito": "Aveiro",
+    "municipio": "Águeda"
+  },
+  "3814-501": {
+    "distrito": "Aveiro",
+    "municipio": "Aveiro"
+  },
+  "4050-371": {
+    "distrito": "Porto",
+    "municipio": "Porto"
+  },
+  "4099-001": {
+    "distrito": "Porto",
+    "municipio": "Porto"
+  },
+  "4200-319": {
+    "distrito": "Porto",
+    "municipio": "Porto"
+  },
+  "4434-502": {
+    "distrito": "Porto",
+    "municipio": "Vila Nova de Gaia"
+  },
+  "4464-513": {
+    "distrito": "Porto",
+    "municipio": "Matosinhos"
+  },
+  "4490-421": {
+    "distrito": "Porto",
+    "municipio": "Póvoa de Varzim"
+  },
+  "4520-211": {
+    "distrito": "Aveiro",
+    "municipio": "Santa Maria da Feira"
+  },
+  "4540-140": {
+    "distrito": "Aveiro",
+    "municipio": "Arouca"
+  },
+  "4560-136": {
+    "distrito": "Porto",
+    "municipio": "Penafiel"
+  },
+  "4600-758": {
+    "distrito": "Porto",
+    "municipio": "Amarante"
+  },
+  "4690-047": {
+    "distrito": "Viseu",
+    "municipio": "Cinfães"
+  },
+  "4710-243": {
+    "distrito": "Braga",
+    "municipio": "Braga"
+  },
+  "4754-909": {
+    "distrito": "Braga",
+    "municipio": "Barcelos"
+  },
+  "4764-958": {
+    "distrito": "Braga",
+    "municipio": "Vila Nova de Famalicão"
+  },
+  "4780-371": {
+    "distrito": "Porto",
+    "municipio": "Santo Tirso"
+  },
+  "4820-148": {
+    "distrito": "Braga",
+    "municipio": "Fafe"
+  },
+  "4835-044": {
+    "distrito": "Braga",
+    "municipio": "Guimarães"
+  },
+  "4904-858": {
+    "distrito": "Viana do Castelo",
+    "municipio": "Viana do Castelo"
+  },
+  "4950-404": {
+    "distrito": "Viana do Castelo",
+    "municipio": "Monção"
+  },
+  "4990-041": {
+    "distrito": "Viana do Castelo",
+    "municipio": "Ponte de Lima"
+  },
+  "5000-508": {
+    "distrito": "Vila Real",
+    "municipio": "Vila Real"
+  },
+  "5100-038": {
+    "distrito": "Viseu",
+    "municipio": "Lamego"
+  },
+  "5150-632": {
+    "distrito": "Guarda",
+    "municipio": "Vila Nova de Foz Côa"
+  },
+  "5200-207": {
+    "distrito": "Bragança",
+    "municipio": "Mogadouro"
+  },
+  "5301-852": {
+    "distrito": "Bragança",
+    "municipio": "Bragança"
+  },
+  "5340-263": {
+    "distrito": "Bragança",
+    "municipio": "Macedo de Cavaleiros"
+  },
+  "5370-210": {
+    "distrito": "Bragança",
+    "municipio": "Mirandela"
+  },
+  "5400-279": {
+    "distrito": "Vila Real",
+    "municipio": "Chaves"
+  },
+  "5470-225": {
+    "distrito": "Vila Real",
+    "municipio": "Montalegre"
+  },
+  "6000-084": {
+    "distrito": "Castelo Branco",
+    "municipio": "Castelo Branco"
+  },
+  "6200-251": {
+    "distrito": "Castelo Branco",
+    "municipio": "Covilhã"
+  },
+  "6270-498": {
+    "distrito": "Guarda",
+    "municipio": "Seia"
+  },
+  "6300-858": {
+    "distrito": "Guarda",
+    "municipio": "Guarda"
+  },
+  "7000-811": {
+    "distrito": "Évora",
+    "municipio": "Évora"
+  },
+  "7100-500": {
+    "distrito": "Évora",
+    "municipio": "Estremoz"
+  },
+  "7300-853": {
+    "distrito": "Portalegre",
+    "municipio": "Portalegre"
+  },
+  "7350-954": {
+    "distrito": "Portalegre",
+    "municipio": "Elvas"
+  },
+  "7400-294": {
+    "distrito": "Portalegre",
+    "municipio": "Ponte de Sor"
+  },
+  "7540-230": {
+    "distrito": "Setúbal",
+    "municipio": "Santiago do Cacém"
+  },
+  "7580-206": {
+    "distrito": "Setúbal",
+    "municipio": "Alcácer do Sal"
+  },
+  "7630-236": {
+    "distrito": "Beja",
+    "municipio": "Odemira"
+  },
+  "7780-123": {
+    "distrito": "Beja",
+    "municipio": "Castro Verde"
+  },
+  "7801-849": {
+    "distrito": "Beja",
+    "municipio": "Beja"
+  },
+  "7860-222": {
+    "distrito": "Beja",
+    "municipio": "Moura"
+  },
+  "8000-386": {
+    "distrito": "Faro",
+    "municipio": "Faro"
+  },
+  "8100-740": {
+    "distrito": "Faro",
+    "municipio": "Loulé"
+  },
+  "8200-200": {
+    "distrito": "Faro",
+    "municipio": "Albufeira"
+  },
+  "8500-338": {
+    "distrito": "Faro",
+    "municipio": "Portimão"
+  },
+  "8600-563": {
+    "distrito": "Faro",
+    "municipio": "Lagos"
+  },
+  "8900-211": {
+    "distrito": "Faro",
+    "municipio": "Vila Real de Santo António"
+  },
+  "9004-514": {
+    "distrito": "Madeira",
+    "municipio": "Funchal"
+  },
+  "9500-370": {
+    "distrito": "Açores",
+    "municipio": "Ponta Delgada"
+  },
+  "9700-851": {
+    "distrito": "Açores",
+    "municipio": "Angra do Heroísmo"
+  },
+  "9900-038": {
+    "distrito": "Açores",
+    "municipio": "Horta"
+  }
+}
