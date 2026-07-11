@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/weatherapp/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/portugal-agora/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
