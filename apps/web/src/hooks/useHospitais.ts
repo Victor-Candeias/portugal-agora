@@ -51,11 +51,22 @@ export interface Atendimento {
 }
 
 async function snsFetch<T>(dataset: string, params: Record<string, string>): Promise<T[]> {
-  const qs = new URLSearchParams(params).toString()
-  const res = await fetch(`${BASE}/${dataset}/records?${qs}`)
-  if (!res.ok) throw new Error(`SNS API erro ${res.status}`)
-  const json = await res.json()
-  return json.results as T[]
+  const PAGE = 100
+  const all: T[] = []
+  let offset = 0
+
+  while (true) {
+    const qs = new URLSearchParams({ ...params, limit: String(PAGE), offset: String(offset) }).toString()
+    const res = await fetch(`${BASE}/${dataset}/records?${qs}`)
+    if (!res.ok) throw new Error(`SNS API erro ${res.status}`)
+    const json = await res.json()
+    const results: T[] = json.results ?? []
+    all.push(...results)
+    if (all.length >= json.total_count || results.length < PAGE) break
+    offset += PAGE
+  }
+
+  return all
 }
 
 /** Devolve todos os hospitais agrupados por serviço de urgência */
