@@ -8,6 +8,7 @@ import { Combustivel } from '@/pages/Combustivel'
 import { Tempo } from '@/pages/Tempo'
 import { EV } from '@/pages/EV'
 import { ProtecaoCivil } from '@/pages/ProtecaoCivil'
+import { Hospitais } from '@/pages/Hospitais'
 import { Economia } from '@/pages/Economia'
 import './index.css'
 
@@ -31,6 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="tempo" element={<Tempo />} />
             <Route path="ev" element={<EV />} />
             <Route path="protecao" element={<ProtecaoCivil />} />
+            <Route path="hospitais" element={<Hospitais />} />
             <Route path="economia" element={<Economia />} />
           </Route>
         </Routes>

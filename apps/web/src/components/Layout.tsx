@@ -1,5 +1,5 @@
 import { NavLink, Outlet, Link } from 'react-router-dom'
-import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag } from 'lucide-react'
+import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag, Hospital } from 'lucide-react'
 import { useAnpcSummary } from '@/hooks/useANPC'
 
 const NAV = [
@@ -7,6 +7,7 @@ const NAV = [
   { to: '/combustivel', label: 'Combustível',    icon: Fuel },
   { to: '/tempo',       label: 'Tempo',          icon: CloudSun },
   { to: '/protecao',    label: 'Proteção Civil', icon: ShieldAlert },
+  { to: '/hospitais',   label: 'Hospitais',      icon: Hospital },
   { to: '/ev',          label: 'EV',             icon: Zap },
   { to: '/economia',    label: 'Economia',       icon: BarChart3 },
 ]
