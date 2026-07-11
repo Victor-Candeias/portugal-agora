@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { useAnpcIncidents, useAnpcSummary } from '@/hooks/useANPC'
@@ -39,8 +40,15 @@ export function ProtecaoCivil() {
   const { data: incidents, isLoading: incLoading, isError: incError, error: incErr, refetch } = useAnpcIncidents()
   const { data: summary, isLoading: sumLoading } = useAnpcSummary()
 
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
+
   const total = incidents?.count ?? 0
   const asOf = incidents?.as_of ? formatTime(incidents.as_of) : ''
+
+  const allIncidents = incidents?.data ?? []
+  const visibleIncidents = selectedDistrict
+    ? allIncidents.filter(inc => inc.location.district === selectedDistrict)
+    : allIncidents
 
   return (
     <div className="space-y-6">
@@ -80,20 +88,42 @@ export function ProtecaoCivil() {
       {/* Summary by district */}
       {(summary?.by_district?.length ?? 0) > 0 && (
         <Card>
-          <CardTitle>Ocorrências por distrito</CardTitle>
+          <div className="flex items-center justify-between mb-3">
+            <CardTitle>Ocorrências por distrito</CardTitle>
+            {selectedDistrict && (
+              <button
+                onClick={() => setSelectedDistrict(null)}
+                className="text-xs text-orange-600 hover:text-orange-700 font-medium underline"
+              >
+                Mostrar todos
+              </button>
+            )}
+          </div>
           {sumLoading && <LoadingBox />}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {summary!.by_district.map(d => (
-              <div
-                key={d.district}
-                className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-3 py-2"
-              >
-                <span className="text-sm font-medium text-slate-700">{d.district}</span>
-                <span className="text-sm font-bold text-orange-700 bg-orange-100 rounded-full w-7 h-7 flex items-center justify-center">
-                  {d.count}
-                </span>
-              </div>
-            ))}
+            {summary!.by_district.map(d => {
+              const isSelected = selectedDistrict === d.district
+              return (
+                <button
+                  key={d.district}
+                  onClick={() => setSelectedDistrict(isSelected ? null : d.district)}
+                  className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors text-left w-full border ${
+                    isSelected
+                      ? 'bg-orange-600 border-orange-600 text-white'
+                      : 'bg-orange-50 border-orange-200 hover:bg-orange-100'
+                  }`}
+                >
+                  <span className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-700'}`}>
+                    {d.district}
+                  </span>
+                  <span className={`text-sm font-bold rounded-full w-7 h-7 flex items-center justify-center flex-shrink-0 ${
+                    isSelected ? 'bg-white text-orange-700' : 'bg-orange-100 text-orange-700'
+                  }`}>
+                    {d.count}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </Card>
       )}
@@ -120,9 +150,13 @@ export function ProtecaoCivil() {
 
       {(incidents?.data?.length ?? 0) > 0 && (
         <Card>
-          <CardTitle>{incidents!.count} ocorrências ativas agora</CardTitle>
+          <CardTitle>
+            {selectedDistrict
+              ? `${visibleIncidents.length} ocorrência${visibleIncidents.length !== 1 ? 's' : ''} em ${selectedDistrict}`
+              : `${incidents!.count} ocorrências ativas agora`}
+          </CardTitle>
           <div className="divide-y divide-slate-100">
-            {incidents!.data.map(inc => (
+            {visibleIncidents.map(inc => (
               <div key={inc.id} className="py-4 flex gap-3">
                 <span className="text-2xl flex-shrink-0 mt-0.5">{getEmoji(inc.type)}</span>
                 <div className="flex-1 min-w-0">
