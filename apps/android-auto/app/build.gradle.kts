@@ -8,6 +8,7 @@ val apiAbertaKey = System.getenv("VITE_APIABERTA_KEY") ?: ""
 android {
     namespace = "pt.portugalhoje.auto"
     compileSdk = 34
+    buildToolsVersion = "34.0.0"
 
     defaultConfig {
         applicationId = "pt.portugalhoje.auto"

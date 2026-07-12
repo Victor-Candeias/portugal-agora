@@ -9,18 +9,13 @@ import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pt.portugalhoje.auto.api.ComboiosApi
 import pt.portugalhoje.auto.api.TrainVehicle
-import kotlin.math.abs
 
 class TransportesScreen(carContext: CarContext) : Screen(carContext) {
-    private val apiScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var requested = false
     private var loading = true
     private var trains: List<TrainVehicle> = emptyList()
@@ -52,44 +47,35 @@ class TransportesScreen(carContext: CarContext) : Screen(carContext) {
         }
 
         val itemList = ItemList.Builder().apply {
-            trains.forEach { train ->
+            trains.take(6).forEach { train: TrainVehicle ->
+                val delayMin = train.delay / 60
+                val delayText = if (delayMin <= 0) "Pontual" else "+${delayMin} min"
                 addItem(
                     Row.Builder()
-                        .setTitle("${train.trainNumber} — ${train.origin.designation} → ${train.destination.designation}")
-                        .addText("${train.service.designation} · ${formatDelay(train.delay)}")
+                        .setTitle("${train.trainNumber} · ${train.origin.designation} → ${train.destination.designation}")
+                        .addText("${train.service.designation} · $delayText")
                         .build(),
                 )
             }
         }.build()
 
         return ListTemplate.Builder()
-            .setTitle("Transportes CP")
+            .setTitle("Comboios CP")
             .setHeaderAction(Action.BACK)
             .setSingleList(itemList)
             .build()
     }
 
-    override fun onDestroy() {
-        apiScope.cancel()
-        super.onDestroy()
-    }
-
     private fun ensureLoaded() {
-        if (requested) {
-            return
-        }
+        if (requested) return
         requested = true
         lifecycleScope.launch {
             loading = true
             errorMessage = null
             runCatching {
-                withContext(apiScope.coroutineContext) {
-                    ComboiosApi.getVehicles()
-                        .sortedByDescending { it.delay }
-                        .take(20)
-                }
+                withContext(Dispatchers.IO) { ComboiosApi.getVehicles() }
             }.onSuccess { result ->
-                trains = result
+                trains = result.sortedByDescending { v: TrainVehicle -> v.delay }
                 loading = false
             }.onFailure { throwable ->
                 errorMessage = throwable.message ?: "Não foi possível carregar os comboios."
@@ -97,13 +83,5 @@ class TransportesScreen(carContext: CarContext) : Screen(carContext) {
             }
             invalidate()
         }
-    }
-
-    private fun formatDelay(delay: Int): String {
-        if (delay <= 0) {
-            return "Pontual"
-        }
-        val minutes = maxOf(1, abs(delay) / 60)
-        return "+${minutes}min atrasado"
     }
 }

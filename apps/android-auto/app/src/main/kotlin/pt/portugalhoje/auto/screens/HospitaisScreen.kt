@@ -12,10 +12,7 @@ import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pt.portugalhoje.auto.api.SnsApi
@@ -24,7 +21,6 @@ import pt.portugalhoje.auto.utils.LocationHelper
 import java.util.Locale
 
 class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
-    private val apiScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val locale = Locale("pt", "PT")
     private var requested = false
     private var loading = true
@@ -57,15 +53,15 @@ class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
         }
 
         val itemList = ItemList.Builder().apply {
-            hospitals.forEach { hospital ->
-                val geo = hospital.record.localizacao_geografica ?: return@forEach
-                val place = Place.Builder(CarLocation.create(geo.lat, geo.lon)).build()
-
+            hospitals.forEach { h: HospitalWithDistance ->
+                val lat = h.hospital.localizacao_geografica?.lat ?: 0.0
+                val lon = h.hospital.localizacao_geografica?.lon ?: 0.0
+                val place = Place.Builder(CarLocation.create(lat, lon)).build()
                 addItem(
                     Row.Builder()
-                        .setTitle(hospital.record.nome_do_servico_de_urgencia)
-                        .addText("${hospital.record.tipo_de_urgencia} · ${formatDistance(hospital.distanceKm)}")
-                        .addText(hospital.record.endereco.ifBlank { hospital.record.localidade })
+                        .setTitle(h.hospital.nome_do_servico_de_urgencia)
+                        .addText("${formatDistance(h.distanceKm)} · ${h.hospital.tipo_de_urgencia}")
+                        .addText(h.hospital.localidade)
                         .setMetadata(Metadata.Builder().setPlace(place).build())
                         .build(),
                 )
@@ -80,41 +76,29 @@ class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 
-    override fun onDestroy() {
-        apiScope.cancel()
-        super.onDestroy()
-    }
-
     private fun ensureLoaded() {
-        if (requested) {
-            return
-        }
+        if (requested) return
         requested = true
         lifecycleScope.launch {
             loading = true
             errorMessage = null
             runCatching {
-                withContext(apiScope.coroutineContext) {
+                withContext(Dispatchers.IO) {
                     val location = LocationHelper.getLocation(carContext)
                     val baseLat = location?.latitude ?: LISBON_LAT
                     val baseLng = location?.longitude ?: LISBON_LNG
-                    val deduplicated = linkedMapOf<String, SnsHospitalRecord>()
                     SnsApi.getHospitals()
-                        .filter { it.localizacao_geografica != null }
-                        .forEach { record ->
-                            deduplicated.putIfAbsent(record.nome_do_servico_de_urgencia, record)
-                        }
-
-                    deduplicated.values
-                        .mapNotNull { record ->
-                            val geo = record.localizacao_geografica ?: return@mapNotNull null
+                        .filter { (it.localizacao_geografica?.lat ?: 0.0) != 0.0 }
+                        .map { hospital: SnsHospitalRecord ->
+                            val hLat = hospital.localizacao_geografica?.lat ?: 0.0
+                            val hLon = hospital.localizacao_geografica?.lon ?: 0.0
                             HospitalWithDistance(
-                                record = record,
-                                distanceKm = LocationHelper.distanceKm(baseLat, baseLng, geo.lat, geo.lon),
+                                hospital = hospital,
+                                distanceKm = LocationHelper.distanceKm(baseLat, baseLng, hLat, hLon),
                             )
                         }
                         .sortedBy { it.distanceKm }
-                        .take(10)
+                        .take(6)
                 }
             }.onSuccess { result ->
                 hospitals = result
@@ -127,15 +111,12 @@ class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
         }
     }
 
-    private fun formatDistance(distanceKm: Double): String = String.format(locale, "%.1f km", distanceKm)
+    private fun formatDistance(km: Double) = String.format(locale, "%.1f km", km)
 
-    private data class HospitalWithDistance(
-        val record: SnsHospitalRecord,
-        val distanceKm: Double,
-    )
+    private data class HospitalWithDistance(val hospital: SnsHospitalRecord, val distanceKm: Double)
 
-    private companion object {
-        const val LISBON_LAT = 38.72
-        const val LISBON_LNG = -9.14
+    companion object {
+        private const val LISBON_LAT = 38.72
+        private const val LISBON_LNG = -9.14
     }
 }

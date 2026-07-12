@@ -12,10 +12,7 @@ import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pt.portugalhoje.auto.api.DgegApi
@@ -24,7 +21,6 @@ import pt.portugalhoje.auto.utils.LocationHelper
 import java.util.Locale
 
 class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
-    private val apiScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val locale = Locale("pt", "PT")
     private var requested = false
     private var loading = true
@@ -57,16 +53,15 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
         }
 
         val itemList = ItemList.Builder().apply {
-            stations.forEach { station ->
+            stations.forEach { s ->
                 val place = Place.Builder(
-                    CarLocation.create(station.station.Latitude, station.station.Longitude),
+                    CarLocation.create(s.station.Latitude, s.station.Longitude),
                 ).build()
-
                 addItem(
                     Row.Builder()
-                        .setTitle(station.station.Nome.ifBlank { station.station.Marca.ifBlank { "Posto ${station.station.Id}" } })
-                        .addText("${formatDistance(station.distanceKm)} · ${station.station.Preco}")
-                        .addText(station.station.Morada.ifBlank { "${station.station.Municipio}, ${station.station.Distrito}" })
+                        .setTitle(s.station.Nome.ifBlank { s.station.Marca })
+                        .addText("${formatDistance(s.distanceKm)} · ${s.station.Preco}")
+                        .addText("${s.station.Municipio}, ${s.station.Distrito}")
                         .setMetadata(Metadata.Builder().setPlace(place).build())
                         .build(),
                 )
@@ -81,21 +76,14 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 
-    override fun onDestroy() {
-        apiScope.cancel()
-        super.onDestroy()
-    }
-
     private fun ensureLoaded() {
-        if (requested) {
-            return
-        }
+        if (requested) return
         requested = true
         lifecycleScope.launch {
             loading = true
             errorMessage = null
             runCatching {
-                withContext(apiScope.coroutineContext) {
+                withContext(Dispatchers.IO) {
                     val location = LocationHelper.getLocation(carContext)
                     val baseLat = location?.latitude ?: LISBON_LAT
                     val baseLng = location?.longitude ?: LISBON_LNG
@@ -104,16 +92,11 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
                         .map { station ->
                             StationWithDistance(
                                 station = station,
-                                distanceKm = LocationHelper.distanceKm(
-                                    baseLat,
-                                    baseLng,
-                                    station.Latitude,
-                                    station.Longitude,
-                                ),
+                                distanceKm = LocationHelper.distanceKm(baseLat, baseLng, station.Latitude, station.Longitude),
                             )
                         }
                         .sortedBy { it.distanceKm }
-                        .take(10)
+                        .take(6)
                 }
             }.onSuccess { result ->
                 stations = result
@@ -126,15 +109,12 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
         }
     }
 
-    private fun formatDistance(distanceKm: Double): String = String.format(locale, "%.1f km", distanceKm)
+    private fun formatDistance(km: Double) = String.format(locale, "%.1f km", km)
 
-    private data class StationWithDistance(
-        val station: DgegStation,
-        val distanceKm: Double,
-    )
+    private data class StationWithDistance(val station: DgegStation, val distanceKm: Double)
 
-    private companion object {
-        const val LISBON_LAT = 38.72
-        const val LISBON_LNG = -9.14
+    companion object {
+        private const val LISBON_LAT = 38.72
+        private const val LISBON_LNG = -9.14
     }
 }
