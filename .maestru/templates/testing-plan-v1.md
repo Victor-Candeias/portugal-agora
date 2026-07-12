@@ -37,5 +37,11 @@ created: {{created}}
 
 ## Impacted Files
 
+<!-- Guidelines:
+- List files covered by the test plan
+- Specify whether each file needs new tests, updates, or validation only
+- Explain why each file matters to verification
+-->
+
 | File | Action | Purpose |
 |------|--------|---------|

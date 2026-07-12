@@ -16,5 +16,5 @@ status: active
 <!-- maestru:work-items-list -->
 | ID | Title | Status | Created | Owner | Priority | Completed | Template | Spec |
 |---|---|---|---|---|---|---|---|---|
-| AA-001 | App Android Auto — Portugal Hoje | in-progress | 2026-07-12 | developer | high |  |  | [AA-001](../specs/mobile/aa-001-spec.md) |
+| AA-001 | App Android Auto — Portugal Hoje | done | 2026-07-12 | developer | high | 2026-07-12 |  | [AA-001](../specs/mobile/aa-001-spec.md) |
 <!-- /maestru:work-items-list -->
