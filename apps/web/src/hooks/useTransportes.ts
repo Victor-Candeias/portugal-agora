@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 
 // ── Comboios CP (comboios.live) ───────────────────────────────────────────
+// Dev: proxied via Vite (/api/comboios → https://comboios.live)
+// Prod: via corsproxy.io to bypass CORS (comboios.live has no CORS headers)
+const COMBOIOS_BASE = import.meta.env.DEV
+  ? '/api/comboios'
+  : 'https://corsproxy.io/?url=https://comboios.live'
 
 export interface Train {
   trainNumber: number
@@ -29,7 +34,7 @@ export function useTrains() {
   return useQuery({
     queryKey: ['cp', 'vehicles'],
     queryFn: async (): Promise<Train[]> => {
-      const res = await fetch('https://comboios.live/api/vehicles')
+      const res = await fetch(`${COMBOIOS_BASE}/api/vehicles`)
       if (!res.ok) throw new Error(`Erro ao carregar comboios (HTTP ${res.status})`)
       const data = await res.json()
       return (data.vehicles as Train[]).sort((a, b) => b.delay - a.delay)
@@ -44,7 +49,7 @@ export function useStations() {
   return useQuery({
     queryKey: ['cp', 'stations'],
     queryFn: async (): Promise<Station[]> => {
-      const res = await fetch('https://comboios.live/api/stations')
+      const res = await fetch(`${COMBOIOS_BASE}/api/stations`)
       if (!res.ok) throw new Error('Erro ao carregar estações')
       const data = await res.json()
       return data.stations as Station[]

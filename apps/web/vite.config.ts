@@ -12,4 +12,13 @@ export default defineConfig({
       '@portugal-hoje/core': path.resolve(__dirname, '../../packages/core/src/index.ts'),
     },
   },
+  server: {
+    proxy: {
+      '/api/comboios': {
+        target: 'https://comboios.live',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/comboios/, ''),
+      },
+    },
+  },
 })
