@@ -97,9 +97,10 @@ export function Hospitais() {
               <select
                 value={distrito}
                 onChange={e => { setDistrito(e.target.value); setMunicipio(''); resetPage() }}
-                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
+                disabled={isLoading}
+                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8 disabled:opacity-50 disabled:cursor-wait"
               >
-                <option value="">Selecione um distrito</option>
+                <option value="">{isLoading ? 'A carregar distritos…' : 'Selecione um distrito'}</option>
                 {distritos.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
@@ -114,7 +115,8 @@ export function Hospitais() {
                 <select
                   value={municipio}
                   onChange={e => { setMunicipio(e.target.value); resetPage() }}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8"
+                  disabled={isLoading}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white appearance-none pr-8 disabled:opacity-50 disabled:cursor-wait"
                 >
                   <option value="">Selecione um município</option>
                   {municipios.map(m => <option key={m} value={m}>{m}</option>)}
