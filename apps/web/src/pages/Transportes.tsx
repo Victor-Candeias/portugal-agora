@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react'
-import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock } from 'lucide-react'
-import { Card, CardTitle } from '@/components/Card'
+import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, ExternalLink, Navigation } from 'lucide-react'
+import { Card } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
-import { useTrains, useTmlAlerts } from '@/hooks/useTransportes'
-import type { Train, TmlAlert } from '@/hooks/useTransportes'
+import { useTrains, useStations, useTmlAlerts } from '@/hooks/useTransportes'
+import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -74,14 +74,93 @@ function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+function formatDateTime(ts: number) {
+  return new Date(ts).toLocaleString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+function trainKey(t: Train) {
+  return `${t.trainNumber}-${t.runDate}`
+}
+
+function stationName(code: string | undefined, stations: Map<string, Station>) {
+  if (!code) return '—'
+  return stations.get(code)?.designation ?? code
+}
+
+function detailItem(label: string, value: React.ReactNode) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-medium text-slate-800">{value || '—'}</p>
+    </div>
+  )
+}
+
+function TrainDetails({ train, stations }: { train: Train; stations: Map<string, Station> }) {
+  const lastStation = stationName(train.lastStation, stations)
+  const currentStop = stationName(train.gtfs?.stopId?.replaceAll('_', '-'), stations)
+  const mapUrl = `https://www.google.com/maps?q=${train.latitude},${train.longitude}`
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {detailItem('Estado', STATUS_LABEL[train.status] ?? train.status)}
+        {detailItem('Atraso', delayLabel(train.delay))}
+        {detailItem('Atualizado', formatDateTime(train.timestamp))}
+        {detailItem('Última estação', lastStation)}
+        {detailItem('Plataforma', train.lastStationPlatform || '—')}
+        {detailItem('Sequência', train.gtfs?.stopSequence ?? '—')}
+      </div>
+
+      <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-950">
+        <p className="font-semibold">Percurso</p>
+        <p className="mt-1">{train.origin.designation} → {train.destination.designation}</p>
+        {train.gtfs?.tripId && (
+          <p className="mt-1 text-xs text-blue-700">Trip ID: {train.gtfs.tripId}</p>
+        )}
+        {currentStop !== '—' && (
+          <p className="mt-1 text-xs text-blue-700">Próxima/paragem GTFS: {currentStop}</p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span className="flex items-center gap-1">
+          <Navigation size={12} />
+          Direção {Math.round(train.bearing || 0)}°
+        </span>
+        <span>{train.skippedStops?.length ?? 0} paragens saltadas</span>
+        {train.hasDisruptions && <span className="font-semibold text-red-600">⚠️ Com perturbações</span>}
+        {train.latitude && train.longitude && (
+          <a
+            href={mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700"
+          >
+            Ver no mapa <ExternalLink size={12} />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Comboios tab ──────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 30
 
 function ComboiosTab() {
   const { data: trains = [], isLoading, isError, refetch, dataUpdatedAt } = useTrains()
+  const { data: stationList = [] } = useStations()
   const [serviceFilter, setServiceFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [selectedTrain, setSelectedTrain] = useState<string | null>(null)
 
   const services = useMemo(
     () => [...new Set(trains.map(t => t.service.designation))].sort(),
@@ -93,11 +172,16 @@ function ComboiosTab() {
     [trains, serviceFilter],
   )
 
+  const stations = useMemo(
+    () => new Map(stationList.map(s => [s.code, s])),
+    [stationList],
+  )
+
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   // reset page when filter changes
-  const handleServiceFilter = (s: string | null) => { setServiceFilter(s); setPage(1) }
+  const handleServiceFilter = (s: string | null) => { setServiceFilter(s); setPage(1); setSelectedTrain(null) }
 
   const delayed    = filtered.filter(t => delayMin(t.delay) > 1).length
   const onTime     = filtered.filter(t => delayMin(t.delay) <= 1).length
@@ -166,9 +250,19 @@ function ComboiosTab() {
 
       {/* Train list */}
       <div className="space-y-2">
-        {paginated.map(t => (
-          <Card key={`${t.trainNumber}-${t.runDate}`} className="p-4">
-            <div className="flex items-center gap-3">
+        {paginated.map(t => {
+          const key = trainKey(t)
+          const isSelected = selectedTrain === key
+
+          return (
+          <Card key={key} className={`p-4 transition-colors ${isSelected ? 'border-blue-200 bg-blue-50/30' : ''}`}>
+            <button
+              type="button"
+              onClick={() => setSelectedTrain(isSelected ? null : key)}
+              aria-expanded={isSelected}
+              className="w-full text-left"
+            >
+              <div className="flex items-center gap-3">
               {/* Train number + service */}
               <div className="flex-shrink-0 text-center min-w-[56px]">
                 <p className="text-lg font-bold text-slate-900">{t.trainNumber}</p>
@@ -196,9 +290,18 @@ function ComboiosTab() {
               <div className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-bold ${delayColor(t.delay)}`}>
                 {delayLabel(t.delay)}
               </div>
+
+              <ChevronDown
+                size={18}
+                className={`flex-shrink-0 text-slate-400 transition-transform ${isSelected ? 'rotate-180' : ''}`}
+              />
             </div>
+            </button>
+
+            {isSelected && <TrainDetails train={t} stations={stations} />}
           </Card>
-        ))}
+          )
+        })}
       </div>
 
       {/* Pagination */}

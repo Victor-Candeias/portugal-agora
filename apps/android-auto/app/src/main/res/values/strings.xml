@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Portugal Hoje</string>
+    <string name="main_activity_title">Portugal Hoje</string>
+    <string name="main_activity_message">Informação útil de Portugal em tempo real.</string>
+</resources>

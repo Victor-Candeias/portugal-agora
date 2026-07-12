@@ -8,14 +8,24 @@ const COMBOIOS_BASE = import.meta.env.DEV
   : 'https://corsproxy.io/?url=https://comboios.live'
 
 export interface Train {
+  agencyId: string
   trainNumber: number
   runDate: string
   delay: number           // seconds (positive = late, negative = early)
   status: 'IN_TRANSIT' | 'AT_STATION' | 'AT_ORIGIN' | 'NEAR_NEXT'
   hasDisruptions: boolean
+  lastStation: string
   latitude: string
   longitude: string
   lastStationPlatform: string
+  bearing: number
+  gtfs?: {
+    tripId: string
+    stopId: string
+    stopIdWithPlatform: string
+    stopSequence: number
+  }
+  skippedStops: string[]
   service: { code: string; designation: string }
   origin: { code: string; designation: string }
   destination: { code: string; designation: string }
