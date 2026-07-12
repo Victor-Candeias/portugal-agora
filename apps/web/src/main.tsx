@@ -11,6 +11,7 @@ import { ProtecaoCivil } from '@/pages/ProtecaoCivil'
 import { Hospitais } from '@/pages/Hospitais'
 import { Transportes } from '@/pages/Transportes'
 import { Economia } from '@/pages/Economia'
+import { CodigoPostal } from '@/pages/CodigoPostal'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="hospitais"   element={<Hospitais />} />
             <Route path="transportes" element={<Transportes />} />
             <Route path="economia"    element={<Economia />} />
+            <Route path="codigo-postal" element={<CodigoPostal />} />
           </Route>
         </Routes>
       </BrowserRouter>
