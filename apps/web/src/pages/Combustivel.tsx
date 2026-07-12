@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapPin, Navigation } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
@@ -8,21 +8,74 @@ import { formatPrice, FUEL_LABELS, FUEL_COLORS, type FuelType } from '@portugal-
 
 const FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel', 'diesel_plus', 'lpg']
 
+type UserLocation = {
+  latitude: number
+  longitude: number
+}
+
+function distanceKm(from: UserLocation, to: { Latitude: number; Longitude: number }) {
+  const toRad = (value: number) => value * Math.PI / 180
+  const earthRadiusKm = 6371
+  const dLat = toRad(to.Latitude - from.latitude)
+  const dLon = toRad(to.Longitude - from.longitude)
+  const lat1 = toRad(from.latitude)
+  const lat2 = toRad(to.Latitude)
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 export function Combustivel() {
   const [fuelType, setFuelType] = useState<FuelType>('gasoline_95')
   const [districtId, setDistrictId] = useState<number | undefined>(11) // Lisboa por defeito
   const [districtName, setDistrictName] = useState<string>('Lisboa')
   const [municipalityId, setMunicipalityId] = useState<number | undefined>(undefined)
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
 
   const { data: districts, isLoading: loadingDistricts } = useDistricts()
   const { data: municipalities } = useMunicipalities(districtId)
   const { data: stations = [], isLoading, isError, error } = useFuelPrices(fuelType, districtId, municipalityId)
 
-  const minPrice = stations[0]?.price_eur
-  const maxPrice = stations[stations.length - 1]?.price_eur
-  const avgPrice = stations.length
-    ? stations.reduce((s, x) => s + x.price_eur, 0) / stations.length
+  const sortedStations = useMemo(() => {
+    if (!userLocation) return stations
+    return [...stations].sort(
+      (a, b) => distanceKm(userLocation, a) - distanceKm(userLocation, b),
+    )
+  }, [stations, userLocation])
+
+  const minPrice = sortedStations.length ? Math.min(...sortedStations.map(s => s.price_eur)) : undefined
+  const maxPrice = sortedStations.length ? Math.max(...sortedStations.map(s => s.price_eur)) : undefined
+  const avgPrice = sortedStations.length
+    ? sortedStations.reduce((s, x) => s + x.price_eur, 0) / sortedStations.length
     : null
+
+  useEffect(() => {
+    requestLocation()
+  }, [])
+
+  function requestLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus('unsupported')
+      return
+    }
+
+    setLocationStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+        setLocationStatus('granted')
+        setDistrictId(undefined)
+        setDistrictName('perto de si')
+        setMunicipalityId(undefined)
+      },
+      () => setLocationStatus('denied'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10 * 60 * 1000 },
+    )
+  }
 
   function handleDistrictChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value ? Number(e.target.value) : undefined
@@ -38,6 +91,28 @@ export function Combustivel() {
         <h1 className="text-2xl font-bold text-slate-900">⛽ Preços de Combustível</h1>
         <p className="text-slate-500 text-sm mt-1">Dados DGEG · Atualização diária</p>
       </div>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            {userLocation ? 'A mostrar postos mais próximos da sua localização.' : 'Permita a localização para ver os postos mais próximos.'}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {locationStatus === 'loading' && 'A pedir acesso à localização...'}
+            {locationStatus === 'denied' && 'Localização não autorizada. A usar Lisboa por defeito.'}
+            {locationStatus === 'unsupported' && 'Este dispositivo não suporta localização no browser.'}
+            {locationStatus === 'granted' && 'Pode alterar distrito/município manualmente.'}
+            {locationStatus === 'idle' && 'A localização é usada apenas para ordenar postos por distância.'}
+          </p>
+        </div>
+        <button
+          onClick={requestLocation}
+          className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+        >
+          <Navigation size={14} />
+          Usar localização
+        </button>
+      </Card>
 
       {/* Filters */}
       <Card>
@@ -118,16 +193,16 @@ export function Combustivel() {
         <CardTitle>
           Postos ordenados por preço — {FUEL_LABELS[fuelType]}
           {districtName ? ` · ${districtName}` : ''}
-          {stations.length > 0 ? ` (${stations.length})` : ''}
+          {sortedStations.length > 0 ? ` (${sortedStations.length})` : ''}
         </CardTitle>
         {isLoading && <LoadingBox />}
         {isError && <ErrorBox message={(error as Error).message} />}
         {!isLoading && !isError && (
           <div className="divide-y divide-slate-100">
-            {stations.length === 0 && (
+            {sortedStations.length === 0 && (
               <p className="text-slate-500 text-sm py-6 text-center">Nenhum resultado encontrado.</p>
             )}
-            {stations.map((s, i) => (
+            {sortedStations.map((s, i) => (
               <div key={s.Id} className="flex items-center py-3 gap-3">
                 <span
                   className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
@@ -142,6 +217,11 @@ export function Combustivel() {
                     <MapPin size={11} />
                     {s.Morada} · {s.Municipio}, {s.Distrito}
                   </p>
+                  {userLocation && (
+                    <p className="text-xs text-green-700 font-medium mt-0.5">
+                      {distanceKm(userLocation, s).toFixed(1)} km de distância
+                    </p>
+                  )}
                 </div>
                 <div className="text-right flex-shrink-0 min-w-[90px]">
                   <p
