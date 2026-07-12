@@ -45,7 +45,7 @@ export interface AnpcSummary {
 export function useAnpcIncidents() {
   return useQuery<{ count: number; as_of: string; data: AnpcIncident[] }>({
     queryKey: ['anpc', 'incidents'],
-    queryFn: () => apiFetch('/anpc/incidents/active'),
+    queryFn: () => apiFetch('/anpc/incidents'),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   })

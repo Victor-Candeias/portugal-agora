@@ -42,12 +42,17 @@ export function ProtecaoCivil() {
 
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<string | null>(null)
+  const [showConcluded, setShowConcluded] = useState(false)
 
-  const total = incidents?.count ?? 0
   const asOf = incidents?.as_of ? formatTime(incidents.as_of) : ''
 
   const allIncidents = incidents?.data ?? []
-  const visibleIncidents = allIncidents
+  const activeIncidents = allIncidents.filter(inc => !inc.status.includes('Conclusão'))
+  const concludedIncidents = allIncidents.filter(inc => inc.status.includes('Conclusão'))
+
+  const baseIncidents = showConcluded ? allIncidents : activeIncidents
+
+  const visibleIncidents = baseIncidents
     .filter(inc => !selectedDistrict || inc.location.district === selectedDistrict)
     .filter(inc => !selectedType || inc.type === selectedType)
 
@@ -71,17 +76,31 @@ export function ProtecaoCivil() {
 
       {/* Status banner */}
       {!incLoading && !incError && (
-        <Card className={total > 0 ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'}>
+        <Card className={activeIncidents.length > 0 ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'}>
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{total > 0 ? '🚒' : '✅'}</span>
+            <span className="text-4xl">{activeIncidents.length > 0 ? '🚒' : '✅'}</span>
             <div>
               <p className="font-bold text-lg text-slate-900">
-                {total > 0 ? `${total} ocorrência${total > 1 ? 's' : ''} ativa${total > 1 ? 's' : ''}` : 'Sem ocorrências ativas'}
+                {activeIncidents.length > 0
+                  ? `${activeIncidents.length} ocorrência${activeIncidents.length > 1 ? 's' : ''} ativa${activeIncidents.length > 1 ? 's' : ''}`
+                  : 'Sem ocorrências ativas'}
               </p>
               <p className="text-sm text-slate-600">
-                {total > 0 ? 'Consulte a lista abaixo.' : 'Situação normal em todo o país.'}
+                {activeIncidents.length > 0 ? 'Consulte a lista abaixo.' : 'Situação normal em todo o país.'}
               </p>
             </div>
+            {concludedIncidents.length > 0 && (
+              <button
+                onClick={() => setShowConcluded(v => !v)}
+                className={`ml-auto text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                  showConcluded
+                    ? 'bg-slate-200 border-slate-300 text-slate-700'
+                    : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {showConcluded ? '✓ ' : ''}{concludedIncidents.length} concluída{concludedIncidents.length > 1 ? 's' : ''}
+              </button>
+            )}
           </div>
         </Card>
       )}
@@ -177,7 +196,9 @@ export function ProtecaoCivil() {
               ? `${visibleIncidents.length} ocorrência${visibleIncidents.length !== 1 ? 's' : ''} em ${selectedDistrict}`
               : selectedType
               ? `${visibleIncidents.length} ocorrência${visibleIncidents.length !== 1 ? 's' : ''} · ${selectedType}`
-              : `${incidents!.count} ocorrências ativas agora`}
+              : showConcluded
+              ? `${visibleIncidents.length} ocorrências (incluindo concluídas)`
+              : `${activeIncidents.length} ocorrências ativas agora`}
           </CardTitle>
           <div className="divide-y divide-slate-100">
             {visibleIncidents.map(inc => (
