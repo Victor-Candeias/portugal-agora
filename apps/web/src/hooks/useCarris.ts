@@ -1,148 +1,184 @@
 import { useQuery } from '@tanstack/react-query'
-import JSZip from 'jszip'
-import Papa from 'papaparse'
-import { transit_realtime } from 'gtfs-realtime-bindings'
 
-// ── Endpoints ─────────────────────────────────────────────────────────────
+// ── Base URL ──────────────────────────────────────────────────────────────
+// API has Access-Control-Allow-Origin: * — no proxy needed.
 
-const BASE = import.meta.env.DEV
-  ? '/api/carris'
-  : 'https://corsproxy.io/?url=https://gateway.carris.pt/gateway/gtfs/api/v2.11'
+const BASE_V2 = 'https://api.carrismetropolitana.pt/v2'
+const BASE_V1 = 'https://api.carrismetropolitana.pt/v1'
 
-const GTFS_ZIP_URL = `${BASE}/GTFS`
-const GTFS_RT_URL  = `${BASE}/GTFS/realtime/vehiclepositions`
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Carris API error ${res.status}: ${url}`)
+  return res.json() as Promise<T>
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371
+  const toRad = (v: number) => (v * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-export interface CarrisRoute {
-  route_id: string
-  route_short_name: string
-  route_long_name: string
-  route_type: string
-  route_color: string
-  route_text_color: string
+export interface CMLine {
+  id: string
+  short_name: string
+  long_name: string
+  color: string
+  text_color: string
+  municipality_ids: string[]
+  pattern_ids: string[]
 }
 
-export interface CarrisStop {
-  stop_id: string
-  stop_name: string
-  stop_lat: string
-  stop_lon: string
+export interface CMStop {
+  id: string
+  long_name: string
+  short_name: string | null
+  lat: number
+  lon: number
+  municipality_id: string
+  municipality_name: string
+  locality_name: string
+  line_ids: string[]
+  wheelchair_boarding: boolean
 }
 
-export interface CarrisTrip {
+export interface CMVehicle {
+  id: string
+  line_id: string
+  pattern_id: string
   route_id: string
   trip_id: string
-  trip_headsign: string
-  direction_id: string
-}
-
-export interface CarrisVehicle {
-  id: string
-  label: string
-  tripId: string
-  routeId: string
-  directionId: number
   lat: number
   lon: number
   bearing: number
   speed: number
-  stopId: string
-  currentStopSequence: number
+  stop_id: string
+  current_status: string
   timestamp: number
+  agency_id: string
+  wheelchair_accessible: boolean
+  propulsion: string
 }
 
-// ── GTFS Static ───────────────────────────────────────────────────────────
-
-interface GtfsStatic {
-  routes: CarrisRoute[]
-  stops: CarrisStop[]
-  trips: CarrisTrip[]
+export interface CMRealtime {
+  line_id: string
+  headsign: string
+  pattern_id: string
+  scheduled_arrival: string
+  scheduled_arrival_unix: number
+  estimated_arrival: string | null
+  estimated_arrival_unix: number | null
+  observed_arrival: string | null
+  observed_arrival_unix: number | null
+  vehicle_id: string
 }
 
-async function fetchGtfsStatic(): Promise<GtfsStatic> {
-  const res = await fetch(GTFS_ZIP_URL)
-  if (!res.ok) throw new Error(`Erro ao descarregar GTFS Carris (HTTP ${res.status})`)
-
-  const buffer = await res.arrayBuffer()
-  const zip = await JSZip.loadAsync(buffer)
-
-  async function parseCsv<T>(filename: string): Promise<T[]> {
-    const file = zip.file(filename)
-    if (!file) return []
-    const text = await file.async('text')
-    const { data } = Papa.parse<T>(text, { header: true, skipEmptyLines: true })
-    return data
-  }
-
-  const [routes, stops, trips] = await Promise.all([
-    parseCsv<CarrisRoute>('routes.txt'),
-    parseCsv<CarrisStop>('stops.txt'),
-    parseCsv<CarrisTrip>('trips.txt'),
-  ])
-
-  return { routes, stops, trips }
+export interface CMMunicipality {
+  id: string
+  name: string
 }
 
-export function useCarrisGtfs() {
+// ── Municipalities (derived from stops — endpoint is 404) ─────────────────
+
+export function useCarrisMunicipalities() {
   return useQuery({
-    queryKey: ['carris', 'gtfs-static'],
-    queryFn: fetchGtfsStatic,
+    queryKey: ['cm', 'municipalities'],
+    queryFn: async (): Promise<CMMunicipality[]> => {
+      const stops = await fetchJson<CMStop[]>(`${BASE_V2}/stops`)
+      const map = new Map<string, string>()
+      stops.forEach(s => {
+        if (s.municipality_id && s.municipality_name)
+          map.set(s.municipality_id, s.municipality_name)
+      })
+      return [...map.entries()]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+    },
     staleTime: 24 * 60 * 60 * 1000,
-    retry: 1,
     gcTime: 24 * 60 * 60 * 1000,
+    retry: 1,
   })
 }
 
-// ── GTFS-Realtime vehicle positions ──────────────────────────────────────
+// ── Lines ─────────────────────────────────────────────────────────────────
 
-async function fetchVehiclePositions(): Promise<CarrisVehicle[]> {
-  const res = await fetch(GTFS_RT_URL)
-  if (!res.ok) throw new Error(`Erro ao obter posições Carris (HTTP ${res.status})`)
-
-  const buffer = await res.arrayBuffer()
-  const feed = transit_realtime.FeedMessage.decode(new Uint8Array(buffer))
-
-  const vehicles: CarrisVehicle[] = []
-
-  for (const entity of feed.entity ?? []) {
-    const vp = entity.vehicle
-    if (!vp?.position) continue
-
-    const routeId  = vp.trip?.routeId  ?? ''
-    const tripId   = vp.trip?.tripId   ?? ''
-    const dirId    = vp.trip?.directionId ?? 0
-    const stopId   = vp.stopId         ?? ''
-    const seq      = vp.currentStopSequence ?? 0
-    const ts       = typeof vp.timestamp === 'object'
-      ? Number((vp.timestamp as unknown as { low: number }).low) * 1000
-      : Number(vp.timestamp ?? 0) * 1000
-
-    vehicles.push({
-      id:                  entity.id,
-      label:               vp.vehicle?.label ?? entity.id,
-      tripId,
-      routeId,
-      directionId:         typeof dirId === 'number' ? dirId : Number(dirId),
-      lat:                 vp.position.latitude,
-      lon:                 vp.position.longitude,
-      bearing:             vp.position.bearing ?? 0,
-      speed:               vp.position.speed   ?? 0,
-      stopId,
-      currentStopSequence: typeof seq === 'number' ? seq : Number(seq),
-      timestamp:           ts,
-    })
-  }
-
-  return vehicles
+export function useCarrisLines(municipalityFilter: string | null = null) {
+  return useQuery({
+    queryKey: ['cm', 'lines', municipalityFilter],
+    queryFn: async (): Promise<CMLine[]> => {
+      const lines = await fetchJson<CMLine[]>(`${BASE_V2}/lines`)
+      if (!municipalityFilter) return lines
+      return lines.filter(l => l.municipality_ids.includes(municipalityFilter))
+    },
+    staleTime: 6 * 60 * 60 * 1000,
+    gcTime: 12 * 60 * 60 * 1000,
+    retry: 1,
+  })
 }
 
-export function useCarrisVehicles() {
+// ── Stops ─────────────────────────────────────────────────────────────────
+
+export function useCarrisStops() {
   return useQuery({
-    queryKey: ['carris', 'vehicles'],
-    queryFn: fetchVehiclePositions,
-    staleTime: 20 * 1000,
+    queryKey: ['cm', 'stops'],
+    queryFn: () => fetchJson<CMStop[]>(`${BASE_V2}/stops`),
+    staleTime: 12 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+  })
+}
+
+export function useNearbyStops(lat: number | null, lon: number | null, radiusKm = 0.5) {
+  const { data: stops = [] } = useCarrisStops()
+  if (!lat || !lon) return []
+  return stops
+    .map(s => ({ ...s, distKm: haversineKm(lat, lon, s.lat, s.lon) }))
+    .filter(s => s.distKm <= radiusKm)
+    .sort((a, b) => a.distKm - b.distKm)
+    .slice(0, 20)
+}
+
+// ── Vehicles ──────────────────────────────────────────────────────────────
+
+export function useCarrisVehicles(lineFilter: string | null = null) {
+  return useQuery({
+    queryKey: ['cm', 'vehicles', lineFilter],
+    queryFn: async (): Promise<CMVehicle[]> => {
+      const vehicles = await fetchJson<CMVehicle[]>(`${BASE_V2}/vehicles`)
+      const active = vehicles.filter(v => v.lat && v.lon)
+      if (!lineFilter) return active
+      return active.filter(v => v.line_id === lineFilter)
+    },
+    staleTime: 15 * 1000,
     refetchInterval: 30 * 1000,
     retry: 1,
   })
+}
+
+// ── Realtime arrivals at stop ─────────────────────────────────────────────
+
+export function useStopRealtime(stopId: string | null) {
+  return useQuery({
+    queryKey: ['cm', 'stop-realtime', stopId],
+    queryFn: () => fetchJson<CMRealtime[]>(`${BASE_V1}/stops/${stopId}/realtime`),
+    enabled: Boolean(stopId),
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
+    retry: 1,
+  })
+}
+
+// ── Lines map (id → CMLine) ───────────────────────────────────────────────
+
+export function useCarrisLinesMap() {
+  const { data: lines = [] } = useCarrisLines()
+  return new Map(lines.map(l => [l.id, l]))
 }

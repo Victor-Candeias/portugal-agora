@@ -1,12 +1,15 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, ExternalLink, Navigation, Bus } from 'lucide-react'
 import { Card } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
 import { useTrains, useStations, useTmlAlerts } from '@/hooks/useTransportes'
 import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
-import { useCarrisGtfs, useCarrisVehicles } from '@/hooks/useCarris'
-import type { CarrisVehicle } from '@/hooks/useCarris'
+import {
+  useCarrisVehicles, useCarrisLines, useCarrisLinesMap,
+  useCarrisStops, useNearbyStops, useStopRealtime,
+} from '@/hooks/useCarris'
+import type { CMVehicle, CMStop, CMRealtime } from '@/hooks/useCarris'
 import 'leaflet/dist/leaflet.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -407,157 +410,117 @@ function AlertasTmlTab() {
   )
 }
 
-// ── Carris GTFS tab ───────────────────────────────────────────────────────
+// ── Carris Metropolitana tab ──────────────────────────────────────────────
 
-function useCarrisMap(vehicles: CarrisVehicle[], routeFilter: string | null) {
+// Sub-tab type
+type CarrisSubTab = 'Veículos' | 'Linhas' | 'Paragens perto'
+
+// ── Leaflet map for CM vehicles ───────────────────────────────────────────
+
+function useCMMap(vehicles: CMVehicle[], linesMap: Map<string, { color: string }>) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<import('leaflet').Map | null>(null)
   const markersRef = useRef<import('leaflet').Marker[]>([])
 
   useEffect(() => {
-    let map = mapInstanceRef.current
-    if (!mapRef.current) return
-
-    if (!map) {
-      // Lazy-import Leaflet to avoid SSR issues
-      import('leaflet').then((L) => {
-        // Fix default marker icons
-        ;(L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl = undefined
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        })
-
-        if (!mapRef.current || mapInstanceRef.current) return
-        map = L.map(mapRef.current).setView([38.72, -9.14], 12)
-        mapInstanceRef.current = map
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap',
-          maxZoom: 18,
-        }).addTo(map)
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!mapRef.current || mapInstanceRef.current) return
+    import('leaflet').then((L) => {
+      if (!mapRef.current || mapInstanceRef.current) return
+      const map = L.map(mapRef.current).setView([38.72, -9.14], 11)
+      mapInstanceRef.current = map
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 18,
+      }).addTo(map)
+    })
   }, [])
 
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (!map) return
-
+    if (!map || vehicles.length === 0) return
     import('leaflet').then((L) => {
-      // Remove old markers
       markersRef.current.forEach(m => m.remove())
       markersRef.current = []
 
-      const filtered = routeFilter
-        ? vehicles.filter(v => v.routeId === routeFilter)
-        : vehicles
-
-      filtered.forEach(v => {
+      vehicles.forEach(v => {
+        const color = linesMap.get(v.line_id)?.color ?? '#2563eb'
         const icon = L.divIcon({
           className: '',
-          html: `<div style="
-            background:#2563eb;color:#fff;border-radius:50%;
-            width:28px;height:28px;display:flex;align-items:center;
-            justify-content:center;font-size:10px;font-weight:700;
-            border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);
-            transform:rotate(${v.bearing}deg)
-          ">🚌</div>`,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
+          html: `<div style="background:${color};color:#fff;border-radius:50%;
+            width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+            font-size:10px;font-weight:700;border:2px solid #fff;
+            box-shadow:0 1px 3px rgba(0,0,0,.4)">${v.line_id}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
         })
 
-        const updatedAt = v.timestamp
-          ? new Date(v.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        const ts = v.timestamp
+          ? new Date(v.timestamp * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
           : '—'
 
         const marker = L.marker([v.lat, v.lon], { icon })
-          .bindPopup(`
-            <b>Carreira ${v.routeId || '?'}</b><br/>
-            Veículo: ${v.label}<br/>
-            Destino: ${v.tripId}<br/>
-            Velocidade: ${Math.round(v.speed * 3.6)} km/h<br/>
-            Atualizado: ${updatedAt}
-          `)
+          .bindPopup(`<b>Linha ${v.line_id}</b><br/>ID: ${v.id}<br/>Vel.: ${Math.round(v.speed * 3.6)} km/h<br/>${ts}`)
           .addTo(map)
-
         markersRef.current.push(marker)
       })
     })
-  }, [vehicles, routeFilter])
+  }, [vehicles, linesMap])
 
   return mapRef
 }
 
-function CarrisTab() {
-  const { data: gtfs, isLoading: gtfsLoading, isError: gtfsError } = useCarrisGtfs()
-  const { data: vehicles = [], isLoading: vpLoading, isError: vpError, refetch, dataUpdatedAt } = useCarrisVehicles()
-  const [routeFilter, setRouteFilter] = useState<string | null>(null)
+// ── Veículos sub-tab ──────────────────────────────────────────────────────
+
+function VehiclesSubTab() {
+  const [lineFilter, setLineFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-
-  const routeMap = useMemo(() => {
-    const map = new Map<string, string>()
-    gtfs?.routes.forEach(r => map.set(r.route_id, r.route_short_name || r.route_long_name))
-    return map
-  }, [gtfs])
-
-  const activeRoutes = useMemo(() => {
-    const ids = [...new Set(vehicles.map(v => v.routeId).filter(Boolean))]
-    return ids.sort((a, b) => (a || '').localeCompare(b || '', 'pt', { numeric: true }))
-  }, [vehicles])
+  const { data: allVehicles = [], isLoading, isError, refetch, dataUpdatedAt } = useCarrisVehicles()
+  const linesMap = useCarrisLinesMap()
 
   const filtered = useMemo(
-    () => routeFilter ? vehicles.filter(v => v.routeId === routeFilter) : vehicles,
-    [vehicles, routeFilter],
+    () => lineFilter ? allVehicles.filter(v => v.line_id === lineFilter) : allVehicles,
+    [allVehicles, lineFilter],
   )
+
+  const activeLines = useMemo(() => {
+    const ids = [...new Set(allVehicles.map(v => v.line_id).filter(Boolean))]
+    return ids.sort((a, b) => a.localeCompare(b, 'pt', { numeric: true }))
+  }, [allVehicles])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const handleRouteFilter = (r: string | null) => { setRouteFilter(r); setPage(1) }
+  const handleLineFilter = (id: string | null) => { setLineFilter(id); setPage(1) }
 
-  const mapRef = useCarrisMap(vehicles, routeFilter)
+  const mapRef = useCMMap(filtered.slice(0, 500), linesMap)
 
   const updatedAt = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : null
 
-  if (vpLoading) return <LoadingBox />
-  if (vpError)   return <ErrorBox message="Erro ao obter posições CARRIS (GTFS-Realtime)." />
+  if (isLoading) return <LoadingBox />
+  if (isError)   return <ErrorBox message="Erro ao carregar veículos Carris Metropolitana." />
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          {vehicles.length} veículos ativos · {filtered.length} exibidos
-          {updatedAt && ` · atualizado às ${updatedAt}`} · atualiza a cada 30s
+          {allVehicles.length} veículos · {filtered.length} exibidos{updatedAt && ` · ${updatedAt}`} · 30s
         </p>
         <button onClick={() => refetch()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
 
-      {gtfsError && (
-        <div className="rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2 text-xs">
-          ⚠️ Dados estáticos GTFS indisponíveis — nomes de carreiras podem não aparecer.
-        </div>
-      )}
-
-      {gtfsLoading && (
-        <div className="text-xs text-slate-400 px-1">A carregar dados GTFS (rotas, paragens)…</div>
-      )}
-
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center py-3">
-          <p className="text-xs text-slate-500 mb-1">Veículos</p>
-          <p className="text-2xl font-bold text-blue-600">{vehicles.length}</p>
+          <p className="text-xs text-slate-500 mb-1">Veículos ativos</p>
+          <p className="text-2xl font-bold text-blue-600">{allVehicles.length}</p>
         </Card>
         <Card className="text-center py-3">
-          <p className="text-xs text-slate-500 mb-1">Carreiras</p>
-          <p className="text-2xl font-bold text-green-600">{activeRoutes.length}</p>
+          <p className="text-xs text-slate-500 mb-1">Linhas ativas</p>
+          <p className="text-2xl font-bold text-green-600">{activeLines.length}</p>
         </Card>
         <Card className="text-center py-3">
           <p className="text-xs text-slate-500 mb-1">Filtrados</p>
@@ -565,62 +528,63 @@ function CarrisTab() {
         </Card>
       </div>
 
-      {/* Route filter chips */}
-      <div className="flex flex-wrap gap-2">
+      {/* Line chips */}
+      <div className="flex flex-wrap gap-1.5">
         <button
-          onClick={() => handleRouteFilter(null)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-            !routeFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          onClick={() => handleLineFilter(null)}
+          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+            !lineFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
-          Todos
+          Todas
         </button>
-        {activeRoutes.map(rid => (
-          <button
-            key={rid}
-            onClick={() => handleRouteFilter(routeFilter === rid ? null : rid)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              routeFilter === rid
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {routeMap.get(rid) || rid}
-          </button>
-        ))}
+        {activeLines.map(lid => {
+          const line = linesMap.get(lid)
+          return (
+            <button
+              key={lid}
+              onClick={() => handleLineFilter(lineFilter === lid ? null : lid)}
+              className="px-2.5 py-1 rounded-full text-xs font-semibold text-white transition-opacity hover:opacity-80"
+              style={{ backgroundColor: lineFilter === lid ? (line?.color ?? '#2563eb') : (line?.color ?? '#64748b') }}
+            >
+              {lid}
+            </button>
+          )
+        })}
       </div>
 
       {/* Map */}
-      <div ref={mapRef} className="w-full h-80 rounded-xl border border-slate-200 overflow-hidden" />
+      <div ref={mapRef} className="w-full h-72 rounded-xl border border-slate-200 overflow-hidden" />
 
       {/* Vehicle list */}
       <div className="space-y-2">
         {paginated.map(v => {
-          const routeName = routeMap.get(v.routeId) || v.routeId || '?'
-          const updTime = v.timestamp
-            ? new Date(v.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          const line = linesMap.get(v.line_id)
+          const ts = v.timestamp
+            ? new Date(v.timestamp * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             : '—'
-
           return (
             <Card key={v.id} className="p-3">
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 text-center min-w-[48px]">
-                  <p className="text-base font-bold text-blue-700">{routeName}</p>
-                  <p className="text-[10px] text-slate-400">{v.label}</p>
+                <div
+                  className="flex-shrink-0 rounded-lg px-2 py-1 text-center min-w-[44px]"
+                  style={{ backgroundColor: line?.color ?? '#64748b' }}
+                >
+                  <p className="text-sm font-bold text-white">{v.line_id}</p>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-600 truncate">{v.tripId || '—'}</p>
+                  <p className="text-xs text-slate-600 truncate">{v.trip_id || '—'}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    {Math.round(v.speed * 3.6)} km/h · dir {Math.round(v.bearing)}° · seq {v.currentStopSequence}
+                    {Math.round(v.speed * 3.6)} km/h · {v.current_status.replace('_', ' ')} · {v.propulsion}
+                    {v.wheelchair_accessible && ' · ♿'}
                   </p>
                 </div>
                 <div className="flex-shrink-0 text-right">
-                  <p className="text-[10px] text-slate-400">{updTime}</p>
+                  <p className="text-[10px] text-slate-400">{ts}</p>
                   <a
                     href={`https://www.google.com/maps?q=${v.lat},${v.lon}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-700 font-medium"
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-end gap-1 text-[10px] text-blue-600 hover:text-blue-700 font-medium"
                   >
                     <MapPin size={10} /> Mapa
                   </a>
@@ -633,8 +597,257 @@ function CarrisTab() {
           <p className="text-slate-400 text-sm text-center py-8">Sem veículos ativos.</p>
         )}
       </div>
-
       <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+    </div>
+  )
+}
+
+// ── Linhas sub-tab ────────────────────────────────────────────────────────
+
+function LinesSubTab() {
+  const [muniFilter, setMuniFilter] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const { data: lines = [], isLoading, isError } = useCarrisLines(muniFilter)
+  const { data: allLines = [] } = useCarrisLines(null)
+  const { data: stops = [] } = useCarrisStops()
+
+  // Build municipality id→name map from stops
+  const muniNames = useMemo(() => {
+    const map = new Map<string, string>()
+    stops.forEach(s => { if (s.municipality_id) map.set(s.municipality_id, s.municipality_name) })
+    return map
+  }, [stops])
+
+  const munis = useMemo(() => {
+    const ids = new Set<string>()
+    allLines.forEach(l => l.municipality_ids.forEach(mid => ids.add(mid)))
+    return [...ids].sort((a, b) => (muniNames.get(a) ?? a).localeCompare(muniNames.get(b) ?? b, 'pt'))
+  }, [allLines, muniNames])
+
+  const totalPages = Math.ceil(lines.length / PAGE_SIZE)
+  const paginated  = lines.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  if (isLoading) return <LoadingBox />
+  if (isError)   return <ErrorBox message="Erro ao carregar linhas Carris Metropolitana." />
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-400">{lines.length} linhas</p>
+
+      {/* Municipality filter */}
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          onClick={() => { setMuniFilter(null); setPage(1) }}
+          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+            !muniFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Todos os municípios
+        </button>
+        {munis.map(mid => (
+          <button
+            key={mid}
+            onClick={() => { setMuniFilter(muniFilter === mid ? null : mid); setPage(1) }}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+              muniFilter === mid ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {muniNames.get(mid) ?? mid}
+          </button>
+        ))}
+      </div>
+
+      {/* Lines list */}
+      <div className="space-y-2">
+        {paginated.map(l => (
+          <Card key={l.id} className="p-3">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex-shrink-0 rounded-lg px-2 py-1 text-center min-w-[52px]"
+                style={{ backgroundColor: l.color }}
+              >
+                <p className="text-sm font-bold" style={{ color: l.text_color }}>{l.short_name}</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-800 truncate">{l.long_name}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  {l.municipality_ids.length} município{l.municipality_ids.length !== 1 ? 's' : ''} ·{' '}
+                  {l.pattern_ids.length} percurso{l.pattern_ids.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {lines.length === 0 && (
+          <p className="text-slate-400 text-sm text-center py-8">Sem linhas.</p>
+        )}
+      </div>
+      <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+    </div>
+  )
+}
+
+// ── Realtime arrivals for a stop ──────────────────────────────────────────
+
+function StopArrivals({ stop }: { stop: CMStop }) {
+  const { data: arrivals = [], isLoading } = useStopRealtime(stop.id)
+  const linesMap = useCarrisLinesMap()
+
+  function formatArrival(unix: number | null) {
+    if (!unix) return '—'
+    return new Date(unix * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{stop.long_name}</p>
+      {isLoading && <p className="text-xs text-slate-400">A carregar chegadas…</p>}
+      {!isLoading && arrivals.length === 0 && (
+        <p className="text-xs text-slate-400">Sem chegadas previstas.</p>
+      )}
+      {arrivals.slice(0, 5).map((a, idx) => {
+        const line = linesMap.get(a.line_id)
+        const planned = formatArrival(a.scheduled_arrival_unix)
+        const estimated = formatArrival(a.estimated_arrival_unix ?? a.observed_arrival_unix)
+        const isLate = a.estimated_arrival_unix && a.scheduled_arrival_unix &&
+          (a.estimated_arrival_unix - a.scheduled_arrival_unix) > 60
+        return (
+          <div key={idx} className="flex items-center gap-2 text-xs">
+            <span
+              className="px-1.5 py-0.5 rounded text-white font-bold flex-shrink-0"
+              style={{ backgroundColor: line?.color ?? '#64748b' }}
+            >
+              {a.line_id}
+            </span>
+            <span className="flex-1 truncate text-slate-700">{a.headsign}</span>
+            <span className="flex-shrink-0 tabular-nums text-slate-500">{planned}</span>
+            {estimated !== planned && (
+              <span className={`flex-shrink-0 tabular-nums font-semibold ${isLate ? 'text-red-600' : 'text-green-600'}`}>
+                {estimated}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Paragens perto sub-tab ────────────────────────────────────────────────
+
+function NearbyStopsSubTab() {
+  const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(null)
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'ok'>('idle')
+  const [selectedStop, setSelectedStop] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const { isLoading: stopsLoading } = useCarrisStops()
+
+  const nearbyStops = useNearbyStops(userPos?.lat ?? null, userPos?.lon ?? null)
+
+  const totalPages = Math.ceil(nearbyStops.length / PAGE_SIZE)
+  const paginated  = nearbyStops.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function requestLocation() {
+    if (!navigator.geolocation) { setLocationStatus('denied'); return }
+    setLocationStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      pos => { setUserPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setLocationStatus('ok') },
+      ()  => setLocationStatus('denied'),
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {locationStatus !== 'ok' && (
+        <Card className="text-center py-6">
+          <p className="text-slate-500 text-sm mb-3">Encontra paragens próximas da tua localização.</p>
+          <button
+            onClick={requestLocation}
+            disabled={locationStatus === 'loading'}
+            className="flex items-center gap-2 mx-auto px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            <MapPin size={16} />
+            {locationStatus === 'loading' ? 'A obter localização…' : 'Usar localização'}
+          </button>
+          {locationStatus === 'denied' && (
+            <p className="text-xs text-red-500 mt-2">Localização negada ou não disponível.</p>
+          )}
+        </Card>
+      )}
+
+      {locationStatus === 'ok' && stopsLoading && <LoadingBox />}
+
+      {locationStatus === 'ok' && !stopsLoading && (
+        <>
+          <p className="text-xs text-slate-400">
+            {nearbyStops.length} paragens num raio de 500 m
+          </p>
+          <div className="space-y-2">
+            {paginated.map(s => (
+              <Card key={s.id} className="p-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStop(selectedStop === s.id ? null : s.id)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{s.long_name}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {s.municipality_name} · {s.locality_name} · {(s as CMStop & { distKm: number }).distKm.toFixed(0) === '0' ? '<1' : ((s as CMStop & { distKm: number }).distKm * 1000).toFixed(0)} m
+                        {s.wheelchair_boarding && ' · ♿'}
+                      </p>
+                    </div>
+                    <ChevronDown
+                      size={16}
+                      className={`flex-shrink-0 text-slate-400 transition-transform ${selectedStop === s.id ? 'rotate-180' : ''}`}
+                    />
+                  </div>
+                </button>
+                {selectedStop === s.id && <StopArrivals stop={s} />}
+              </Card>
+            ))}
+            {nearbyStops.length === 0 && (
+              <p className="text-slate-400 text-sm text-center py-8">Sem paragens próximas encontradas.</p>
+            )}
+          </div>
+          <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Carris Metropolitana main tab ─────────────────────────────────────────
+
+const CARRIS_SUBTABS: CarrisSubTab[] = ['Veículos', 'Linhas', 'Paragens perto']
+
+function CarrisTab() {
+  const [sub, setSub] = useState<CarrisSubTab>('Veículos')
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tab bar */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {CARRIS_SUBTABS.map(t => (
+          <button
+            key={t}
+            onClick={() => setSub(t)}
+            className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors -mb-px ${
+              sub === t
+                ? 'border-blue-500 text-blue-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {sub === 'Veículos'       && <VehiclesSubTab />}
+      {sub === 'Linhas'         && <LinesSubTab />}
+      {sub === 'Paragens perto' && <NearbyStopsSubTab />}
     </div>
   )
 }
