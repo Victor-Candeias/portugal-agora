@@ -31,7 +31,7 @@ export function Layout() {
       <header className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2">
           <span className="text-2xl">🇵🇹</span>
-          <span className="font-bold text-lg text-green-700">Portugal Hoje</span>
+          <span className="font-bold text-lg text-green-700">Portugal-Hoje</span>
         </div>
       </header>
 
