@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapPin, Navigation } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
+import { Pagination } from '@/components/Pagination'
 import { useFuelPrices } from '@/hooks/useFuel'
 import { useDistricts, useMunicipalities } from '@/hooks/useGeo'
 import { formatPrice, FUEL_LABELS, FUEL_COLORS, type FuelType } from '@portugal-hoje/core'
 
 const FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel', 'diesel_plus', 'lpg']
+const PAGE_SIZE = 20
 
 type UserLocation = {
   latitude: number
@@ -32,6 +34,7 @@ export function Combustivel() {
   const [municipalityId, setMunicipalityId] = useState<number | undefined>(undefined)
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
+  const [page, setPage] = useState(1)
 
   const { data: districts, isLoading: loadingDistricts } = useDistricts()
   const { data: municipalities } = useMunicipalities(districtId)
@@ -49,6 +52,9 @@ export function Combustivel() {
   const avgPrice = sortedStations.length
     ? sortedStations.reduce((s, x) => s + x.price_eur, 0) / sortedStations.length
     : null
+
+  const totalPages   = Math.ceil(sortedStations.length / PAGE_SIZE)
+  const pageStations = sortedStations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   useEffect(() => {
     requestLocation()
@@ -83,6 +89,7 @@ export function Combustivel() {
     setDistrictId(id)
     setDistrictName(id ? name : '')
     setMunicipalityId(undefined)
+    setPage(1)
   }
 
   return (
@@ -123,7 +130,7 @@ export function Combustivel() {
               {FUEL_TYPES.map(ft => (
                 <button
                   key={ft}
-                  onClick={() => setFuelType(ft)}
+                  onClick={() => { setFuelType(ft); setPage(1) }}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     fuelType === ft
                       ? 'text-white shadow'
@@ -156,7 +163,7 @@ export function Combustivel() {
                 <label className="block text-xs font-medium text-slate-500 mb-1">Município</label>
                 <select
                   value={municipalityId ?? ''}
-                  onChange={e => setMunicipalityId(e.target.value ? Number(e.target.value) : undefined)}
+                  onChange={e => { setMunicipalityId(e.target.value ? Number(e.target.value) : undefined); setPage(1) }}
                   className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white"
                 >
                   <option value="">Todos os municípios</option>
@@ -198,56 +205,62 @@ export function Combustivel() {
         {isLoading && <LoadingBox />}
         {isError && <ErrorBox message={(error as Error).message} />}
         {!isLoading && !isError && (
-          <div className="divide-y divide-slate-100">
-            {sortedStations.length === 0 && (
-              <p className="text-slate-500 text-sm py-6 text-center">Nenhum resultado encontrado.</p>
-            )}
-            {sortedStations.map((s, i) => (
-              <div key={s.Id} className="flex items-center py-3 gap-3">
-                <span
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                  style={{ backgroundColor: i === 0 ? '#16a34a' : i === 1 ? '#65a30d' : '#94a3b8' }}
-                >
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900 text-sm truncate">{s.Nome}</p>
-                  <p className="text-xs text-slate-400">{s.Marca}</p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1">
-                    <MapPin size={11} />
-                    {s.Morada} · {s.Municipio}, {s.Distrito}
-                  </p>
-                  {userLocation && (
-                    <p className="text-xs text-green-700 font-medium mt-0.5">
-                      {distanceKm(userLocation, s).toFixed(1)} km de distância
-                    </p>
-                  )}
-                </div>
-                <div className="text-right flex-shrink-0 min-w-[90px]">
-                  <p
-                    className="text-lg font-bold tabular-nums"
-                    style={{ color: i === 0 ? '#16a34a' : '#0f172a' }}
+          <>
+            <div className="divide-y divide-slate-100">
+              {sortedStations.length === 0 && (
+                <p className="text-slate-500 text-sm py-6 text-center">Nenhum resultado encontrado.</p>
+              )}
+              {pageStations.map((s, i) => {
+                const globalIndex = (page - 1) * PAGE_SIZE + i
+                return (
+                <div key={s.Id} className="flex items-center py-3 gap-3">
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ backgroundColor: globalIndex === 0 ? '#16a34a' : globalIndex === 1 ? '#65a30d' : '#94a3b8' }}
                   >
-                    {formatPrice(s.price_eur)}
-                  </p>
-                  {minPrice && i > 0 && (
-                    <p className="text-xs text-red-500 tabular-nums">
-                      +{formatPrice(s.price_eur - minPrice)}
+                    {globalIndex + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900 text-sm truncate">{s.Nome}</p>
+                    <p className="text-xs text-slate-400">{s.Marca}</p>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <MapPin size={11} />
+                      {s.Morada} · {s.Municipio}, {s.Distrito}
                     </p>
-                  )}
+                    {userLocation && (
+                      <p className="text-xs text-green-700 font-medium mt-0.5">
+                        {distanceKm(userLocation, s).toFixed(1)} km de distância
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0 min-w-[90px]">
+                    <p
+                      className="text-lg font-bold tabular-nums"
+                      style={{ color: globalIndex === 0 ? '#16a34a' : '#0f172a' }}
+                    >
+                      {formatPrice(s.price_eur)}
+                    </p>
+                    {minPrice && globalIndex > 0 && (
+                      <p className="text-xs text-red-500 tabular-nums">
+                        +{formatPrice(s.price_eur - minPrice)}
+                      </p>
+                    )}
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${s.Latitude},${s.Longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
+                    title="Navegar"
+                  >
+                    <Navigation size={14} className="text-slate-600" />
+                  </a>
                 </div>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${s.Latitude},${s.Longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
-                  title="Navegar"
-                >
-                  <Navigation size={14} className="text-slate-600" />
-                </a>
-              </div>
-            ))}
-          </div>
+                )
+              })}
+            </div>
+            <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+          </>
         )}
       </Card>
     </div>

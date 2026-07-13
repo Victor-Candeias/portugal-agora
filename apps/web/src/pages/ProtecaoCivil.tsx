@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
+import { Pagination } from '@/components/Pagination'
 import { useAnpcIncidents, useAnpcSummary } from '@/hooks/useANPC'
+
+const PAGE_SIZE = 20
 
 const TYPE_EMOJI: Record<string, string> = {
   'Mato':                   '🔥',
@@ -43,6 +46,7 @@ export function ProtecaoCivil() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<string | null>(null)
   const [showConcluded, setShowConcluded] = useState(false)
+  const [page, setPage] = useState(1)
 
   const asOf = incidents?.as_of ? formatTime(incidents.as_of) : ''
 
@@ -55,6 +59,11 @@ export function ProtecaoCivil() {
   const visibleIncidents = baseIncidents
     .filter(inc => !selectedDistrict || inc.location.district === selectedDistrict)
     .filter(inc => !selectedType || inc.type === selectedType)
+
+  const totalPages      = Math.ceil(visibleIncidents.length / PAGE_SIZE)
+  const pageIncidents   = visibleIncidents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function resetPage() { setPage(1) }
 
   return (
     <div className="space-y-6">
@@ -91,7 +100,7 @@ export function ProtecaoCivil() {
             </div>
             {concludedIncidents.length > 0 && (
               <button
-                onClick={() => setShowConcluded(v => !v)}
+                onClick={() => { setShowConcluded(v => !v); resetPage() }}
                 className={`ml-auto text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
                   showConcluded
                     ? 'bg-slate-200 border-slate-300 text-slate-700'
@@ -126,7 +135,7 @@ export function ProtecaoCivil() {
               return (
                 <button
                   key={d.district}
-                  onClick={() => { setSelectedDistrict(isSelected ? null : d.district); setSelectedType(null) }}
+                  onClick={() => { setSelectedDistrict(isSelected ? null : d.district); setSelectedType(null); resetPage() }}
                   className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors text-left w-full border ${
                     isSelected
                       ? 'bg-orange-600 border-orange-600 text-white'
@@ -168,7 +177,7 @@ export function ProtecaoCivil() {
               return (
                 <button
                   key={t.type}
-                  onClick={() => { setSelectedType(isSelected ? null : t.type); setSelectedDistrict(null) }}
+                  onClick={() => { setSelectedType(isSelected ? null : t.type); setSelectedDistrict(null); resetPage() }}
                   className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border transition-colors ${
                     isSelected
                       ? 'bg-slate-700 border-slate-700 text-white'
@@ -201,7 +210,7 @@ export function ProtecaoCivil() {
               : `${activeIncidents.length} ocorrências ativas agora`}
           </CardTitle>
           <div className="divide-y divide-slate-100">
-            {visibleIncidents.map(inc => (
+            {pageIncidents.map(inc => (
               <div key={inc.id} className="py-4 flex gap-3">
                 <span className="text-2xl flex-shrink-0 mt-0.5">{getEmoji(inc.type)}</span>
                 <div className="flex-1 min-w-0">
@@ -232,6 +241,7 @@ export function ProtecaoCivil() {
               </div>
             ))}
           </div>
+          <Pagination page={page} totalPages={totalPages} onPage={setPage} />
         </Card>
       )}
     </div>

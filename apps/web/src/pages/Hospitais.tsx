@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { MapPin, Phone, Mail, Activity, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MapPin, Phone, Mail, Activity, ChevronDown } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
+import { Pagination } from '@/components/Pagination'
 import { useHospitaisValencias } from '@/hooks/useHospitais'
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = 20
 
 const TIPO_COLOR: Record<string, string> = {
   'Serviço de Urgência Básica':                           'bg-blue-100 text-blue-800',
@@ -214,44 +215,7 @@ export function Hospitais() {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-5">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                  .reduce<(number | '…')[]>((acc, p, i, arr) => {
-                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
-                    acc.push(p)
-                    return acc
-                  }, [])
-                  .map((p, i) =>
-                    p === '…'
-                      ? <span key={`ellipsis-${i}`} className="px-1 text-slate-400 text-sm">…</span>
-                      : <button
-                          key={p}
-                          onClick={() => setPage(p as number)}
-                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                            page === p
-                              ? 'bg-blue-600 text-white'
-                              : 'border border-slate-200 hover:bg-slate-50 text-slate-600'
-                          }`}
-                        >{p}</button>
-                  )}
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
+            <Pagination page={page} totalPages={totalPages} onPage={setPage} />
           </>
         )}
       </Card>

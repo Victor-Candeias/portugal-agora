@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, ExternalLink, Navigation, Bus } from 'lucide-react'
 import { Card } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
+import { Pagination } from '@/components/Pagination'
 import { useTrains, useStations, useTmlAlerts } from '@/hooks/useTransportes'
 import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
 import { useCarrisGtfs, useCarrisVehicles } from '@/hooks/useCarris'
@@ -156,7 +157,7 @@ function TrainDetails({ train, stations }: { train: Train; stations: Map<string,
 
 // ── Comboios tab ──────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = 20
 
 function ComboiosTab() {
   const { data: trains = [], isLoading, isError, refetch, dataUpdatedAt } = useTrains()
@@ -307,36 +308,7 @@ function ComboiosTab() {
         })}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-1 flex-wrap">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40"
-          >
-            ‹
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-            <button
-              key={n}
-              onClick={() => setPage(n)}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                n === page ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40"
-          >
-            ›
-          </button>
-        </div>
-      )}
+      <Pagination page={page} totalPages={totalPages} onPage={setPage} />
     </div>
   )
 }
@@ -522,6 +494,7 @@ function CarrisTab() {
   const { data: gtfs, isLoading: gtfsLoading, isError: gtfsError } = useCarrisGtfs()
   const { data: vehicles = [], isLoading: vpLoading, isError: vpError, refetch, dataUpdatedAt } = useCarrisVehicles()
   const [routeFilter, setRouteFilter] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const routeMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -538,6 +511,11 @@ function CarrisTab() {
     () => routeFilter ? vehicles.filter(v => v.routeId === routeFilter) : vehicles,
     [vehicles, routeFilter],
   )
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const handleRouteFilter = (r: string | null) => { setRouteFilter(r); setPage(1) }
 
   const mapRef = useCarrisMap(vehicles, routeFilter)
 
@@ -590,7 +568,7 @@ function CarrisTab() {
       {/* Route filter chips */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => setRouteFilter(null)}
+          onClick={() => handleRouteFilter(null)}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
             !routeFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
@@ -600,7 +578,7 @@ function CarrisTab() {
         {activeRoutes.map(rid => (
           <button
             key={rid}
-            onClick={() => setRouteFilter(routeFilter === rid ? null : rid)}
+            onClick={() => handleRouteFilter(routeFilter === rid ? null : rid)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               routeFilter === rid
                 ? 'bg-blue-600 text-white'
@@ -617,7 +595,7 @@ function CarrisTab() {
 
       {/* Vehicle list */}
       <div className="space-y-2">
-        {filtered.slice(0, 50).map(v => {
+        {paginated.map(v => {
           const routeName = routeMap.get(v.routeId) || v.routeId || '?'
           const updTime = v.timestamp
             ? new Date(v.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -651,15 +629,12 @@ function CarrisTab() {
             </Card>
           )
         })}
-        {filtered.length > 50 && (
-          <p className="text-xs text-slate-400 text-center py-2">
-            A mostrar 50 de {filtered.length} veículos. Filtra por carreira para ver todos.
-          </p>
-        )}
         {filtered.length === 0 && (
           <p className="text-slate-400 text-sm text-center py-8">Sem veículos ativos.</p>
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} onPage={setPage} />
     </div>
   )
 }
