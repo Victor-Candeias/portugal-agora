@@ -1,8 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 50" role="img" aria-label="Bandeira de Portugal">
-  <rect width="28" height="50" fill="#046a38"/>
-  <rect x="28" width="42" height="50" fill="#da291c"/>
-  <circle cx="28" cy="25" r="10" fill="#ffcd00"/>
-  <circle cx="28" cy="25" r="7.5" fill="#fff"/>
-  <path fill="#da291c" d="M23 18.5h10v8c0 4-5 6-5 6s-5-2-5-6z"/>
-  <path fill="#0032a0" d="M25 21h2v2h-2zm4 0h2v2h-2zm-4 4h2v2h-2zm4 0h2v2h-2zm-2 4h2v2h-2z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Bandeira de Portugal">
+  <!-- square canvas: green strip (40%), red strip (60%) -->
+  <rect width="40" height="100" fill="#046a38"/>
+  <rect x="40" width="60" height="100" fill="#da291c"/>
+  <!-- coat-of-arms: yellow ring + white circle -->
+  <circle cx="40" cy="50" r="18" fill="#ffcd00"/>
+  <circle cx="40" cy="50" r="13.5" fill="#fff"/>
+  <!-- shield -->
+  <path fill="#da291c" d="M31 39h18v14c0 7-9 11-9 11s-9-4-9-11z"/>
+  <!-- blue quinas (5 dots) -->
+  <rect x="37" y="43" width="3.5" height="3.5" fill="#0032a0"/>
+  <rect x="43" y="43" width="3.5" height="3.5" fill="#0032a0"/>
+  <rect x="37" y="49" width="3.5" height="3.5" fill="#0032a0"/>
+  <rect x="43" y="49" width="3.5" height="3.5" fill="#0032a0"/>
+  <rect x="40" y="55" width="3.5" height="3.5" fill="#0032a0"/>
 </svg>

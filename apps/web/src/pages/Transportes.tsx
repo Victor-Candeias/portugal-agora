@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react'
-import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, ExternalLink, Navigation } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, ExternalLink, Navigation, Bus } from 'lucide-react'
 import { Card } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { useTrains, useStations, useTmlAlerts } from '@/hooks/useTransportes'
 import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
+import { useCarrisGtfs, useCarrisVehicles } from '@/hooks/useCarris'
+import type { CarrisVehicle } from '@/hooks/useCarris'
+import 'leaflet/dist/leaflet.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -432,9 +435,238 @@ function AlertasTmlTab() {
   )
 }
 
+// ── Carris GTFS tab ───────────────────────────────────────────────────────
+
+function useCarrisMap(vehicles: CarrisVehicle[], routeFilter: string | null) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<import('leaflet').Map | null>(null)
+  const markersRef = useRef<import('leaflet').Marker[]>([])
+
+  useEffect(() => {
+    let map = mapInstanceRef.current
+    if (!mapRef.current) return
+
+    if (!map) {
+      // Lazy-import Leaflet to avoid SSR issues
+      import('leaflet').then((L) => {
+        // Fix default marker icons
+        ;(L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl = undefined
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        })
+
+        if (!mapRef.current || mapInstanceRef.current) return
+        map = L.map(mapRef.current).setView([38.72, -9.14], 12)
+        mapInstanceRef.current = map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap',
+          maxZoom: 18,
+        }).addTo(map)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map) return
+
+    import('leaflet').then((L) => {
+      // Remove old markers
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
+
+      const filtered = routeFilter
+        ? vehicles.filter(v => v.routeId === routeFilter)
+        : vehicles
+
+      filtered.forEach(v => {
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="
+            background:#2563eb;color:#fff;border-radius:50%;
+            width:28px;height:28px;display:flex;align-items:center;
+            justify-content:center;font-size:10px;font-weight:700;
+            border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);
+            transform:rotate(${v.bearing}deg)
+          ">🚌</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        })
+
+        const updatedAt = v.timestamp
+          ? new Date(v.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          : '—'
+
+        const marker = L.marker([v.lat, v.lon], { icon })
+          .bindPopup(`
+            <b>Carreira ${v.routeId || '?'}</b><br/>
+            Veículo: ${v.label}<br/>
+            Destino: ${v.tripId}<br/>
+            Velocidade: ${Math.round(v.speed * 3.6)} km/h<br/>
+            Atualizado: ${updatedAt}
+          `)
+          .addTo(map)
+
+        markersRef.current.push(marker)
+      })
+    })
+  }, [vehicles, routeFilter])
+
+  return mapRef
+}
+
+function CarrisTab() {
+  const { data: gtfs, isLoading: gtfsLoading, isError: gtfsError } = useCarrisGtfs()
+  const { data: vehicles = [], isLoading: vpLoading, isError: vpError, refetch, dataUpdatedAt } = useCarrisVehicles()
+  const [routeFilter, setRouteFilter] = useState<string | null>(null)
+
+  const routeMap = useMemo(() => {
+    const map = new Map<string, string>()
+    gtfs?.routes.forEach(r => map.set(r.route_id, r.route_short_name || r.route_long_name))
+    return map
+  }, [gtfs])
+
+  const activeRoutes = useMemo(() => {
+    const ids = [...new Set(vehicles.map(v => v.routeId).filter(Boolean))]
+    return ids.sort((a, b) => (a || '').localeCompare(b || '', 'pt', { numeric: true }))
+  }, [vehicles])
+
+  const filtered = useMemo(
+    () => routeFilter ? vehicles.filter(v => v.routeId === routeFilter) : vehicles,
+    [vehicles, routeFilter],
+  )
+
+  const mapRef = useCarrisMap(vehicles, routeFilter)
+
+  const updatedAt = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null
+
+  if (vpLoading) return <LoadingBox />
+  if (vpError)   return <ErrorBox message="Erro ao obter posições CARRIS (GTFS-Realtime)." />
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-400">
+          {vehicles.length} veículos ativos · {filtered.length} exibidos
+          {updatedAt && ` · atualizado às ${updatedAt}`} · atualiza a cada 30s
+        </p>
+        <button onClick={() => refetch()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+          <RefreshCw size={12} /> Atualizar
+        </button>
+      </div>
+
+      {gtfsError && (
+        <div className="rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2 text-xs">
+          ⚠️ Dados estáticos GTFS indisponíveis — nomes de carreiras podem não aparecer.
+        </div>
+      )}
+
+      {gtfsLoading && (
+        <div className="text-xs text-slate-400 px-1">A carregar dados GTFS (rotas, paragens)…</div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="text-center py-3">
+          <p className="text-xs text-slate-500 mb-1">Veículos</p>
+          <p className="text-2xl font-bold text-blue-600">{vehicles.length}</p>
+        </Card>
+        <Card className="text-center py-3">
+          <p className="text-xs text-slate-500 mb-1">Carreiras</p>
+          <p className="text-2xl font-bold text-green-600">{activeRoutes.length}</p>
+        </Card>
+        <Card className="text-center py-3">
+          <p className="text-xs text-slate-500 mb-1">Filtrados</p>
+          <p className="text-2xl font-bold text-slate-700">{filtered.length}</p>
+        </Card>
+      </div>
+
+      {/* Route filter chips */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setRouteFilter(null)}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+            !routeFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Todos
+        </button>
+        {activeRoutes.map(rid => (
+          <button
+            key={rid}
+            onClick={() => setRouteFilter(routeFilter === rid ? null : rid)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              routeFilter === rid
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {routeMap.get(rid) || rid}
+          </button>
+        ))}
+      </div>
+
+      {/* Map */}
+      <div ref={mapRef} className="w-full h-80 rounded-xl border border-slate-200 overflow-hidden" />
+
+      {/* Vehicle list */}
+      <div className="space-y-2">
+        {filtered.slice(0, 50).map(v => {
+          const routeName = routeMap.get(v.routeId) || v.routeId || '?'
+          const updTime = v.timestamp
+            ? new Date(v.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : '—'
+
+          return (
+            <Card key={v.id} className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 text-center min-w-[48px]">
+                  <p className="text-base font-bold text-blue-700">{routeName}</p>
+                  <p className="text-[10px] text-slate-400">{v.label}</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-600 truncate">{v.tripId || '—'}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {Math.round(v.speed * 3.6)} km/h · dir {Math.round(v.bearing)}° · seq {v.currentStopSequence}
+                  </p>
+                </div>
+                <div className="flex-shrink-0 text-right">
+                  <p className="text-[10px] text-slate-400">{updTime}</p>
+                  <a
+                    href={`https://www.google.com/maps?q=${v.lat},${v.lon}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    <MapPin size={10} /> Mapa
+                  </a>
+                </div>
+              </div>
+            </Card>
+          )
+        })}
+        {filtered.length > 50 && (
+          <p className="text-xs text-slate-400 text-center py-2">
+            A mostrar 50 de {filtered.length} veículos. Filtra por carreira para ver todos.
+          </p>
+        )}
+        {filtered.length === 0 && (
+          <p className="text-slate-400 text-sm text-center py-8">Sem veículos ativos.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────
 
-const TABS = ['Comboios CP', 'Alertas TML'] as const
+const TABS = ['Comboios CP', 'Carris', 'Alertas TML'] as const
 type Tab = typeof TABS[number]
 
 export function Transportes() {
@@ -444,7 +676,7 @@ export function Transportes() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">🚆 Transportes</h1>
-        <p className="text-slate-500 text-sm mt-1">Comboios CP em tempo real · Alertas TML Lisboa/Setúbal</p>
+        <p className="text-slate-500 text-sm mt-1">Comboios CP em tempo real · Carris GTFS · Alertas TML Lisboa/Setúbal</p>
       </div>
 
       <div className="flex gap-2 border-b border-slate-200">
@@ -458,13 +690,16 @@ export function Transportes() {
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
             }`}
           >
-            {t === 'Comboios CP' ? <TrainIcon size={15} /> : <AlertTriangle size={15} />}
+            {t === 'Comboios CP' && <TrainIcon size={15} />}
+            {t === 'Carris'      && <Bus size={15} />}
+            {t === 'Alertas TML' && <AlertTriangle size={15} />}
             {t}
           </button>
         ))}
       </div>
 
       {active === 'Comboios CP' && <ComboiosTab />}
+      {active === 'Carris'      && <CarrisTab />}
       {active === 'Alertas TML' && <AlertasTmlTab />}
     </div>
   )

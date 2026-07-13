@@ -19,6 +19,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/comboios/, ''),
       },
+      '/api/carris': {
+        target: 'https://gateway.carris.pt/gateway/gtfs/api/v2.11',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/carris/, ''),
+      },
     },
   },
 })

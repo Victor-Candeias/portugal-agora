@@ -18,4 +18,5 @@ status: active
 |---|---|---|---|---|---|---|---|---|
 | AA-001 | App Android Auto — Portugal Hoje | done | 2026-07-12 | developer | high | 2026-07-12 |  | [AA-001](../specs/mobile/aa-001-spec.md) |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |
+| WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high |  |  |  |
 <!-- /maestru:work-items-list -->
