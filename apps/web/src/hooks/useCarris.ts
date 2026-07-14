@@ -48,6 +48,8 @@ export interface CMStop {
   locality_name: string
   line_ids: string[]
   wheelchair_boarding: boolean
+  facilities: string[]
+  operational_status: string
 }
 
 export interface CMVehicle {
@@ -72,6 +74,9 @@ export interface CMRealtime {
   line_id: string
   headsign: string
   pattern_id: string
+  route_id?: string
+  trip_id?: string
+  stop_sequence?: number
   scheduled_arrival: string
   scheduled_arrival_unix: number
   estimated_arrival: string | null
@@ -119,12 +124,43 @@ export function useCarrisLines(municipalityFilter: string | null = null) {
   })
 }
 
-// ── Stops ─────────────────────────────────────────────────────────────────
+// ── Stops (v1 has richer data: operational_status, facilities — v2 lacks these) ─
+
+interface V1Stop {
+  id: string
+  name: string
+  short_name: string | null
+  lat: string
+  lon: string
+  municipality_id: string
+  municipality_name: string
+  locality: string
+  lines: string[]
+  wheelchair_boarding: string
+  facilities: string[]
+  operational_status: string
+}
 
 export function useCarrisStops() {
   return useQuery({
     queryKey: ['cm', 'stops'],
-    queryFn: () => fetchJson<CMStop[]>(`${BASE_V2}/stops`),
+    queryFn: async (): Promise<CMStop[]> => {
+      const stops = await fetchJson<V1Stop[]>(`${BASE_V1}/stops`)
+      return stops.map(s => ({
+        id: s.id,
+        long_name: s.name,
+        short_name: s.short_name,
+        lat: parseFloat(s.lat),
+        lon: parseFloat(s.lon),
+        municipality_id: s.municipality_id,
+        municipality_name: s.municipality_name,
+        locality_name: s.locality,
+        line_ids: s.lines,
+        wheelchair_boarding: s.wheelchair_boarding === '1',
+        facilities: s.facilities ?? [],
+        operational_status: s.operational_status,
+      }))
+    },
     staleTime: 12 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     retry: 1,
@@ -135,6 +171,7 @@ export function useNearbyStops(lat: number | null, lon: number | null, radiusKm 
   const { data: stops = [] } = useCarrisStops()
   if (!lat || !lon) return []
   return stops
+    .filter(s => s.operational_status === 'ACTIVE')
     .map(s => ({ ...s, distKm: haversineKm(lat, lon, s.lat, s.lon) }))
     .filter(s => s.distKm <= radiusKm)
     .sort((a, b) => a.distKm - b.distKm)
@@ -158,12 +195,13 @@ export function useCarrisVehicles(lineFilter: string | null = null) {
   })
 }
 
-// ── Realtime arrivals at stop ─────────────────────────────────────────────
+// ── Realtime arrivals at stop (v2 arrivals endpoint — fixes malformed trip_id
+// that v1's /stops/{id}/realtime returns) ──────────────────────────────────
 
 export function useStopRealtime(stopId: string | null) {
   return useQuery({
     queryKey: ['cm', 'stop-realtime', stopId],
-    queryFn: () => fetchJson<CMRealtime[]>(`${BASE_V1}/stops/${stopId}/realtime`),
+    queryFn: () => fetchJson<CMRealtime[]>(`${BASE_V2}/arrivals/by_stop/${stopId}`),
     enabled: Boolean(stopId),
     staleTime: 15 * 1000,
     refetchInterval: 30 * 1000,

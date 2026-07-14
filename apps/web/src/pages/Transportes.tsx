@@ -824,6 +824,10 @@ function NearbyStopsSubTab() {
                       <p className="text-[10px] text-slate-400 mt-0.5">
                         {s.municipality_name} · {s.locality_name} · {(s as CMStop & { distKm: number }).distKm.toFixed(0) === '0' ? '<1' : ((s as CMStop & { distKm: number }).distKm * 1000).toFixed(0)} m
                         {s.wheelchair_boarding && ' · ♿'}
+                        {s.facilities.includes('train') && ' · 🚆'}
+                        {s.facilities.includes('subway') && ' · 🚇'}
+                        {s.facilities.includes('light_rail') && ' · 🚊'}
+                        {s.facilities.includes('boat') && ' · ⛴️'}
                       </p>
                     </div>
                     <ChevronDown
