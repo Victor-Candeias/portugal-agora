@@ -1,31 +1,61 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { Navigation } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { useDistricts, useMunicipalities } from '@/hooks/useGeo'
 import { useOpenMeteoGeocode, useOpenMeteoForecast } from '@/hooks/useOpenMeteo'
+
+const DEFAULT_DISTRICT_ID = 11 // Lisboa
+const DEFAULT_MUNICIPALITY_NAME = 'Lisboa'
 
 function windDirLabel(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
   return dirs[Math.round(deg / 45) % 8]
 }
 
+type UserLocation = {
+  latitude: number
+  longitude: number
+}
+
 export function Tempo() {
-  const [districtId, setDistrictId] = useState<number | undefined>(undefined)
+  const [districtId, setDistrictId] = useState<number | undefined>(DEFAULT_DISTRICT_ID)
   const [municipalityId, setMunicipalityId] = useState<number | undefined>(undefined)
   const [municipalityName, setMunicipalityName] = useState<string | undefined>(undefined)
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
 
   const { data: districts } = useDistricts()
   const { data: municipalities } = useMunicipalities(districtId)
 
+  // Sem localização: escolhe Lisboa (distrito + município) por defeito assim que a lista carregar.
+  useEffect(() => {
+    if (!userLocation && districtId === DEFAULT_DISTRICT_ID && !municipalityId && municipalities) {
+      const lisboa = municipalities.find(m => m.Descritivo === DEFAULT_MUNICIPALITY_NAME)
+      if (lisboa) {
+        setMunicipalityId(lisboa.Id)
+        setMunicipalityName(lisboa.Descritivo)
+      }
+    }
+  }, [municipalities, userLocation, districtId, municipalityId])
+
+  useEffect(() => {
+    requestLocation()
+  }, [])
+
   const { data: geoResult, isLoading: isGeocoding, isError: isGeoError } =
-    useOpenMeteoGeocode(municipalityName)
+    useOpenMeteoGeocode(!userLocation ? municipalityName : undefined)
+
+  const lat = userLocation?.latitude ?? geoResult?.latitude
+  const lng = userLocation?.longitude ?? geoResult?.longitude
 
   const { data: forecasts, isLoading: isForecastLoading, isError: isForecastError } =
-    useOpenMeteoForecast(geoResult?.latitude, geoResult?.longitude)
+    useOpenMeteoForecast(lat, lng)
 
-  const isLoading = isGeocoding || isForecastLoading
-  const isError = isGeoError || isForecastError
+  const isLoading = (!userLocation && isGeocoding) || isForecastLoading
+  const isError = (!userLocation && isGeoError) || isForecastError
+  const displayName = userLocation ? 'A sua localização' : municipalityName
 
   const chartData = (forecasts ?? []).map(f => ({
     date: new Date(f.date).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric' }),
@@ -33,13 +63,38 @@ export function Tempo() {
     max: f.tMax,
   }))
 
+  function requestLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus('unsupported')
+      return
+    }
+
+    setLocationStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+        setLocationStatus('granted')
+        setDistrictId(undefined)
+        setMunicipalityId(undefined)
+        setMunicipalityName(undefined)
+      },
+      () => setLocationStatus('denied'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10 * 60 * 1000 },
+    )
+  }
+
   function handleDistrictChange(id: number) {
+    setUserLocation(null)
     setDistrictId(id)
     setMunicipalityId(undefined)
     setMunicipalityName(undefined)
   }
 
   function handleMunicipalityChange(id: number, name: string) {
+    setUserLocation(null)
     setMunicipalityId(id)
     setMunicipalityName(name)
   }
@@ -50,6 +105,28 @@ export function Tempo() {
         <h1 className="text-2xl font-bold text-slate-900">🌤️ Meteorologia</h1>
         <p className="text-slate-500 text-sm mt-1">Open-Meteo · Previsão 7 dias · Todos os municípios</p>
       </div>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            {userLocation ? 'A mostrar a previsão para a sua localização.' : 'Permita a localização para ver a previsão do sítio onde está.'}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {locationStatus === 'loading' && 'A pedir acesso à localização...'}
+            {locationStatus === 'denied' && 'Localização não autorizada. A usar Lisboa por defeito.'}
+            {locationStatus === 'unsupported' && 'Este dispositivo não suporta localização no browser.'}
+            {locationStatus === 'granted' && 'Pode alterar distrito/município manualmente.'}
+            {locationStatus === 'idle' && 'A localização é usada apenas para saber a sua previsão.'}
+          </p>
+        </div>
+        <button
+          onClick={requestLocation}
+          className="flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+        >
+          <Navigation size={14} />
+          Usar localização
+        </button>
+      </Card>
 
       {/* Location selectors */}
       <Card>
@@ -88,22 +165,22 @@ export function Tempo() {
         </div>
       </Card>
 
-      {!municipalityName && (
+      {!userLocation && !municipalityName && (
         <p className="text-slate-400 text-sm text-center py-8">
           Seleciona um distrito e município para ver a previsão.
         </p>
       )}
 
-      {municipalityName && isLoading && <LoadingBox />}
-      {municipalityName && isError && <ErrorBox message="Erro ao carregar dados meteorológicos." />}
+      {(userLocation || municipalityName) && isLoading && <LoadingBox />}
+      {(userLocation || municipalityName) && isError && <ErrorBox message="Erro ao carregar dados meteorológicos." />}
 
-      {forecasts && forecasts.length > 0 && geoResult && (
+      {forecasts && forecasts.length > 0 && lat !== undefined && lng !== undefined && (
         <>
           {/* Today highlight */}
           <Card className="bg-gradient-to-br from-sky-500 to-blue-600 text-white border-0">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sky-100 text-sm font-medium mb-1">{municipalityName} · Hoje</p>
+                <p className="text-sky-100 text-sm font-medium mb-1">{displayName} · Hoje</p>
                 <p className="text-7xl font-bold leading-none">{forecasts[0].tMax}°</p>
                 <p className="text-sky-100 mt-2">{forecasts[0].desc}</p>
               </div>
@@ -159,7 +236,7 @@ export function Tempo() {
 
           {/* Detailed list */}
           <Card>
-            <CardTitle>Previsão detalhada — {municipalityName}</CardTitle>
+            <CardTitle>Previsão detalhada — {displayName}</CardTitle>
             <div className="divide-y divide-slate-100">
               {forecasts.map((f, i) => (
                 <div key={f.date} className="flex items-center gap-4 py-3">
