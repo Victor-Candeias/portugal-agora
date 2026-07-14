@@ -472,14 +472,31 @@ function useCMMap(vehicles: CMVehicle[], linesMap: Map<string, { color: string }
 // ── Veículos sub-tab ──────────────────────────────────────────────────────
 
 function VehiclesSubTab() {
+  const [operatorFilter, setOperatorFilter] = useState<string | null>(null)
   const [lineFilter, setLineFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const { data: allVehicles = [], isLoading, isError, refetch, dataUpdatedAt } = useCarrisVehicles()
   const linesMap = useCarrisLinesMap()
 
+  const operators = useMemo(() => {
+    const ids = [...new Set(allVehicles.map(v => v.agency_id).filter(Boolean))]
+    return ids.sort((a, b) => a.localeCompare(b, 'pt', { numeric: true }))
+  }, [allVehicles])
+
+  const linesForOperator = useMemo(() => {
+    const source = operatorFilter
+      ? allVehicles.filter(v => v.agency_id === operatorFilter)
+      : allVehicles
+    const ids = [...new Set(source.map(v => v.line_id).filter(Boolean))]
+    return ids.sort((a, b) => a.localeCompare(b, 'pt', { numeric: true }))
+  }, [allVehicles, operatorFilter])
+
   const filtered = useMemo(
-    () => lineFilter ? allVehicles.filter(v => v.line_id === lineFilter) : allVehicles,
-    [allVehicles, lineFilter],
+    () => allVehicles.filter(v =>
+      (!operatorFilter || v.agency_id === operatorFilter) &&
+      (!lineFilter || v.line_id === lineFilter),
+    ),
+    [allVehicles, operatorFilter, lineFilter],
   )
 
   const activeLines = useMemo(() => {
@@ -490,7 +507,12 @@ function VehiclesSubTab() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const handleLineFilter = (id: string | null) => { setLineFilter(id); setPage(1) }
+  const handleOperatorFilter = (id: string) => {
+    setOperatorFilter(id || null)
+    setLineFilter(null)
+    setPage(1)
+  }
+  const handleLineFilter = (id: string) => { setLineFilter(id || null); setPage(1) }
 
   const mapRef = useCMMap(filtered.slice(0, 500), linesMap)
 
@@ -528,29 +550,34 @@ function VehiclesSubTab() {
         </Card>
       </div>
 
-      {/* Line chips */}
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          onClick={() => handleLineFilter(null)}
-          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
-            !lineFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          Todas
-        </button>
-        {activeLines.map(lid => {
-          const line = linesMap.get(lid)
-          return (
-            <button
-              key={lid}
-              onClick={() => handleLineFilter(lineFilter === lid ? null : lid)}
-              className="px-2.5 py-1 rounded-full text-xs font-semibold text-white transition-opacity hover:opacity-80"
-              style={{ backgroundColor: lineFilter === lid ? (line?.color ?? '#2563eb') : (line?.color ?? '#64748b') }}
-            >
-              {lid}
-            </button>
-          )
-        })}
+      {/* Operator + line filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Operador</label>
+          <select
+            value={operatorFilter ?? ''}
+            onChange={e => handleOperatorFilter(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">Todos os operadores</option>
+            {operators.map(id => (
+              <option key={id} value={id}>Operador {id}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Carreira</label>
+          <select
+            value={lineFilter ?? ''}
+            onChange={e => handleLineFilter(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">Todas as carreiras</option>
+            {linesForOperator.map(lid => (
+              <option key={lid} value={lid}>{lid}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Map */}

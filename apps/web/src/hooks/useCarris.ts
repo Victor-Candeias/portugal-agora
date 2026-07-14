@@ -84,23 +84,18 @@ export interface CMRealtime {
 export interface CMMunicipality {
   id: string
   name: string
+  district_id?: string
+  district_name?: string
 }
 
-// ── Municipalities (derived from stops — endpoint is 404) ─────────────────
+// ── Municipalities (endpoint only exists on v1, not v2) ────────────────────
 
 export function useCarrisMunicipalities() {
   return useQuery({
     queryKey: ['cm', 'municipalities'],
     queryFn: async (): Promise<CMMunicipality[]> => {
-      const stops = await fetchJson<CMStop[]>(`${BASE_V2}/stops`)
-      const map = new Map<string, string>()
-      stops.forEach(s => {
-        if (s.municipality_id && s.municipality_name)
-          map.set(s.municipality_id, s.municipality_name)
-      })
-      return [...map.entries()]
-        .map(([id, name]) => ({ id, name }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+      const municipalities = await fetchJson<CMMunicipality[]>(`${BASE_V1}/municipalities`)
+      return [...municipalities].sort((a, b) => a.name.localeCompare(b.name, 'pt'))
     },
     staleTime: 24 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
