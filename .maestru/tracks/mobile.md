@@ -22,4 +22,5 @@ status: active
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |
 | WEB-004 | Combustivel: layout responsivo distrito/municipio | done | 2026-07-14 |  | low | 2026-07-14 |  |  |
 | WEB-005 | Tempo: usar localizacao do utilizador com fallback Lisboa | done | 2026-07-14 |  | low | 2026-07-14 |  |  |
+| WEB-006 | Hospitais: usar localizacao do utilizador com fallback Lisboa/todos municipios | done | 2026-07-14 |  | low | 2026-07-14 |  |  |
 <!-- /maestru:work-items-list -->
