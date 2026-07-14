@@ -143,7 +143,7 @@ export function Combustivel() {
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Distrito</label>
               <select
