@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Base de dados estática gerada em build/CI (scripts/build-carris-db.mjs) —
+# nunca versionada, é regenerada a cada deploy/dia (ver WEB-010/011/016).
+public/data/*.sqlite
+public/data/*.sqlite-*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

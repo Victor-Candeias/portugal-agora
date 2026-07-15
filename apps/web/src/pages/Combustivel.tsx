@@ -3,6 +3,7 @@ import { MapPin, Navigation } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
+import { SinglePointMap } from '@/components/SinglePointMap'
 import { useFuelPrices } from '@/hooks/useFuel'
 import { useDistricts, useMunicipalities } from '@/hooks/useGeo'
 import { formatPrice, FUEL_LABELS, FUEL_COLORS, type FuelType } from '@portugal-hoje/core'
@@ -35,6 +36,7 @@ export function Combustivel() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
   const [page, setPage] = useState(1)
+  const [mapStationId, setMapStationId] = useState<number | null>(null)
 
   const { data: districts, isLoading: loadingDistricts } = useDistricts()
   const { data: municipalities } = useMunicipalities(districtId)
@@ -212,54 +214,66 @@ export function Combustivel() {
               )}
               {pageStations.map((s, i) => {
                 const globalIndex = (page - 1) * PAGE_SIZE + i
+                const showMap = mapStationId === s.Id
                 return (
-                <div key={s.Id} className="flex items-center py-3 gap-3">
-                  <span
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                    style={{ backgroundColor: globalIndex === 0 ? '#16a34a' : globalIndex === 1 ? '#65a30d' : '#94a3b8' }}
-                  >
-                    {globalIndex + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-slate-900 text-sm truncate">{s.Nome}</p>
-                    <p className="text-xs text-slate-400">{s.Marca}</p>
-                    <p className="text-xs text-slate-500 flex items-center gap-1">
-                      <MapPin size={11} />
-                      {s.Morada} · {s.Municipio}, {s.Distrito}
-                    </p>
-                    {userLocation && (
-                      <p className="text-xs text-green-700 font-medium mt-0.5">
-                        {distanceKm(userLocation, s).toFixed(1)} km de distância
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0 min-w-[90px]">
-                    <p
-                      className="text-lg font-bold tabular-nums"
-                      style={{ color: globalIndex === 0 ? '#16a34a' : '#0f172a' }}
+                <div key={s.Id} className="py-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ backgroundColor: globalIndex === 0 ? '#16a34a' : globalIndex === 1 ? '#65a30d' : '#94a3b8' }}
                     >
-                      {formatPrice(s.price_eur)}
-                    </p>
-                    {minPrice && globalIndex > 0 && (
-                      <p className="text-xs text-red-500 tabular-nums">
-                        +{formatPrice(s.price_eur - minPrice)}
+                      {globalIndex + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-900 text-sm truncate">{s.Nome}</p>
+                      <p className="text-xs text-slate-400">{s.Marca}</p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1">
+                        <MapPin size={11} />
+                        {s.Morada} · {s.Municipio}, {s.Distrito}
                       </p>
-                    )}
+                      {userLocation && (
+                        <p className="text-xs text-green-700 font-medium mt-0.5">
+                          {distanceKm(userLocation, s).toFixed(1)} km de distância
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0 min-w-[90px]">
+                      <p
+                        className="text-lg font-bold tabular-nums"
+                        style={{ color: globalIndex === 0 ? '#16a34a' : '#0f172a' }}
+                      >
+                        {formatPrice(s.price_eur)}
+                      </p>
+                      {minPrice && globalIndex > 0 && (
+                        <p className="text-xs text-red-500 tabular-nums">
+                          +{formatPrice(s.price_eur - minPrice)}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMapStationId(showMap ? null : s.Id)}
+                      className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
+                        showMap ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title="Ver no mapa"
+                    >
+                      <Navigation size={14} />
+                    </button>
                   </div>
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${s.Latitude},${s.Longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-shrink-0 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
-                    title="Navegar"
-                  >
-                    <Navigation size={14} className="text-slate-600" />
-                  </a>
+                  {showMap && (
+                    <SinglePointMap
+                      lat={s.Latitude}
+                      lon={s.Longitude}
+                      label={`${s.Nome} · ${s.Marca}`}
+                      className="mt-2 w-full h-56 rounded-xl border border-slate-200 overflow-hidden"
+                    />
+                  )}
                 </div>
                 )
               })}
             </div>
-            <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapStationId(null) }} />
           </>
         )}
       </Card>

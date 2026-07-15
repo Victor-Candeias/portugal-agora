@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, ExternalLink, Navigation, Bus } from 'lucide-react'
+import { Train as TrainIcon, AlertTriangle, RefreshCw, MapPin, Clock, ChevronDown, Navigation, Bus } from 'lucide-react'
 import { Card } from '@/components/Card'
+import { Modal } from '@/components/Modal'
+import { SinglePointMap } from '@/components/SinglePointMap'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
 import { useTrains, useStations, useTmlAlerts } from '@/hooks/useTransportes'
@@ -8,6 +10,7 @@ import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
 import {
   useCarrisVehicles, useCarrisLines, useCarrisLinesMap,
   useCarrisStops, useNearbyStops, useStopRealtime, useCarrisLinePatterns,
+  useCarrisOperators,
 } from '@/hooks/useCarris'
 import type { CMVehicle, CMStop, CMRealtime, CMLine } from '@/hooks/useCarris'
 import 'leaflet/dist/leaflet.css'
@@ -61,6 +64,12 @@ const STATUS_LABEL: Record<string, string> = {
   NEAR_NEXT:   'A chegar',
 }
 
+const VEHICLE_STATUS_LABEL: Record<string, string> = {
+  INCOMING_AT:   'A chegar à paragem',
+  STOPPED_AT:    'Parado na paragem',
+  IN_TRANSIT_TO: 'Em trânsito',
+}
+
 function delayMin(s: number) { return Math.round(s / 60) }
 
 function delayLabel(s: number) {
@@ -112,7 +121,8 @@ function detailItem(label: string, value: React.ReactNode) {
 function TrainDetails({ train, stations }: { train: Train; stations: Map<string, Station> }) {
   const lastStation = stationName(train.lastStation, stations)
   const currentStop = stationName(train.gtfs?.stopId?.replaceAll('_', '-'), stations)
-  const mapUrl = `https://www.google.com/maps?q=${train.latitude},${train.longitude}`
+  const [showMap, setShowMap] = useState(false)
+  const hasCoords = !!(train.latitude && train.longitude)
 
   return (
     <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
@@ -143,17 +153,24 @@ function TrainDetails({ train, stations }: { train: Train; stations: Map<string,
         </span>
         <span>{train.skippedStops?.length ?? 0} paragens saltadas</span>
         {train.hasDisruptions && <span className="font-semibold text-red-600">⚠️ Com perturbações</span>}
-        {train.latitude && train.longitude && (
-          <a
-            href={mapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+        {hasCoords && (
+          <button
+            type="button"
+            onClick={() => setShowMap(v => !v)}
             className="ml-auto flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700"
           >
-            Ver no mapa <ExternalLink size={12} />
-          </a>
+            {showMap ? 'Ocultar mapa' : 'Ver no mapa'} <MapPin size={12} />
+          </button>
         )}
       </div>
+
+      {showMap && hasCoords && (
+        <SinglePointMap
+          lat={Number(train.latitude)}
+          lon={Number(train.longitude)}
+          label={`Comboio ${train.trainNumber} · ${train.origin.designation} → ${train.destination.designation}`}
+        />
+      )}
     </div>
   )
 }
@@ -418,29 +435,45 @@ type CarrisSubTab = 'Veículos' | 'Linhas' | 'Paragens perto'
 // ── Leaflet map for CM vehicles ───────────────────────────────────────────
 
 function useCMMap(vehicles: CMVehicle[], linesMap: Map<string, { color: string }>) {
-  const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<import('leaflet').Map | null>(null)
-  const markersRef = useRef<import('leaflet').Marker[]>([])
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  const [map, setMap] = useState<import('leaflet').Map | null>(null)
+  const markersRef = useRef<Map<string, import('leaflet').Marker>>(new Map())
 
-  useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return
-    import('leaflet').then((L) => {
-      if (!mapRef.current || mapInstanceRef.current) return
-      const map = L.map(mapRef.current).setView([38.72, -9.14], 11)
-      mapInstanceRef.current = map
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 18,
-      }).addTo(map)
-    })
+  // Callback ref instead of useRef+useEffect([]): the map container only
+  // exists in the DOM once loading finishes, so we need to react to it
+  // actually mounting rather than relying on a one-time mount effect.
+  const mapRef = useCallback((node: HTMLDivElement | null) => {
+    setContainer(node)
   }, [])
 
   useEffect(() => {
-    const map = mapInstanceRef.current
+    if (!container) return
+    let cancelled = false
+    let createdMap: import('leaflet').Map | null = null
+    const markers = markersRef.current
+    import('leaflet').then((L) => {
+      if (cancelled) return
+      const m = L.map(container).setView([38.72, -9.14], 11)
+      createdMap = m
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 18,
+      }).addTo(m)
+      setMap(m)
+    })
+    return () => {
+      cancelled = true
+      createdMap?.remove()
+      setMap(null)
+      markers.clear()
+    }
+  }, [container])
+
+  useEffect(() => {
     if (!map || vehicles.length === 0) return
     import('leaflet').then((L) => {
       markersRef.current.forEach(m => m.remove())
-      markersRef.current = []
+      markersRef.current.clear()
 
       vehicles.forEach(v => {
         const color = linesMap.get(v.line_id)?.color ?? '#2563eb'
@@ -461,12 +494,20 @@ function useCMMap(vehicles: CMVehicle[], linesMap: Map<string, { color: string }
         const marker = L.marker([v.lat, v.lon], { icon })
           .bindPopup(`<b>Linha ${v.line_id}</b><br/>ID: ${v.id}<br/>Vel.: ${Math.round(v.speed * 3.6)} km/h<br/>${ts}`)
           .addTo(map)
-        markersRef.current.push(marker)
+        markersRef.current.set(v.id, marker)
       })
     })
-  }, [vehicles, linesMap])
+  }, [map, vehicles, linesMap])
 
-  return mapRef
+  const focusVehicle = useCallback((id: string) => {
+    const marker = markersRef.current.get(id)
+    if (!map || !marker) return
+    container?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    map.setView(marker.getLatLng(), 16, { animate: true })
+    marker.openPopup()
+  }, [map, container])
+
+  return { mapRef, focusVehicle }
 }
 
 // ── Veículos sub-tab ──────────────────────────────────────────────────────
@@ -475,8 +516,14 @@ function VehiclesSubTab() {
   const [operatorFilter, setOperatorFilter] = useState<string | null>(null)
   const [lineFilter, setLineFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [detailLineId, setDetailLineId] = useState<string | null>(null)
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null)
   const { data: allVehicles = [], isLoading, isError, refetch, dataUpdatedAt } = useCarrisVehicles()
   const linesMap = useCarrisLinesMap()
+  const { data: operatorList = [] } = useCarrisOperators()
+  const operatorNames = useMemo(() => new Map(operatorList.map(o => [o.id, o.name])), [operatorList])
+  const { data: stops = [] } = useCarrisStops()
+  const stopsMap = useMemo(() => new Map(stops.map(s => [s.id, s])), [stops])
 
   const operators = useMemo(() => {
     const ids = [...new Set(allVehicles.map(v => v.agency_id).filter(Boolean))]
@@ -514,7 +561,7 @@ function VehiclesSubTab() {
   }
   const handleLineFilter = (id: string) => { setLineFilter(id || null); setPage(1) }
 
-  const mapRef = useCMMap(filtered.slice(0, 500), linesMap)
+  const { mapRef, focusVehicle } = useCMMap(filtered.slice(0, 500), linesMap)
 
   const updatedAt = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -561,7 +608,7 @@ function VehiclesSubTab() {
           >
             <option value="">Todos os operadores</option>
             {operators.map(id => (
-              <option key={id} value={id}>Operador {id}</option>
+              <option key={id} value={id}>{operatorNames.get(id) ?? `Operador ${id}`}</option>
             ))}
           </select>
         </div>
@@ -590,14 +637,28 @@ function VehiclesSubTab() {
           const ts = v.timestamp
             ? new Date(v.timestamp * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             : '—'
+          const isSelected = selectedVehicle === v.id
           return (
             <Card key={v.id} className="p-3">
-              <div className="flex items-center gap-3">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedVehicle(isSelected ? null : v.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedVehicle(isSelected ? null : v.id) }}
+                className="flex items-center gap-3 cursor-pointer"
+              >
                 <div
                   className="flex-shrink-0 rounded-lg px-2 py-1 text-center min-w-[44px]"
                   style={{ backgroundColor: line?.color ?? '#64748b' }}
                 >
-                  <p className="text-sm font-bold text-white">{v.line_id}</p>
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setDetailLineId(v.line_id) }}
+                    className="text-sm font-bold text-white hover:underline"
+                    title="Ver detalhe da carreira"
+                  >
+                    {v.line_id}
+                  </button>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-slate-600 truncate">{v.trip_id || '—'}</p>
@@ -608,15 +669,29 @@ function VehiclesSubTab() {
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <p className="text-[10px] text-slate-400">{ts}</p>
-                  <a
-                    href={`https://www.google.com/maps?q=${v.lat},${v.lon}`}
-                    target="_blank" rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); focusVehicle(v.id) }}
                     className="flex items-center justify-end gap-1 text-[10px] text-blue-600 hover:text-blue-700 font-medium"
                   >
                     <MapPin size={10} /> Mapa
-                  </a>
+                  </button>
                 </div>
+                <ChevronDown
+                  size={16}
+                  className={`flex-shrink-0 text-slate-400 transition-transform ${isSelected ? 'rotate-180' : ''}`}
+                />
               </div>
+              {isSelected && (
+                <VehicleDetails
+                  vehicle={v}
+                  line={line}
+                  operatorName={operatorNames.get(v.agency_id)}
+                  stop={stopsMap.get(v.stop_id)}
+                  onShowLine={() => setDetailLineId(v.line_id)}
+                  onShowMap={() => focusVehicle(v.id)}
+                />
+              )}
             </Card>
           )
         })}
@@ -625,6 +700,61 @@ function VehiclesSubTab() {
         )}
       </div>
       <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+      {detailLineId && <LineInfoModal lineId={detailLineId} onClose={() => setDetailLineId(null)} />}
+    </div>
+  )
+}
+
+// ── Detalhe de um veículo (composição/estado, à semelhança de TrainDetails) ─
+
+function VehicleDetails({
+  vehicle, line, operatorName, stop, onShowLine, onShowMap,
+}: {
+  vehicle: CMVehicle
+  line: CMLine | undefined
+  operatorName: string | undefined
+  stop: CMStop | undefined
+  onShowLine: () => void
+  onShowMap: () => void
+}) {
+  const ts = vehicle.timestamp ? formatDateTime(vehicle.timestamp * 1000) : '—'
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {detailItem('Estado', VEHICLE_STATUS_LABEL[vehicle.current_status] ?? vehicle.current_status)}
+        {detailItem('Velocidade', `${Math.round(vehicle.speed * 3.6)} km/h`)}
+        {detailItem('Direção', `${Math.round(vehicle.bearing || 0)}°`)}
+        {detailItem('Propulsão', vehicle.propulsion || '—')}
+        {detailItem('Acessibilidade', vehicle.wheelchair_accessible ? '♿ Acessível' : '—')}
+        {detailItem('Atualizado', ts)}
+      </div>
+
+      <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-950">
+        <p className="font-semibold">Carreira e percurso</p>
+        <p className="mt-1">
+          <button type="button" onClick={onShowLine} className="font-semibold underline hover:no-underline">
+            {line?.short_name ?? vehicle.line_id}
+          </button>
+          {line && ` · ${line.long_name}`}
+        </p>
+        {operatorName && <p className="mt-1 text-xs text-blue-700">Operador: {operatorName}</p>}
+        {stop && <p className="mt-1 text-xs text-blue-700">Paragem atual: {stop.long_name}</p>}
+        <p className="mt-1 text-xs text-blue-700">
+          Route: {vehicle.route_id || '—'} · Pattern: {vehicle.pattern_id || '—'} · Trip: {vehicle.trip_id || '—'}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span>Matrícula/ID: {vehicle.id}</span>
+        <button
+          type="button"
+          onClick={onShowMap}
+          className="ml-auto flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700"
+        >
+          Ver no mapa <MapPin size={12} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -767,11 +897,55 @@ function LineDetails({ line, muniNames, stops }: { line: CMLine; muniNames: Map<
   )
 }
 
+// ── Popup com detalhe de uma carreira (usado a partir de Veículos / Chegadas) ─
+
+function LineInfoModal({ lineId, onClose }: { lineId: string; onClose: () => void }) {
+  const { data: allLines = [], isLoading: linesLoading } = useCarrisLines(null)
+  const { data: stops = [], isLoading: stopsLoading } = useCarrisStops()
+  const { data: operators = [] } = useCarrisOperators()
+
+  const line = allLines.find(l => l.id === lineId)
+  const operatorName = operators.find(o => o.id === line?.operator_id)?.name
+
+  const muniNames = useMemo(() => {
+    const map = new Map<string, string>()
+    stops.forEach(s => { if (s.municipality_id) map.set(s.municipality_id, s.municipality_name) })
+    return map
+  }, [stops])
+
+  const isLoading = linesLoading || stopsLoading
+
+  return (
+    <Modal title={line ? `Carreira ${line.short_name}` : `Carreira ${lineId}`} onClose={onClose}>
+      {isLoading && <p className="text-xs text-slate-400">A carregar…</p>}
+      {!isLoading && !line && (
+        <p className="text-xs text-slate-400">Sem informação disponível para esta carreira.</p>
+      )}
+      {!isLoading && line && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-lg px-2 py-1 text-sm font-bold"
+              style={{ backgroundColor: line.color, color: line.text_color }}
+            >
+              {line.short_name}
+            </span>
+            <p className="text-sm font-semibold text-slate-800">{line.long_name}</p>
+          </div>
+          {operatorName && <p className="text-xs text-slate-500">Operador: {operatorName}</p>}
+          <LineDetails line={line} muniNames={muniNames} stops={stops} />
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 // ── Realtime arrivals for a stop ──────────────────────────────────────────
 
 function StopArrivals({ stop }: { stop: CMStop }) {
   const { data: arrivals = [], isLoading } = useStopRealtime(stop.id)
   const linesMap = useCarrisLinesMap()
+  const [detailLineId, setDetailLineId] = useState<string | null>(null)
 
   function formatArrival(unix: number | null) {
     if (!unix) return '—'
@@ -793,12 +967,15 @@ function StopArrivals({ stop }: { stop: CMStop }) {
           (a.estimated_arrival_unix - a.scheduled_arrival_unix) > 60
         return (
           <div key={idx} className="flex items-center gap-2 text-xs">
-            <span
-              className="px-1.5 py-0.5 rounded text-white font-bold flex-shrink-0"
+            <button
+              type="button"
+              onClick={() => setDetailLineId(a.line_id)}
+              className="px-1.5 py-0.5 rounded text-white font-bold flex-shrink-0 hover:underline"
               style={{ backgroundColor: line?.color ?? '#64748b' }}
+              title="Ver detalhe da carreira"
             >
               {a.line_id}
-            </span>
+            </button>
             <span className="flex-1 truncate text-slate-700">{a.headsign}</span>
             <span className="flex-shrink-0 tabular-nums text-slate-500">{planned}</span>
             {estimated !== planned && (
@@ -809,6 +986,7 @@ function StopArrivals({ stop }: { stop: CMStop }) {
           </div>
         )
       })}
+      {detailLineId && <LineInfoModal lineId={detailLineId} onClose={() => setDetailLineId(null)} />}
     </div>
   )
 }

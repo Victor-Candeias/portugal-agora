@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
+import { SinglePointMap } from '@/components/SinglePointMap'
 import { useAnpcIncidents, useAnpcSummary } from '@/hooks/useANPC'
 
 const PAGE_SIZE = 20
@@ -47,6 +48,7 @@ export function ProtecaoCivil() {
   const [selectedType, setSelectedType] = useState<string | null>(null)
   const [showConcluded, setShowConcluded] = useState(false)
   const [page, setPage] = useState(1)
+  const [mapIncidentId, setMapIncidentId] = useState<string | null>(null)
 
   const asOf = incidents?.as_of ? formatTime(incidents.as_of) : ''
 
@@ -210,38 +212,50 @@ export function ProtecaoCivil() {
               : `${activeIncidents.length} ocorrências ativas agora`}
           </CardTitle>
           <div className="divide-y divide-slate-100">
-            {pageIncidents.map(inc => (
-              <div key={inc.id} className="py-4 flex gap-3">
-                <span className="text-2xl flex-shrink-0 mt-0.5">{getEmoji(inc.type)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="font-semibold text-slate-900 text-sm">{inc.type}</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(inc.status)}`}>
-                      {inc.status}
-                    </span>
+            {pageIncidents.map(inc => {
+              const showMap = mapIncidentId === inc.id
+              return (
+              <div key={inc.id} className="py-4">
+                <div className="flex gap-3">
+                  <span className="text-2xl flex-shrink-0 mt-0.5">{getEmoji(inc.type)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="font-semibold text-slate-900 text-sm">{inc.type}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(inc.status)}`}>
+                        {inc.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      📍 {inc.location.address}
+                    </p>
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+                      <span>🕒 {formatTime(inc.datetime)}</span>
+                      {inc.resources.ground > 0 && <span>🚒 {inc.resources.ground} terrestres</span>}
+                      {inc.resources.aerial > 0 && <span>🚁 {inc.resources.aerial} aéreos</span>}
+                      {inc.resources.water > 0 && <span>💧 {inc.resources.water} água</span>}
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    📍 {inc.location.address}
-                  </p>
-                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
-                    <span>🕒 {formatTime(inc.datetime)}</span>
-                    {inc.resources.ground > 0 && <span>🚒 {inc.resources.ground} terrestres</span>}
-                    {inc.resources.aerial > 0 && <span>🚁 {inc.resources.aerial} aéreos</span>}
-                    {inc.resources.water > 0 && <span>💧 {inc.resources.water} água</span>}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMapIncidentId(showMap ? null : inc.id)}
+                    className="text-xs text-orange-600 hover:text-orange-700 font-medium flex-shrink-0 mt-1"
+                  >
+                    {showMap ? 'Ocultar mapa' : 'Ver mapa'}
+                  </button>
                 </div>
-                <a
-                  href={`https://www.google.com/maps?q=${inc.location.lat},${inc.location.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-orange-600 hover:text-orange-700 font-medium flex-shrink-0 mt-1"
-                >
-                  Ver mapa
-                </a>
+                {showMap && (
+                  <SinglePointMap
+                    lat={inc.location.lat}
+                    lon={inc.location.lng}
+                    label={`${inc.type} · ${inc.location.address}`}
+                    className="mt-3 w-full h-56 rounded-xl border border-slate-200 overflow-hidden"
+                  />
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
-          <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+          <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapIncidentId(null) }} />
         </Card>
       )}
     </div>

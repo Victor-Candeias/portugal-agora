@@ -3,6 +3,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    # Refresca dados estáticos da Carris (linhas/paragens/patterns/operadores)
+    # diariamente, mesmo sem push de código — ver WEB-010/011/016.
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -34,6 +38,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build Carris static DB (linhas/paragens/patterns/operadores)
+        run: pnpm --filter web build:db
 
       - name: Build
         run: pnpm --filter web build

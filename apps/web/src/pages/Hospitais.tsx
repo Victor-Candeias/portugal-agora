@@ -3,6 +3,7 @@ import { MapPin, Phone, Mail, Activity, ChevronDown, Navigation } from 'lucide-r
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
+import { SinglePointMap } from '@/components/SinglePointMap'
 import { useHospitaisValencias } from '@/hooks/useHospitais'
 
 const PAGE_SIZE = 20
@@ -45,6 +46,7 @@ export function Hospitais() {
   const [municipio, setMunicipio] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [mapHospital, setMapHospital] = useState<string | null>(null)
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
 
@@ -233,7 +235,9 @@ export function Hospitais() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {paginated.map(h => (
+              {paginated.map(h => {
+                const showMap = mapHospital === h.nome
+                return (
                 <div key={h.nome} className="border border-slate-100 rounded-lg p-4 hover:border-slate-300 transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <p className="font-semibold text-slate-900 text-sm leading-snug">{h.nome}</p>
@@ -282,24 +286,34 @@ export function Hospitais() {
                       </a>
                     )}
                     {h.lat !== 0 && (
-                      <a
-                        href={`https://www.google.com/maps?q=${h.lat},${h.lng}`}
-                        target="_blank" rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => setMapHospital(showMap ? null : h.nome)}
                         className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium flex-shrink-0"
                       >
-                        <MapPin size={11} /> Mapa
-                      </a>
+                        <MapPin size={11} /> {showMap ? 'Ocultar mapa' : 'Mapa'}
+                      </button>
                     )}
                   </div>
+
+                  {showMap && h.lat !== 0 && (
+                    <SinglePointMap
+                      lat={h.lat}
+                      lon={h.lng}
+                      label={h.nome}
+                      className="mt-3 w-full h-56 rounded-xl border border-slate-200 overflow-hidden"
+                    />
+                  )}
                 </div>
-              ))}
+                )
+              })}
               {sortedFiltered.length === 0 && (
                 <p className="col-span-2 text-slate-400 text-sm text-center py-8">Nenhum resultado encontrado.</p>
               )}
             </div>
 
             {/* Pagination */}
-            <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapHospital(null) }} />
           </>
         )}
       </Card>

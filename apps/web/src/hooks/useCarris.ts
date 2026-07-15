@@ -1,7 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
+import { queryAll } from '@/lib/staticDb'
 
 // ── Base URL ──────────────────────────────────────────────────────────────
 // API has Access-Control-Allow-Origin: * — no proxy needed.
+// NOTA: linhas, paragens, patterns e operadores (dados estáticos) já não são
+// pedidos aqui em tempo real — vêm do `.sqlite` local gerado em build/CI
+// (ver apps/web/scripts/build-carris-db.mjs e src/lib/staticDb.ts, WEB-010/011/016).
+// Só os dados dinâmicos (veículos, chegadas) continuam a usar estas bases.
 
 const BASE_V2 = 'https://api.carrismetropolitana.pt/v2'
 const BASE_V1 = 'https://api.carrismetropolitana.pt/v1'
@@ -36,6 +41,14 @@ export interface CMLine {
   municipality_ids: string[]
   pattern_ids: string[]
   route_ids: string[]
+  operator_id: string | null
+}
+
+export interface CMOperator {
+  id: string
+  name: string
+  website: string | null
+  timezone: string | null
 }
 
 export interface CMStop {
@@ -109,23 +122,63 @@ export function useCarrisMunicipalities() {
   })
 }
 
-// ── Lines ─────────────────────────────────────────────────────────────────
+// ── Lines (dados estáticos → .sqlite local) ────────────────────────────────
 
 export function useCarrisLines(municipalityFilter: string | null = null) {
   return useQuery({
     queryKey: ['cm', 'lines', municipalityFilter],
     queryFn: async (): Promise<CMLine[]> => {
-      const lines = await fetchJson<CMLine[]>(`${BASE_V2}/lines`)
+      const rows = await queryAll<{
+        id: string; short_name: string; long_name: string; color: string
+        text_color: string; operator_id: string | null
+      }>('SELECT id, short_name, long_name, color, text_color, operator_id FROM lines')
+
+      const [muniRows, routeRows, patternRows] = await Promise.all([
+        queryAll<{ line_id: string; municipality_id: string }>('SELECT line_id, municipality_id FROM line_municipalities'),
+        queryAll<{ line_id: string; route_id: string }>('SELECT line_id, route_id FROM line_routes'),
+        queryAll<{ line_id: string; pattern_id: string }>('SELECT line_id, pattern_id FROM line_patterns'),
+      ])
+      const groupBy = <T extends { line_id: string }>(rows: T[], key: keyof T) => {
+        const map = new Map<string, string[]>()
+        for (const r of rows) {
+          const arr = map.get(r.line_id) ?? []
+          arr.push(String(r[key]))
+          map.set(r.line_id, arr)
+        }
+        return map
+      }
+      const munis = groupBy(muniRows, 'municipality_id')
+      const routes = groupBy(routeRows, 'route_id')
+      const patterns = groupBy(patternRows, 'pattern_id')
+
+      const lines: CMLine[] = rows.map(l => ({
+        ...l,
+        municipality_ids: munis.get(l.id) ?? [],
+        route_ids: routes.get(l.id) ?? [],
+        pattern_ids: patterns.get(l.id) ?? [],
+      }))
       if (!municipalityFilter) return lines
       return lines.filter(l => l.municipality_ids.includes(municipalityFilter))
     },
-    staleTime: 6 * 60 * 60 * 1000,
-    gcTime: 12 * 60 * 60 * 1000,
+    staleTime: Infinity,
+    gcTime: Infinity,
     retry: 1,
   })
 }
 
-// ── Line patterns (per-direction route detail: headsign, stops path) ──────
+// ── Operators (dados estáticos → .sqlite local, via GTFS) ─────────────────
+
+export function useCarrisOperators() {
+  return useQuery({
+    queryKey: ['cm', 'operators'],
+    queryFn: () => queryAll<CMOperator>('SELECT id, name, website, timezone FROM operators'),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: 1,
+  })
+}
+
+// ── Line patterns (dados estáticos → .sqlite local) ────────────────────────
 
 export interface CMPattern {
   id: string
@@ -141,57 +194,65 @@ export function useCarrisLinePatterns(patternIds: string[]) {
   return useQuery({
     queryKey: ['cm', 'patterns', ...patternIds],
     queryFn: async (): Promise<CMPattern[]> => {
-      const results = await Promise.all(
-        patternIds.map(id => fetchJson<CMPattern[]>(`${BASE_V2}/patterns/${id}`)),
+      if (patternIds.length === 0) return []
+      const placeholders = patternIds.map(() => '?').join(',')
+      const rows = await queryAll<{
+        id: string; line_id: string; direction_id: number; headsign: string; color: string
+      }>(`SELECT id, line_id, direction_id, headsign, color FROM patterns WHERE id IN (${placeholders})`, patternIds)
+      const pathRows = await queryAll<{ pattern_id: string; stop_id: string; stop_sequence: number; distance: number }>(
+        `SELECT pattern_id, stop_id, stop_sequence, distance FROM pattern_path WHERE pattern_id IN (${placeholders}) ORDER BY stop_sequence`,
+        patternIds,
       )
-      return results.flat()
+      const pathByPattern = new Map<string, CMPattern['path']>()
+      for (const p of pathRows) {
+        const arr = pathByPattern.get(p.pattern_id) ?? []
+        arr.push({ stop_id: p.stop_id, stop_sequence: p.stop_sequence, distance: p.distance })
+        pathByPattern.set(p.pattern_id, arr)
+      }
+      return rows.map(r => ({ ...r, municipality_ids: [], path: pathByPattern.get(r.id) ?? [] }))
     },
     enabled: patternIds.length > 0,
-    staleTime: 24 * 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
+    staleTime: Infinity,
+    gcTime: Infinity,
     retry: 1,
   })
 }
 
-// ── Stops (v1 has richer data: operational_status, facilities — v2 lacks these) ─
-
-interface V1Stop {
-  id: string
-  name: string
-  short_name: string | null
-  lat: string
-  lon: string
-  municipality_id: string
-  municipality_name: string
-  locality: string
-  lines: string[]
-  wheelchair_boarding: string
-  facilities: string[]
-  operational_status: string
-}
+// ── Stops (dados estáticos → .sqlite local) ────────────────────────────────
 
 export function useCarrisStops() {
   return useQuery({
     queryKey: ['cm', 'stops'],
     queryFn: async (): Promise<CMStop[]> => {
-      const stops = await fetchJson<V1Stop[]>(`${BASE_V1}/stops`)
-      return stops.map(s => ({
+      const rows = await queryAll<{
+        id: string; long_name: string; short_name: string | null; lat: number; lon: number
+        municipality_id: string; municipality_name: string; locality_name: string
+        wheelchair_boarding: number; facilities: string; operational_status: string
+      }>('SELECT * FROM stops')
+      const lineRows = await queryAll<{ stop_id: string; line_id: string }>('SELECT stop_id, line_id FROM stop_lines')
+      const linesByStop = new Map<string, string[]>()
+      for (const r of lineRows) {
+        const arr = linesByStop.get(r.stop_id) ?? []
+        arr.push(r.line_id)
+        linesByStop.set(r.stop_id, arr)
+      }
+      return rows.map(s => ({
         id: s.id,
-        long_name: s.name,
+        long_name: s.long_name,
         short_name: s.short_name,
-        lat: parseFloat(s.lat),
-        lon: parseFloat(s.lon),
+        lat: s.lat,
+        lon: s.lon,
         municipality_id: s.municipality_id,
         municipality_name: s.municipality_name,
-        locality_name: s.locality,
-        line_ids: s.lines,
-        wheelchair_boarding: s.wheelchair_boarding === '1',
-        facilities: s.facilities ?? [],
+        locality_name: s.locality_name,
+        line_ids: linesByStop.get(s.id) ?? [],
+        wheelchair_boarding: s.wheelchair_boarding === 1,
+        facilities: JSON.parse(s.facilities || '[]'),
         operational_status: s.operational_status,
       }))
     },
-    staleTime: 12 * 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
+    staleTime: Infinity,
+    gcTime: Infinity,
     retry: 1,
   })
 }
