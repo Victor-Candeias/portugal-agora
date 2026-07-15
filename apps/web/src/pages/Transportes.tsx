@@ -7,9 +7,9 @@ import { useTrains, useStations, useTmlAlerts } from '@/hooks/useTransportes'
 import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
 import {
   useCarrisVehicles, useCarrisLines, useCarrisLinesMap,
-  useCarrisStops, useNearbyStops, useStopRealtime,
+  useCarrisStops, useNearbyStops, useStopRealtime, useCarrisLinePatterns,
 } from '@/hooks/useCarris'
-import type { CMVehicle, CMStop, CMRealtime } from '@/hooks/useCarris'
+import type { CMVehicle, CMStop, CMRealtime, CMLine } from '@/hooks/useCarris'
 import 'leaflet/dist/leaflet.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -634,6 +634,7 @@ function VehiclesSubTab() {
 function LinesSubTab() {
   const [muniFilter, setMuniFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [selectedLine, setSelectedLine] = useState<string | null>(null)
   const { data: lines = [], isLoading, isError } = useCarrisLines(muniFilter)
   const { data: allLines = [] } = useCarrisLines(null)
   const { data: stops = [] } = useCarrisStops()
@@ -688,21 +689,32 @@ function LinesSubTab() {
       <div className="space-y-2">
         {paginated.map(l => (
           <Card key={l.id} className="p-3">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex-shrink-0 rounded-lg px-2 py-1 text-center min-w-[52px]"
-                style={{ backgroundColor: l.color }}
-              >
-                <p className="text-sm font-bold" style={{ color: l.text_color }}>{l.short_name}</p>
+            <button
+              type="button"
+              onClick={() => setSelectedLine(selectedLine === l.id ? null : l.id)}
+              className="w-full text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex-shrink-0 rounded-lg px-2 py-1 text-center min-w-[52px]"
+                  style={{ backgroundColor: l.color }}
+                >
+                  <p className="text-sm font-bold" style={{ color: l.text_color }}>{l.short_name}</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-800 truncate">{l.long_name}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {l.municipality_ids.length} município{l.municipality_ids.length !== 1 ? 's' : ''} ·{' '}
+                    {l.pattern_ids.length} percurso{l.pattern_ids.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`flex-shrink-0 text-slate-400 transition-transform ${selectedLine === l.id ? 'rotate-180' : ''}`}
+                />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-slate-800 truncate">{l.long_name}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  {l.municipality_ids.length} município{l.municipality_ids.length !== 1 ? 's' : ''} ·{' '}
-                  {l.pattern_ids.length} percurso{l.pattern_ids.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
+            </button>
+            {selectedLine === l.id && <LineDetails line={l} muniNames={muniNames} stops={stops} />}
           </Card>
         ))}
         {lines.length === 0 && (
@@ -710,6 +722,47 @@ function LinesSubTab() {
         )}
       </div>
       <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+    </div>
+  )
+}
+
+// ── Detalhe de uma carreira (percursos, sentidos, paragens) ────────────────
+
+function LineDetails({ line, muniNames, stops }: { line: CMLine; muniNames: Map<string, string>; stops: CMStop[] }) {
+  const { data: patterns = [], isLoading } = useCarrisLinePatterns(line.pattern_ids)
+  const stopsMap = useMemo(() => new Map(stops.map(s => [s.id, s])), [stops])
+
+  const municipalityNames = line.municipality_ids
+    .map(mid => muniNames.get(mid) ?? mid)
+    .sort((a, b) => a.localeCompare(b, 'pt'))
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+      <p className="text-xs text-slate-500">
+        <span className="font-semibold">Municípios:</span> {municipalityNames.join(', ') || '—'}
+      </p>
+
+      {isLoading && <p className="text-xs text-slate-400">A carregar percursos…</p>}
+
+      {!isLoading && patterns.length === 0 && (
+        <p className="text-xs text-slate-400">Sem percursos disponíveis.</p>
+      )}
+
+      {patterns.map(p => {
+        const firstStop = stopsMap.get(p.path[0]?.stop_id)
+        const lastStop = stopsMap.get(p.path[p.path.length - 1]?.stop_id)
+        return (
+          <div key={p.id} className="text-xs bg-slate-50 rounded-lg p-2.5">
+            <p className="font-semibold text-slate-700">
+              {p.direction_id === 0 ? 'Ida' : 'Volta'} · {p.headsign}
+            </p>
+            <p className="text-slate-500 mt-1">
+              {firstStop?.long_name ?? '—'} → {lastStop?.long_name ?? '—'}
+            </p>
+            <p className="text-slate-400 mt-1">{p.path.length} paragens</p>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -35,6 +35,7 @@ export interface CMLine {
   text_color: string
   municipality_ids: string[]
   pattern_ids: string[]
+  route_ids: string[]
 }
 
 export interface CMStop {
@@ -120,6 +121,34 @@ export function useCarrisLines(municipalityFilter: string | null = null) {
     },
     staleTime: 6 * 60 * 60 * 1000,
     gcTime: 12 * 60 * 60 * 1000,
+    retry: 1,
+  })
+}
+
+// ── Line patterns (per-direction route detail: headsign, stops path) ──────
+
+export interface CMPattern {
+  id: string
+  line_id: string
+  direction_id: number
+  headsign: string
+  color: string
+  municipality_ids: string[]
+  path: { stop_id: string; stop_sequence: number; distance: number }[]
+}
+
+export function useCarrisLinePatterns(patternIds: string[]) {
+  return useQuery({
+    queryKey: ['cm', 'patterns', ...patternIds],
+    queryFn: async (): Promise<CMPattern[]> => {
+      const results = await Promise.all(
+        patternIds.map(id => fetchJson<CMPattern[]>(`${BASE_V2}/patterns/${id}`)),
+      )
+      return results.flat()
+    },
+    enabled: patternIds.length > 0,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     retry: 1,
   })
 }

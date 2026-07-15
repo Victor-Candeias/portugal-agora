@@ -25,4 +25,5 @@ status: active
 | WEB-006 | Hospitais: usar localizacao do utilizador com fallback Lisboa/todos municipios | done | 2026-07-14 |  | low | 2026-07-14 |  |  |
 | WEB-007 | Carris Veiculos: combobox operador e carreira em vez de chips de linhas | done | 2026-07-14 |  | low | 2026-07-14 |  |  |
 | WEB-008 | Carris: aproveitar v1 stops (status/facilities) e v2 arrivals by_stop | done | 2026-07-14 |  | low | 2026-07-14 |  |  |
+| WEB-009 | Carris Linhas: expandir carreira ao clicar para ver mais informacao | done | 2026-07-15 |  | low | 2026-07-15 |  |  |
 <!-- /maestru:work-items-list -->
