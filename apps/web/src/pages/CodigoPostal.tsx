@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { MapPin, Search, X } from 'lucide-react'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
+import { SinglePointMap } from '@/components/SinglePointMap'
 import { useCodigoPostal } from '@/hooks/useCodigoPostal'
 
 function formatInput(value: string): string {
@@ -13,6 +14,7 @@ function formatInput(value: string): string {
 export function CodigoPostal() {
   const [input, setInput]   = useState('')
   const [query, setQuery]   = useState('')
+  const [showMap, setShowMap] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const valid = /^\d{4}-\d{3}$/.test(query)
@@ -30,6 +32,7 @@ export function CodigoPostal() {
   function handleClear() {
     setInput('')
     setQuery('')
+    setShowMap(false)
     inputRef.current?.focus()
   }
 
@@ -91,14 +94,13 @@ export function CodigoPostal() {
                 <p className="text-lg font-semibold text-slate-700 mt-1">{data['Designação Postal']}</p>
               </div>
               {lat && lng && (
-                <a
-                  href={`https://www.google.com/maps?q=${lat},${lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setShowMap((v) => !v)}
                   className="flex items-center gap-1.5 text-sm text-orange-600 hover:text-orange-700 font-medium flex-shrink-0 border border-orange-200 rounded-lg px-3 py-1.5 hover:bg-orange-50 transition-colors"
                 >
-                  <MapPin size={14} /> Ver no mapa
-                </a>
+                  <MapPin size={14} /> {showMap ? 'Ocultar mapa' : 'Ver no mapa'}
+                </button>
               )}
             </div>
 
@@ -116,6 +118,15 @@ export function CodigoPostal() {
                 <p className="text-sm font-semibold text-slate-800">{data.Localidade || '—'}</p>
               </div>
             </div>
+
+            {showMap && lat && lng && (
+              <SinglePointMap
+                lat={lat}
+                lon={lng}
+                label={`${data.CP} · ${data['Designação Postal']}`}
+                className="mt-4 w-full h-64 rounded-xl border border-slate-200 overflow-hidden"
+              />
+            )}
           </Card>
 
           {/* Streets */}
