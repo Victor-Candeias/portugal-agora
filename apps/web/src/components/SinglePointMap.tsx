@@ -18,7 +18,21 @@ export function SinglePointMap({ lat, lon, label, className }: { lat: number; lo
         attribution: '© OpenStreetMap',
         maxZoom: 18,
       }).addTo(map)
-      L.marker([lat, lon]).addTo(map).bindPopup(label).openPopup()
+      const popupEl = document.createElement('div')
+      const labelEl = document.createElement('div')
+      labelEl.className = 'text-sm font-medium text-slate-800 mb-1.5'
+      labelEl.textContent = label
+      popupEl.appendChild(labelEl)
+
+      const dirLink = document.createElement('a')
+      dirLink.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
+      dirLink.target = '_blank'
+      dirLink.rel = 'noopener noreferrer'
+      dirLink.textContent = '🧭 Direções'
+      dirLink.className = 'text-xs font-semibold text-blue-600 hover:text-blue-700 underline'
+      popupEl.appendChild(dirLink)
+
+      L.marker([lat, lon]).addTo(map).bindPopup(popupEl).openPopup()
     })
     return () => {
       cancelled = true
