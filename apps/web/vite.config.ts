@@ -24,11 +24,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/carris/, ''),
       },
-      '/api/sigtur': {
-        target: 'https://geo.turismodeportugal.pt/server/rest/services/TDP',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/sigtur/, ''),
-      },
     },
   },
 })

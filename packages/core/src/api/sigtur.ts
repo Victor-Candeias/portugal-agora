@@ -8,19 +8,30 @@
 const ARCGIS_BASE = 'https://geo.turismodeportugal.pt/server/rest/services/TDP'
 
 // O servidor só devolve cabeçalhos CORS para origens oficiais (ex. sigtur.turismodeportugal.pt),
-// pelo que apps web (browser) precisam de reescrever o pedido através de um proxy — ver padrão
-// idêntico em apps/web/src/hooks/useTransportes.ts (comboios.live). Apps nativas (mobile) não
-// são sujeitas a CORS, por isso o URL é usado diretamente (identidade) por omissão.
-let requestUrlTransform: (url: string) => string = (url) => url
+// pelo que apps web (browser) não conseguem usar `fetch` diretamente nem via proxies de
+// terceiros (corsproxy.io passou a exigir plano pago; alternativas gratuitas como
+// allorigins/codetabs não conseguem alcançar este servidor a partir de infraestrutura cloud).
+// A solução robusta e nativa dos servidores ArcGIS REST é JSONP (parâmetro `callback`),
+// que contorna CORS por completo (pedido feito via <script>, não via fetch/XHR).
+// Apps nativas (mobile) não são sujeitas a CORS, por isso usam `fetch` diretamente.
+export type SigturTransport = (url: URL) => Promise<ArcGisGeoJsonResponse>
+
+async function defaultFetchTransport(url: URL): Promise<ArcGisGeoJsonResponse> {
+  url.searchParams.set('f', 'geojson')
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`SIGTUR ArcGIS error: ${res.status}`)
+  return res.json() as Promise<ArcGisGeoJsonResponse>
+}
+
+let transport: SigturTransport = defaultFetchTransport
 
 /**
- * Permite a uma app (ex. web) reescrever o URL final do pedido (ex. via proxy Vite em dev,
- * ou via corsproxy.io em produção) para contornar restrições de CORS do servidor ArcGIS.
- * O URL completo (com querystring) é passado já construído, para evitar quebrar proxies
- * que esperam o URL alvo como um único parâmetro literal (ex. corsproxy.io?url=...).
+ * Permite a uma app (ex. web) substituir o mecanismo de pedido usado para consultar o ArcGIS
+ * (por omissão, `fetch` direto — usado pela app mobile, que não está sujeita a CORS).
+ * A app web usa isto para fazer os pedidos via JSONP (ver apps/web/src/lib/sigtur.ts).
  */
-export function configureSigturRequestUrl(transform: (url: string) => string): void {
-  requestUrlTransform = transform
+export function configureSigturTransport(fn: SigturTransport): void {
+  transport = fn
 }
 
 export interface SigturLayerConfig {
@@ -94,7 +105,7 @@ export interface ArcGisQueryParams {
   resultRecordCount?: number
 }
 
-interface ArcGisGeoJsonResponse {
+export interface ArcGisGeoJsonResponse {
   features: Array<{
     type: 'Feature'
     geometry: { type: string; coordinates: [number, number] } | null
@@ -108,7 +119,6 @@ async function queryLayer(layer: SigturLayerConfig, params: ArcGisQueryParams = 
   url.searchParams.set('outFields', '*')
   url.searchParams.set('returnGeometry', 'true')
   url.searchParams.set('outSR', '4326')
-  url.searchParams.set('f', 'geojson')
   url.searchParams.set('resultOffset', String(params.resultOffset ?? 0))
   url.searchParams.set('resultRecordCount', String(params.resultRecordCount ?? 1000))
 
@@ -123,9 +133,7 @@ async function queryLayer(layer: SigturLayerConfig, params: ArcGisQueryParams = 
     }
   }
 
-  const res = await fetch(requestUrlTransform(url.toString()))
-  if (!res.ok) throw new Error(`SIGTUR ArcGIS error: ${res.status}`)
-  return res.json() as Promise<ArcGisGeoJsonResponse>
+  return transport(url)
 }
 
 /** Mapeamento de campos de origem (variam por layer) → modelo normalizado. */
