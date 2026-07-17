@@ -10,6 +10,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   'culture': 'Cultural',
   'beaches-golf': 'Praias e Golfe',
   'wine-tourism': 'Enoturismo',
+  'monuments': 'Monumentos',
 }
 
 // Coordenadas de Lisboa usadas como fallback caso a localização não seja concedida.

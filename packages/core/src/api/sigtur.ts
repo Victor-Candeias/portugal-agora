@@ -90,6 +90,11 @@ export const SIGTUR_LAYERS: SigturLayerConfig[] = [
     service: 'SIGTUR_Light_Enoturismo',
     layerId: 1, // "Unidades de Enoturismo"
   },
+  {
+    category: 'monuments',
+    service: 'Programa_REVIVE',
+    layerId: 10, // "Programa REVIVE" — monumentos nacionais (mosteiros, fortalezas, castelos) reconvertidos em pousadas/hotéis
+  },
 ]
 
 function layerUrl(layer: SigturLayerConfig): string {

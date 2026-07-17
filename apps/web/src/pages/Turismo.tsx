@@ -17,6 +17,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   'culture': 'Cultural',
   'beaches-golf': 'Praias e Golfe',
   'wine-tourism': 'Enoturismo',
+  'monuments': 'Monumentos',
 }
 
 const NEARBY_RADIUS_KM = 25
