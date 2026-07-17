@@ -34,4 +34,5 @@ status: active
 | WEB-015 | Carris: alertas da rede (desvios, obras, interrupções) | backlog | 2026-07-15 |  | medium |  |  | WEB-010 |  |
 | WEB-016 | Carris: identificação de operadores via GTFS (agency.txt + routes.txt) | done | 2026-07-15 |  | medium | 2026-07-15 |  | WEB-010, WEB-011 |  |
 | WEB-017 | Carris: migrar apps (web/mobile/android-auto) para consumir API própria | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-011, WEB-012, WEB-013, WEB-014, WEB-015, WEB-016 |  |
+| WEB-018 | Turismo: integrar SIGTUR/TravelBI (ArcGIS REST) e criar tab/página Turismo | done | 2026-07-17 |  | medium | 2026-07-17 |  |  | [WEB-018](../specs/mobile/web-018-spec.md) |
 <!-- /maestru:work-items-list -->

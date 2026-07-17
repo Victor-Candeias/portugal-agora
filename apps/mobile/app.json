@@ -7,7 +7,15 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "portugal-hoje",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A app usa a tua localização para mostrar pontos de interesse turístico perto de ti."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "pt.portugalhoje.app"

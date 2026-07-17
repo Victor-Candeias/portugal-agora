@@ -1,5 +1,5 @@
 import { NavLink, Outlet, Link } from 'react-router-dom'
-import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag, Hospital, Train, MailOpen } from 'lucide-react'
+import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag, Hospital, Train, MailOpen, Palmtree } from 'lucide-react'
 import { useAnpcSummary } from '@/hooks/useANPC'
 
 const NAV = [
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/ev',           label: 'EV',             icon: Zap },
   { to: '/economia',     label: 'Economia',       icon: BarChart3 },
   { to: '/codigo-postal', label: 'Cód. Postal',   icon: MailOpen },
+  { to: '/turismo',      label: 'Turismo',        icon: Palmtree },
 ]
 
 export function Layout() {

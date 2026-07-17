@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { Dashboard } from '@/pages/Dashboard'
@@ -12,6 +12,7 @@ import { Hospitais } from '@/pages/Hospitais'
 import { Transportes } from '@/pages/Transportes'
 import { Economia } from '@/pages/Economia'
 import { CodigoPostal } from '@/pages/CodigoPostal'
+import { Turismo } from '@/pages/Turismo'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -26,7 +27,7 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <HashRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
@@ -38,9 +39,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="transportes" element={<Transportes />} />
             <Route path="economia"    element={<Economia />} />
             <Route path="codigo-postal" element={<CodigoPostal />} />
+            <Route path="turismo" element={<Turismo />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </QueryClientProvider>
   </React.StrictMode>,
 )

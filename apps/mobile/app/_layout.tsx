@@ -57,6 +57,13 @@ export default function RootLayout() {
               tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📊</Text>,
             }}
           />
+          <Tabs.Screen
+            name="(tabs)/turismo"
+            options={{
+              title: 'Turismo',
+              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏖️</Text>,
+            }}
+          />
         </Tabs>
       </SafeAreaProvider>
     </QueryClientProvider>
