@@ -21,6 +21,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   'protected-areas': 'Áreas Protegidas',
   'natura-2000': 'Rede Natura 2000',
   'trails': 'Percursos Pedestres',
+  'unesco': 'Património Mundial UNESCO',
 }
 
 const NEARBY_RADIUS_KM = 25
@@ -116,7 +117,7 @@ export function Turismo() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">🏖️ Turismo</h1>
-          <p className="text-slate-500 text-sm mt-1">SIGTUR · Turismo de Portugal · ICNF</p>
+          <p className="text-slate-500 text-sm mt-1">SIGTUR · Turismo de Portugal · ICNF · UNESCO</p>
         </div>
         <a
           href="https://sigtur.turismodeportugal.pt/"

@@ -5,17 +5,19 @@
 // disponíveis em toda a app sem alterações adicionais.
 import { sigturClient, type TourismPoint, type TourismPointsParams } from './sigtur.js'
 import { icnfClient } from './icnf.js'
+import { unescoClient } from './unesco.js'
 
 export const tourismClient = {
   async getTourismPoints(params: TourismPointsParams = {}): Promise<TourismPoint[]> {
-    const [sigturPoints, icnfPoints] = await Promise.all([
+    const [sigturPoints, icnfPoints, unescoPoints] = await Promise.all([
       sigturClient.getTourismPoints(params),
       icnfClient.getTourismPoints(params),
+      unescoClient.getTourismPoints(params),
     ])
-    return [...sigturPoints, ...icnfPoints]
+    return [...sigturPoints, ...icnfPoints, ...unescoPoints]
   },
 
   getCategories(): string[] {
-    return [...new Set([...sigturClient.getCategories(), ...icnfClient.getCategories()])]
+    return [...new Set([...sigturClient.getCategories(), ...icnfClient.getCategories(), ...unescoClient.getCategories()])]
   },
 }

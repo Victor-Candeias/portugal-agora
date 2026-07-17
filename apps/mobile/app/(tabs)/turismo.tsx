@@ -14,6 +14,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   'protected-areas': 'Áreas Protegidas',
   'natura-2000': 'Rede Natura 2000',
   'trails': 'Percursos Pedestres',
+  'unesco': 'Património Mundial UNESCO',
 }
 
 // Coordenadas de Lisboa usadas como fallback caso a localização não seja concedida.
@@ -50,7 +51,7 @@ export default function Turismo() {
         <View>
           <Text style={styles.title}>🏖️ Turismo</Text>
           <Text style={styles.subtitle}>
-            SIGTUR · ICNF · 25km {locationStatus === 'denied' ? '(perto de Lisboa)' : 'perto de ti'}
+            SIGTUR · ICNF · UNESCO · 25km {locationStatus === 'denied' ? '(perto de Lisboa)' : 'perto de ti'}
           </Text>
         </View>
         <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>

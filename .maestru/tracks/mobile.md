@@ -36,4 +36,5 @@ status: active
 | WEB-017 | Carris: migrar apps (web/mobile/android-auto) para consumir API própria | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-011, WEB-012, WEB-013, WEB-014, WEB-015, WEB-016 |  |
 | WEB-018 | Turismo: integrar SIGTUR/TravelBI (ArcGIS REST) e criar tab/página Turismo | done | 2026-07-17 |  | medium | 2026-07-17 |  |  | [WEB-018](../specs/mobile/web-018-spec.md) |
 | WEB-019 | Turismo: integrar ICNF (Áreas Protegidas, Rede Natura 2000, Percursos Pedestres) | done | 2026-07-17 |  | medium | 2026-07-17 |  |  |  |
+| WEB-020 | Turismo: validar Agenda Cultural Lisboa/OSM Overpass/Wikidata/UNESCO e integrar UNESCO | done | 2026-07-17 |  | medium | 2026-07-17 |  |  |  |
 <!-- /maestru:work-items-list -->
