@@ -165,8 +165,10 @@ export interface TourismPoint {
   latitude: number
   longitude: number
   source: {
-    provider: 'Turismo de Portugal'
-    system: 'SIGTUR'
+    /** Ex. "Turismo de Portugal", "ICNF". Generalizado para admitir múltiplas fontes (ver icnf.ts). */
+    provider: string
+    /** Ex. "SIGTUR", "ICNF". */
+    system: string
     service: string
     layerId: number
     objectId: string

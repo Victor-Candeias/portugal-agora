@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { FuelType } from '@portugal-hoje/core'
 import { apiClient } from '../lib/api'
-import { dgegClient, DGEG_FUEL_IDS, sigturClient } from '@portugal-hoje/core'
+import { dgegClient, DGEG_FUEL_IDS, tourismClient } from '@portugal-hoje/core'
 
 export function useFuelPrices(fuelType: FuelType, districtId?: number, municipalityId?: number) {
   return useQuery({
@@ -86,7 +86,7 @@ export function useInterestRates() {
 export function useTourismPoints(lat?: number, lng?: number, category?: string) {
   return useQuery({
     queryKey: ['tourism', 'points', lat, lng, category ?? 'all'],
-    queryFn: () => sigturClient.getTourismPoints({
+    queryFn: () => tourismClient.getTourismPoints({
       nearby: lat && lng ? { latitude: lat, longitude: lng, radiusKm: 25 } : undefined,
       category,
     }),

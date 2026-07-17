@@ -11,6 +11,9 @@ const CATEGORY_LABEL: Record<string, string> = {
   'beaches-golf': 'Praias e Golfe',
   'wine-tourism': 'Enoturismo',
   'monuments': 'Monumentos',
+  'protected-areas': 'Áreas Protegidas',
+  'natura-2000': 'Rede Natura 2000',
+  'trails': 'Percursos Pedestres',
 }
 
 // Coordenadas de Lisboa usadas como fallback caso a localização não seja concedida.
@@ -47,7 +50,7 @@ export default function Turismo() {
         <View>
           <Text style={styles.title}>🏖️ Turismo</Text>
           <Text style={styles.subtitle}>
-            SIGTUR · Turismo de Portugal · 25km {locationStatus === 'denied' ? '(perto de Lisboa)' : 'perto de ti'}
+            SIGTUR · ICNF · 25km {locationStatus === 'denied' ? '(perto de Lisboa)' : 'perto de ti'}
           </Text>
         </View>
         <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
