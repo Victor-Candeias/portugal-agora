@@ -40,8 +40,7 @@ export function ServicosPublicos() {
   const [category, setCategory] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [showMap, setShowMap] = useState(false)
+  const [mapService, setMapService] = useState<string | null>(null)
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
 
@@ -156,14 +155,8 @@ export function ServicosPublicos() {
                   distanceLabel={userLocation && service.latitude != null && service.longitude != null
                     ? `${distanceKm(userLocation, { lat: service.latitude, lng: service.longitude }).toFixed(1)} km`
                     : null}
-                  expanded={expanded === service.id}
-                  showMap={showMap && expanded === service.id}
-                  onToggle={() => {
-                    const next = expanded === service.id ? null : service.id
-                    setExpanded(next)
-                    if (!next) setShowMap(false)
-                  }}
-                  onToggleMap={() => setShowMap(!showMap)}
+                  showMap={mapService === service.id}
+                  onToggleMap={() => setMapService(mapService === service.id ? null : service.id)}
                 />
               ))}
               {filtered.length === 0 && (
@@ -171,7 +164,7 @@ export function ServicosPublicos() {
               )}
             </div>
 
-            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setExpanded(null); setShowMap(false) }} />
+            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapService(null) }} />
           </>
         )}
       </Card>
@@ -182,73 +175,72 @@ export function ServicosPublicos() {
 interface PublicServiceCardProps {
   service: PublicService
   distanceLabel: string | null
-  expanded: boolean
   showMap: boolean
-  onToggle: () => void
   onToggleMap: () => void
 }
 
-function PublicServiceCard({ service, distanceLabel, expanded, showMap, onToggle, onToggleMap }: PublicServiceCardProps) {
+function PublicServiceCard({ service, distanceLabel, showMap, onToggleMap }: PublicServiceCardProps) {
+  const hasCoords = service.latitude != null && service.longitude != null
+
   return (
     <div className="border border-slate-100 rounded-lg p-4 hover:border-slate-300 transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div>
-          <p className="font-semibold text-slate-900 text-sm leading-snug flex items-center gap-1.5">
-            <Shield size={14} className="text-blue-600 flex-shrink-0" /> {service.name}
-          </p>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${CATEGORY_COLOR[service.category] ?? 'bg-slate-100 text-slate-700'}`}>
-              {service.subcategory}
-            </span>
-            {distanceLabel && <span className="text-[10px] text-slate-400">· {distanceLabel}</span>}
-          </div>
+        <p className="font-semibold text-slate-900 text-sm leading-snug flex items-center gap-1.5">
+          <Shield size={14} className="text-blue-600 flex-shrink-0" /> {service.name}
+        </p>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${CATEGORY_COLOR[service.category] ?? 'bg-slate-100 text-slate-700'}`}>
+            {service.subcategory}
+          </span>
+          {distanceLabel && <span className="text-xs text-orange-600 font-medium whitespace-nowrap">{distanceLabel}</span>}
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-xs font-medium text-blue-600 hover:text-blue-700 flex-shrink-0"
-        >
-          {expanded ? 'Fechar' : 'Detalhes'}
-        </button>
       </div>
 
-      {expanded && (
-        <div className="mt-2 space-y-1.5 text-xs text-slate-600">
-          {service.address && (
-            <p className="flex items-center gap-1.5"><MapPin size={11} className="flex-shrink-0" /> {service.address}{service.locality ? `, ${service.locality}` : ''}</p>
-          )}
-          {service.phone && (
-            <p className="flex items-center gap-1.5"><Phone size={11} className="flex-shrink-0" /> <a href={`tel:${service.phone}`} className="hover:underline">{service.phone}</a></p>
-          )}
-          {service.email && (
-            <p className="flex items-center gap-1.5"><Mail size={11} className="flex-shrink-0" /> <a href={`mailto:${service.email}`} className="hover:underline">{service.email}</a></p>
-          )}
-          {service.opening_hours && (
-            <p className="flex items-center gap-1.5"><Clock3 size={11} className="flex-shrink-0" /> {service.opening_hours}</p>
-          )}
-          {!service.address && !service.phone && !service.email && !service.opening_hours && (
-            <p className="text-slate-400">Sem informação de contacto disponível (OpenStreetMap).</p>
-          )}
+      {service.address && (
+        <p className="text-xs text-slate-500 flex items-center gap-1 mb-2">
+          <MapPin size={11} />
+          {service.address}{service.locality ? `, ${service.locality}` : ''}
+        </p>
+      )}
 
-          {service.latitude != null && service.longitude != null && (
-            <button
-              type="button"
-              onClick={onToggleMap}
-              className="flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium mt-1"
-            >
-              <MapPin size={11} /> {showMap ? 'Ocultar mapa' : 'Mapa / direções'}
-            </button>
-          )}
+      {service.opening_hours && (
+        <p className="text-xs text-slate-400 flex items-center gap-1 mb-2">
+          <Clock3 size={11} /> {service.opening_hours}
+        </p>
+      )}
 
-          {showMap && service.latitude != null && service.longitude != null && (
-            <SinglePointMap
-              lat={service.latitude}
-              lon={service.longitude}
-              label={service.name}
-              className="w-full h-56 rounded-xl border border-slate-200 overflow-hidden mt-1"
-            />
-          )}
-        </div>
+      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+        {service.phone && (
+          <a href={`tel:${service.phone}`} className="flex items-center gap-1 hover:text-blue-600">
+            <Phone size={11} /> {service.phone}
+          </a>
+        )}
+        {service.email && (
+          <a href={`mailto:${service.email}`} className="flex items-center gap-1 hover:text-blue-600 max-w-[180px] truncate">
+            <Mail size={11} /> {service.email}
+          </a>
+        )}
+        {!service.address && !service.phone && !service.email && !service.opening_hours && (
+          <span className="text-slate-400">Sem informação de contacto disponível (OpenStreetMap).</span>
+        )}
+        {hasCoords && (
+          <button
+            type="button"
+            onClick={onToggleMap}
+            className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium flex-shrink-0"
+          >
+            <MapPin size={11} /> {showMap ? 'Ocultar mapa' : 'Mapa'}
+          </button>
+        )}
+      </div>
+
+      {showMap && hasCoords && (
+        <SinglePointMap
+          lat={service.latitude!}
+          lon={service.longitude!}
+          label={service.name}
+          className="mt-3 w-full h-56 rounded-xl border border-slate-200 overflow-hidden"
+        />
       )}
     </div>
   )
