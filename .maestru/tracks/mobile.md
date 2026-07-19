@@ -38,4 +38,5 @@ status: active
 | WEB-019 | Turismo: integrar ICNF (Áreas Protegidas, Rede Natura 2000, Percursos Pedestres) | done | 2026-07-17 |  | medium | 2026-07-17 |  |  |  |
 | WEB-020 | Turismo: validar Agenda Cultural Lisboa/OSM Overpass/Wikidata/UNESCO e integrar UNESCO | done | 2026-07-17 |  | medium | 2026-07-17 |  |  |  |
 | WEB-021 | Turismo: enriquecimento on-demand via Wikidata (descrição + foto Wikimedia Commons) | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
+| WEB-022 | Metro do Porto: pipeline GTFS->SQLite (WASM) + página de estações/próximas partidas | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 <!-- /maestru:work-items-list -->

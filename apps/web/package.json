@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:db": "node scripts/build-carris-db.mjs",
+    "build:db": "node scripts/build-carris-db.mjs && node scripts/build-metro-porto-db.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
