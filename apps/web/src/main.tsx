@@ -14,6 +14,7 @@ import { Economia } from '@/pages/Economia'
 import { CodigoPostal } from '@/pages/CodigoPostal'
 import { Turismo } from '@/pages/Turismo'
 import { MetroPorto } from '@/pages/MetroPorto'
+import { ServicosPublicos } from '@/pages/ServicosPublicos'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -42,6 +43,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="codigo-postal" element={<CodigoPostal />} />
             <Route path="turismo" element={<Turismo />} />
             <Route path="metro-porto" element={<MetroPorto />} />
+            <Route path="servicos-publicos" element={<ServicosPublicos />} />
           </Route>
         </Routes>
       </HashRouter>

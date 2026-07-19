@@ -39,4 +39,5 @@ status: active
 | WEB-020 | Turismo: validar Agenda Cultural Lisboa/OSM Overpass/Wikidata/UNESCO e integrar UNESCO | done | 2026-07-17 |  | medium | 2026-07-17 |  |  |  |
 | WEB-021 | Turismo: enriquecimento on-demand via Wikidata (descrição + foto Wikimedia Commons) | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-022 | Metro do Porto: pipeline GTFS->SQLite (WASM) + página de estações/próximas partidas | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
+| WEB-023 | Serviços Públicos: PSP/GNR via Overpass (SQLite/WASM) + página perto de mim | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 <!-- /maestru:work-items-list -->
