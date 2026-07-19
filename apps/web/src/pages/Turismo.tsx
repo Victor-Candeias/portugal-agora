@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { MapPin, Phone, Globe, Compass, Mail, Navigation } from 'lucide-react'
-import { tourismClient } from '@portugal-hoje/core'
+import { MapPin, Phone, Globe, Compass, Mail, Navigation, BookOpen, ExternalLink } from 'lucide-react'
+import { tourismClient, getWikidataEnrichment } from '@portugal-hoje/core'
 import '@/lib/sigtur'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
@@ -54,10 +54,24 @@ function useTourismPoints(category?: string, nearby?: UserLocation) {
   })
 }
 
+// Enriquecimento (descrição + fotografia) via Wikidata/Wikimedia Commons, pedido só quando o
+// utilizador expande explicitamente um ponto ("Saber mais") — nunca em bloco para a listagem
+// inteira, para evitar o problema N+1/rate-limit identificado em WEB-020.
+function useWikidataEnrichment(name: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['tourism', 'wikidata', name],
+    queryFn: () => getWikidataEnrichment(name),
+    enabled,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+  })
+}
+
 export function Turismo() {
   const [category, setCategory] = useState('')
   const [search, setSearch] = useState('')
   const [mapPoint, setMapPoint] = useState<string | null>(null)
+  const [infoPoint, setInfoPoint] = useState<string | null>(null)
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const [nearbyEnabled, setNearbyEnabled] = useState(false)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'>('idle')
@@ -199,76 +213,153 @@ export function Turismo() {
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {paginated.map(point => {
-                const showMap = mapPoint === point.id
-                return (
-                  <div key={point.id} className="border border-slate-100 rounded-lg p-4 hover:border-slate-300 transition-colors">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <p className="font-semibold text-slate-900 text-sm leading-snug">{point.name}</p>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-800">
-                          {CATEGORY_LABEL[point.category] ?? point.category}
-                        </span>
-                        {nearby && (
-                          <span className="text-xs text-orange-600 font-medium whitespace-nowrap">
-                            {distanceKm(nearby, { lat: point.latitude, lng: point.longitude }).toFixed(1)} km
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {point.address && (
-                      <p className="text-xs text-slate-500 flex items-center gap-1 mb-2">
-                        <MapPin size={11} />
-                        {point.address}{point.municipality ? `, ${point.municipality}` : ''}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                      {point.phone && (
-                        <a href={`tel:${point.phone}`} className="flex items-center gap-1 hover:text-blue-600">
-                          <Phone size={11} /> {point.phone}
-                        </a>
-                      )}
-                      {point.website && (
-                        <a href={point.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-blue-600">
-                          <Globe size={11} /> Site
-                        </a>
-                      )}
-                      {point.email && (
-                        <a href={`mailto:${point.email}`} className="flex items-center gap-1 hover:text-blue-600 max-w-[180px] truncate">
-                          <Mail size={11} /> {point.email}
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setMapPoint(showMap ? null : point.id)}
-                        className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium flex-shrink-0"
-                      >
-                        <MapPin size={11} /> {showMap ? 'Ocultar mapa' : 'Mapa'}
-                      </button>
-                    </div>
-
-                    {showMap && (
-                      <SinglePointMap
-                        lat={point.latitude}
-                        lon={point.longitude}
-                        label={point.name}
-                        className="mt-3 w-full h-56 rounded-xl border border-slate-200 overflow-hidden"
-                      />
-                    )}
-                  </div>
-                )
-              })}
+              {paginated.map(point => (
+                <TourismPointCard
+                  key={point.id}
+                  point={point}
+                  distanceLabel={nearby ? `${distanceKm(nearby, { lat: point.latitude, lng: point.longitude }).toFixed(1)} km` : undefined}
+                  showMap={mapPoint === point.id}
+                  onToggleMap={() => setMapPoint(mapPoint === point.id ? null : point.id)}
+                  showInfo={infoPoint === point.id}
+                  onToggleInfo={() => setInfoPoint(infoPoint === point.id ? null : point.id)}
+                />
+              ))}
               {filtered.length === 0 && (
                 <p className="col-span-2 text-slate-400 text-sm text-center py-8">Nenhum resultado encontrado.</p>
               )}
             </div>
 
-            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapPoint(null) }} />
+            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapPoint(null); setInfoPoint(null) }} />
           </>
         )}
       </Card>
+    </div>
+  )
+}
+
+interface TourismPointCardProps {
+  point: {
+    id: string
+    name: string
+    category: string
+    address?: string
+    municipality?: string
+    phone?: string
+    website?: string
+    email?: string
+    latitude: number
+    longitude: number
+  }
+  distanceLabel?: string
+  showMap: boolean
+  onToggleMap: () => void
+  showInfo: boolean
+  onToggleInfo: () => void
+}
+
+function TourismPointCard({ point, distanceLabel, showMap, onToggleMap, showInfo, onToggleInfo }: TourismPointCardProps) {
+  const { data: enrichment, isLoading: isLoadingInfo, isError: isInfoError } = useWikidataEnrichment(point.name, showInfo)
+
+  return (
+    <div className="border border-slate-100 rounded-lg p-4 hover:border-slate-300 transition-colors">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <p className="font-semibold text-slate-900 text-sm leading-snug">{point.name}</p>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-800">
+            {CATEGORY_LABEL[point.category] ?? point.category}
+          </span>
+          {distanceLabel && (
+            <span className="text-xs text-orange-600 font-medium whitespace-nowrap">
+              {distanceLabel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {point.address && (
+        <p className="text-xs text-slate-500 flex items-center gap-1 mb-2">
+          <MapPin size={11} />
+          {point.address}{point.municipality ? `, ${point.municipality}` : ''}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+        {point.phone && (
+          <a href={`tel:${point.phone}`} className="flex items-center gap-1 hover:text-blue-600">
+            <Phone size={11} /> {point.phone}
+          </a>
+        )}
+        {point.website && (
+          <a href={point.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-blue-600">
+            <Globe size={11} /> Site
+          </a>
+        )}
+        {point.email && (
+          <a href={`mailto:${point.email}`} className="flex items-center gap-1 hover:text-blue-600 max-w-[180px] truncate">
+            <Mail size={11} /> {point.email}
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={onToggleInfo}
+          className="flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium flex-shrink-0"
+        >
+          <BookOpen size={11} /> {showInfo ? 'Ocultar info' : 'Saber mais'}
+        </button>
+        <button
+          type="button"
+          onClick={onToggleMap}
+          className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium flex-shrink-0"
+        >
+          <MapPin size={11} /> {showMap ? 'Ocultar mapa' : 'Mapa'}
+        </button>
+      </div>
+
+      {showInfo && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          {isLoadingInfo && <p className="text-xs text-slate-400">A procurar informação na Wikipédia…</p>}
+          {isInfoError && <p className="text-xs text-slate-400">Não foi possível obter mais informação.</p>}
+          {!isLoadingInfo && !isInfoError && !enrichment && (
+            <p className="text-xs text-slate-400">Sem informação adicional disponível na Wikipédia/Wikidata.</p>
+          )}
+          {enrichment && (
+            <div className="flex gap-3 items-start">
+              {enrichment.imageUrl && (
+                <img
+                  src={enrichment.imageUrl}
+                  alt={point.name}
+                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-slate-200"
+                  loading="lazy"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              )}
+              <div className="min-w-0">
+                {enrichment.description && (
+                  <p className="text-xs text-slate-600 leading-relaxed">{enrichment.description}</p>
+                )}
+                {enrichment.wikipediaUrl && (
+                  <a
+                    href={enrichment.wikipediaUrl}
+                    target="_blank" rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    <ExternalLink size={11} /> Ver na Wikipédia
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showMap && (
+        <SinglePointMap
+          lat={point.latitude}
+          lon={point.longitude}
+          label={point.name}
+          className="mt-3 w-full h-56 rounded-xl border border-slate-200 overflow-hidden"
+        />
+      )}
     </div>
   )
 }

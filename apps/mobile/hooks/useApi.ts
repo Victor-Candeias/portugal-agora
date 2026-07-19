@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { FuelType } from '@portugal-hoje/core'
 import { apiClient } from '../lib/api'
-import { dgegClient, DGEG_FUEL_IDS, tourismClient } from '@portugal-hoje/core'
+import { dgegClient, DGEG_FUEL_IDS, tourismClient, getWikidataEnrichment } from '@portugal-hoje/core'
 
 export function useFuelPrices(fuelType: FuelType, districtId?: number, municipalityId?: number) {
   return useQuery({
@@ -92,5 +92,18 @@ export function useTourismPoints(lat?: number, lng?: number, category?: string) 
     }),
     staleTime: 24 * 60 * 60 * 1000,
     enabled: !!(lat && lng),
+  })
+}
+
+// Enriquecimento on-demand (descrição + fotografia) via Wikidata/Wikimedia Commons, pedido só
+// quando o utilizador expande um ponto (mesmo padrão da app web, ver WEB-021) — evita o
+// problema N+1/rate-limit de enriquecer toda a listagem de uma vez.
+export function useWikidataEnrichment(name: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['tourism', 'wikidata', name],
+    queryFn: () => getWikidataEnrichment(name),
+    enabled,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 1,
   })
 }
