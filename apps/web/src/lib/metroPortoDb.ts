@@ -3,7 +3,7 @@
 // Mesmo padrão de `staticDb.ts` (Carris, WEB-010/011/016): dados praticamente estáticos
 // (estações, linhas, viagens, horários, calendário) são gerados em build/CI
 // (scripts/build-metro-porto-db.mjs, a partir do GTFS oficial publicado em
-// opendata.porto.digital) e servidos como asset estático em `/data/metro-porto.sqlite`.
+// dadosabertos.cm-porto.pt) e servidos como asset estático em `/data/metro-porto.sqlite`.
 // Aqui carregamos esse ficheiro no browser via SQLite compilado para WebAssembly (sql.js)
 // e consultamo-lo localmente, sem pedidos de rede repetidos.
 //

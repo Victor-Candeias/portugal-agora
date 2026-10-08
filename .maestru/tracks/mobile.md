@@ -47,4 +47,5 @@ status: active
 | WEB-021 | Turismo: enriquecimento on-demand via Wikidata (descrição + foto Wikimedia Commons) | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-022 | Metro do Porto: pipeline GTFS->SQLite (WASM) + página de estações/próximas partidas | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-023 | Serviços Públicos: PSP/GNR via Overpass (SQLite/WASM) + página perto de mim | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
+| WEB-024 | Metro do Porto: corrigir URL do portal (dadosabertos.cm-porto.pt) e seleção do GTFS mais recente | done | 2026-10-08 | developer | high | 2026-10-08 |  |  |  |
 <!-- /maestru:work-items-list -->

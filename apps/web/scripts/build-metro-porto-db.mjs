@@ -1,5 +1,5 @@
 // Gera apps/web/public/data/metro-porto.sqlite a partir do GTFS oficial do Metro do Porto,
-// publicado no portal Open Data do Porto (opendata.porto.digital, organização "metro-do-porto").
+// publicado no portal de Dados Abertos do Porto (dadosabertos.cm-porto.pt, organização "metro-do-porto").
 // Corre em Node no momento do build/CI — nunca em runtime no browser.
 // Ver .Docs/metro porto.txt e WEB-022 (.maestru/tracks/mobile/).
 import fs from 'node:fs'
@@ -14,7 +14,9 @@ const OUT_DIR = path.resolve(__dirname, '../public/data')
 const OUT_FILE = path.join(OUT_DIR, 'metro-porto.sqlite')
 
 // Dataset CKAN "Horários, paragens e rotas da Metro do Porto" (organização metro-do-porto).
-const CKAN_PACKAGE_URL = 'https://opendata.porto.digital/api/3/action/package_show?id=15f22603-a216-492a-ab1c-40b1d8aa2f08'
+// O portal migrou de opendata.porto.digital para dadosabertos.cm-porto.pt e o UUID do dataset
+// mudou (o antigo dá 404, WEB-024) — usamos o nome (slug), que é estável entre migrações.
+const CKAN_PACKAGE_URL = 'https://dadosabertos.cm-porto.pt/api/3/action/package_show?id=horarios-paragens-e-rotas-metro-porto'
 
 async function fetchJson(url) {
   const res = await fetch(url)
@@ -34,17 +36,25 @@ function parseCsv(text) {
 
 /**
  * O portal Open Data do Porto já teve recursos GTFS "mais recentes" publicados vazios
- * (0 bytes) — ver nota em WEB-022. Por isso percorremos os recursos ZIP por ordem
- * decrescente de criação e usamos o primeiro que descarrega com conteúdo real, em vez de
+ * (0 bytes) — ver nota em WEB-022. Por isso percorremos os recursos ZIP do mais recente
+ * para o mais antigo e usamos o primeiro que descarrega com conteúdo real, em vez de
  * confiar cegamente no rótulo "Mais Recente".
+ *
+ * A ordem vem de `position` (ordem de publicação no dataset), não de `created`: na migração
+ * do portal todos os recursos foram recriados no mesmo instante e `created` deixou de refletir
+ * a data real do GTFS (WEB-024). `last_modified`/`created` ficam só como desempate.
  */
+function resourceTime(r) {
+  return new Date(r.last_modified ?? r.created ?? 0).getTime() || 0
+}
+
 async function fetchLatestGtfsZip() {
-  console.log('→ a consultar catálogo CKAN (opendata.porto.digital)...')
+  console.log('→ a consultar catálogo CKAN (dadosabertos.cm-porto.pt)...')
   const pkg = await fetchJson(CKAN_PACKAGE_URL)
   const resources = (pkg.result?.resources ?? [])
     .filter(r => r.format === 'ZIP' || r.format === 'GTFS')
     .filter(r => !!r.url)
-    .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+    .sort((a, b) => ((b.position ?? -1) - (a.position ?? -1)) || (resourceTime(b) - resourceTime(a)))
 
   for (const resource of resources) {
     console.log(`  a tentar "${resource.name}" (${resource.created})...`)
@@ -290,7 +300,7 @@ async function main() {
   console.log(`  ${calendarDates.length} exceção(ões) de calendário guardada(s).`)
 
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('generated_at', new Date().toISOString())
-  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('source', `opendata.porto.digital: ${resource.name}`)
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('source', `dadosabertos.cm-porto.pt: ${resource.name}`)
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('gtfs_resource_created', resource.created)
 
   db.exec('VACUUM')
