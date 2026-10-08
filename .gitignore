@@ -5,3 +5,15 @@ dist/
 .env.*.local
 *.log
 .DS_Store
+
+# Android / Gradle (apps/android-auto)
+apps/android-auto/.gradle/
+apps/android-auto/.kotlin/
+apps/android-auto/.idea/
+apps/android-auto/build/
+apps/android-auto/app/build/
+apps/android-auto/local.properties
+
+# Keystores de assinatura (nunca versionar)
+*.jks
+*.keystore
