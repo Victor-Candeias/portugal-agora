@@ -3,17 +3,23 @@ plugins {
     kotlin("android")
 }
 
-val apiAbertaKey = System.getenv("VITE_APIABERTA_KEY") ?: ""
+// APIABERTA_KEY é o nome preferido; VITE_APIABERTA_KEY mantém compatibilidade com o setup antigo.
+val apiAbertaKey = System.getenv("APIABERTA_KEY") ?: System.getenv("VITE_APIABERTA_KEY") ?: ""
+
+// Assinatura de release via variáveis de ambiente (nunca commitar keystores/passwords).
+// Sem estas variáveis o APK/AAB de release é gerado sem assinatura.
+val releaseKeystorePath: String? = System.getenv("ANDROID_KEYSTORE_PATH")
+val hasReleaseSigning = !releaseKeystorePath.isNullOrBlank()
 
 android {
     namespace = "pt.portugalhoje.auto"
-    compileSdk = 34
-    buildToolsVersion = "34.0.0"
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "pt.portugalhoje.auto"
         minSdk = 23
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -21,19 +27,24 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file("${System.getProperty("user.home")}/.config/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         release {
             isDebuggable = false
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
