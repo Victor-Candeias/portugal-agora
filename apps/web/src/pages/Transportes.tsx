@@ -10,10 +10,10 @@ import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
 import {
   useCarrisVehicles, useCarrisLines, useCarrisLinesMap,
   useCarrisStops, useNearbyStops, useStopRealtime, useCarrisLinePatterns,
-  useCarrisOperators, useStopSchedule, useLineSchedule,
+  useCarrisOperators, useStopSchedule, useLineSchedule, useCarrisAlerts,
 } from '@/hooks/useCarris'
 import type { CMVehicle, CMStop, CMRealtime, CMLine, CMScheduledDeparture } from '@/hooks/useCarris'
-import { lisbonServiceDay } from '@portugal-hoje/core'
+import { lisbonServiceDay, isAlertActive } from '@portugal-hoje/core'
 import 'leaflet/dist/leaflet.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -36,6 +36,7 @@ const CAUSE_LABEL: Record<string, string> = {
   WEATHER:        '🌩️ Mau tempo',
   DEMONSTRATION:  '📢 Manifestação',
   NETWORK_UPDATE: '🔄 Atualização de rede',
+  OTHER_CAUSE:    'ℹ️ Outra causa',
 }
 
 const EFFECT_COLOR: Record<string, string> = {
@@ -431,7 +432,7 @@ function AlertasTmlTab() {
 // ── Carris Metropolitana tab ──────────────────────────────────────────────
 
 // Sub-tab type
-type CarrisSubTab = 'Veículos' | 'Linhas' | 'Paragens perto'
+type CarrisSubTab = 'Veículos' | 'Linhas' | 'Paragens perto' | 'Alertas'
 
 // ── Leaflet map for CM vehicles ───────────────────────────────────────────
 
@@ -1139,9 +1140,147 @@ function NearbyStopsSubTab() {
   )
 }
 
+// ── Alertas da rede Carris sub-tab (WEB-015) ──────────────────────────────
+
+function CarrisAlertsSubTab() {
+  const { data: alerts = [], isLoading, isError, refetch, isFetching, dataUpdatedAt } = useCarrisAlerts()
+  const linesMap = useCarrisLinesMap()
+  const [effectFilter, setEffectFilter] = useState<string | null>(null)
+  const [lineQuery, setLineQuery] = useState('')
+
+  const effects = useMemo(() => [...new Set(alerts.map(a => a.effect))].sort(), [alerts])
+
+  const filtered = useMemo(() => {
+    const q = lineQuery.trim()
+    return alerts.filter(a =>
+      (!effectFilter || a.effect === effectFilter) &&
+      (!q || a.line_ids.some(id => id.startsWith(q))))
+  }, [alerts, effectFilter, lineQuery])
+
+  if (isLoading) return <LoadingBox />
+  if (isError)   return <ErrorBox message="Erro ao carregar alertas da Carris Metropolitana." />
+
+  const nowSeconds = Date.now() / 1000
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-slate-400">
+          {filtered.length} alertas · atualizado às{' '}
+          {new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+        </p>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 disabled:opacity-50"
+        >
+          <RefreshCw size={12} className={isFetching ? 'animate-spin' : ''} /> Atualizar
+        </button>
+      </div>
+
+      <input
+        type="search"
+        inputMode="numeric"
+        value={lineQuery}
+        onChange={e => setLineQuery(e.target.value)}
+        placeholder="Filtrar por linha (ex.: 1728)"
+        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200"
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setEffectFilter(null)}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+            !effectFilter ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Todos
+        </button>
+        {effects.map(e => (
+          <button
+            key={e}
+            onClick={() => setEffectFilter(effectFilter === e ? null : e)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              effectFilter === e
+                ? (EFFECT_COLOR[e] ?? 'bg-slate-200 text-slate-800')
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {EFFECT_LABEL[e] ?? e}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map(a => {
+          const active = isAlertActive(a, nowSeconds)
+          return (
+            <Card key={a.id} className="p-4">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="font-semibold text-slate-900 text-sm leading-snug">{a.header}</p>
+                <div className="flex flex-col gap-1 flex-shrink-0 items-end">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${EFFECT_COLOR[a.effect] ?? 'bg-slate-100 text-slate-700'}`}>
+                    {EFFECT_LABEL[a.effect] ?? a.effect}
+                  </span>
+                  {!active && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Programado</span>
+                  )}
+                </div>
+              </div>
+
+              {a.description && (
+                <p className="text-xs text-slate-500 mb-2 leading-relaxed whitespace-pre-line">{a.description}</p>
+              )}
+
+              {a.line_ids.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {a.line_ids.map(id => (
+                    <span
+                      key={id}
+                      className="px-1.5 py-0.5 rounded text-white text-xs font-bold"
+                      style={{ backgroundColor: linesMap.get(id)?.color ?? '#64748b' }}
+                    >
+                      {id}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                <span>{CAUSE_LABEL[a.cause] ?? a.cause}</span>
+                <span className="flex items-center gap-1">
+                  <Clock size={11} />
+                  {a.start ? formatDate(a.start * 1000) : '—'} – {a.end ? formatDate(a.end * 1000) : 'sem fim previsto'}
+                </span>
+                {a.stop_ids.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <MapPin size={11} /> {a.stop_ids.length} {a.stop_ids.length === 1 ? 'paragem' : 'paragens'}
+                  </span>
+                )}
+                {a.image_url && (
+                  <a
+                    href={a.image_url}
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700 font-medium ml-auto"
+                  >
+                    Ver imagem
+                  </a>
+                )}
+              </div>
+            </Card>
+          )
+        })}
+        {filtered.length === 0 && (
+          <p className="text-slate-400 text-sm text-center py-8">Sem alertas.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Carris Metropolitana main tab ─────────────────────────────────────────
 
-const CARRIS_SUBTABS: CarrisSubTab[] = ['Veículos', 'Linhas', 'Paragens perto']
+const CARRIS_SUBTABS: CarrisSubTab[] = ['Veículos', 'Linhas', 'Paragens perto', 'Alertas']
 
 function CarrisTab() {
   const [sub, setSub] = useState<CarrisSubTab>('Veículos')
@@ -1168,6 +1307,7 @@ function CarrisTab() {
       {sub === 'Veículos'       && <VehiclesSubTab />}
       {sub === 'Linhas'         && <LinesSubTab />}
       {sub === 'Paragens perto' && <NearbyStopsSubTab />}
+      {sub === 'Alertas'        && <CarrisAlertsSubTab />}
     </div>
   )
 }

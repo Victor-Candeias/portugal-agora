@@ -2,7 +2,7 @@
 //
 // Dados estáticos (linhas, paragens, patterns, operadores, horários GTFS) vêm do `.sqlite` gerado em build/CI
 // (apps/web/scripts/build-carris-db.mjs, WEB-010/011/012/016), consultado via `QueryAll` injetado
-// pela app. Dados dinâmicos (veículos, chegadas, municípios) vêm da API oficial, que tem
+// pela app. Dados dinâmicos (veículos, chegadas, alertas, municípios) vêm da API oficial, que tem
 // `Access-Control-Allow-Origin: *` — `fetch` direto tanto no browser como no nativo.
 import type { QueryAll } from '../sqlite.js'
 import { getStaticDbMeta } from '../sqlite.js'
@@ -160,6 +160,75 @@ function toDayDepartures(
     }
   }
   return result.sort((a, b) => a.seconds - b.seconds)
+}
+
+// ── Alertas da rede (`/v2/alerts`, formato GTFS-RT em JSON, WEB-015) ─────
+
+interface CMTranslated {
+  translation?: { language?: string; text: string }[]
+}
+
+interface CMAlertRaw {
+  active_period?: { start?: number; end?: number }[]
+  cause?: string
+  effect?: string
+  header_text?: CMTranslated
+  description_text?: CMTranslated
+  informed_entity?: { agency_id?: string; route_id?: string; stop_id?: string }[]
+  image?: { localized_image?: { language?: string; media_type?: string; url: string }[] }
+}
+
+export interface CMAlert {
+  id: string
+  header: string
+  description: string
+  cause: string
+  effect: string
+  /** Início/fim do período ativo (unix, segundos); `null` = sem limite. */
+  start: number | null
+  end: number | null
+  line_ids: string[]
+  stop_ids: string[]
+  image_url: string | null
+}
+
+function pickTranslation(t: CMTranslated | undefined): string {
+  const tr = t?.translation ?? []
+  return (tr.find(x => x.language === 'pt') ?? tr[0])?.text?.trim() ?? ''
+}
+
+/** `[A2L1N]4466_0` → `4466` (o route_short_name do GTFS é o line_id). */
+function lineIdFromRouteId(routeId: string): string {
+  return routeId.replace(/^(\[[^\]]*\])+/, '').split('_')[0]
+}
+
+export function isAlertActive(alert: CMAlert, nowSeconds: number = Date.now() / 1000): boolean {
+  return (alert.start ?? -Infinity) <= nowSeconds && (alert.end ?? Infinity) >= nowSeconds
+}
+
+function normalizeAlert(raw: CMAlertRaw): CMAlert {
+  const periods = raw.active_period ?? []
+  const starts = periods.map(p => p.start).filter((v): v is number => typeof v === 'number')
+  const ends = periods.map(p => p.end)
+  const header = pickTranslation(raw.header_text)
+  const start = starts.length ? Math.min(...starts) : null
+  const end = ends.length && ends.every((v): v is number => typeof v === 'number') ? Math.max(...ends) : null
+  const entities = raw.informed_entity ?? []
+  const lineIds = [...new Set(entities.filter(e => e.route_id).map(e => lineIdFromRouteId(e.route_id!)))]
+  const stopIds = [...new Set(entities.map(e => e.stop_id).filter((v): v is string => Boolean(v)))]
+  const images = raw.image?.localized_image ?? []
+  return {
+    id: `${start ?? ''}:${end ?? ''}:${header}`,
+    header,
+    description: pickTranslation(raw.description_text),
+    cause: raw.cause ?? 'UNKNOWN_CAUSE',
+    effect: raw.effect ?? 'UNKNOWN_EFFECT',
+    start,
+    end,
+    line_ids: lineIds.sort((a, b) => a.localeCompare(b, 'pt', { numeric: true })),
+    stop_ids: stopIds,
+    image_url: (images.find(i => i.language === 'pt') ?? images[0])?.url ?? null,
+  }
 }
 
 export interface CarrisClientOptions {
@@ -336,6 +405,18 @@ export function createCarrisClient(options: CarrisClientOptions) {
     /** Chegadas em tempo real (v2 — corrige o trip_id malformado devolvido pela v1). */
     getStopRealtime(stopId: string): Promise<CMRealtime[]> {
       return fetchJson<CMRealtime[]>(`${baseV2}/arrivals/by_stop/${stopId}`)
+    },
+
+    /** Alertas da rede ainda não terminados: ativos primeiro, depois futuros; mais recentes primeiro. */
+    async getAlerts(): Promise<CMAlert[]> {
+      const raw = await fetchJson<CMAlertRaw[]>(`${baseV2}/alerts`)
+      const now = Date.now() / 1000
+      const seen = new Set<string>()
+      return raw
+        .map(normalizeAlert)
+        .filter(a => (a.end ?? Infinity) >= now && !seen.has(a.id) && Boolean(seen.add(a.id)))
+        .sort((a, b) =>
+          Number(isAlertActive(b, now)) - Number(isAlertActive(a, now)) || (b.start ?? 0) - (a.start ?? 0))
     },
   }
 }

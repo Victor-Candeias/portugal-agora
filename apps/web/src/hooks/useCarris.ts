@@ -5,7 +5,7 @@ import { carrisClient } from '@/lib/clients'
 // Lógica de dados (queries ao `.sqlite` estático e pedidos à API Carris) vive em
 // packages/core/src/api/carris.ts (MOB-002). Aqui ficam apenas os hooks React Query do web.
 export type {
-  CMLine, CMOperator, CMStop, CMVehicle, CMRealtime, CMMunicipality, CMPattern, CMScheduledDeparture,
+  CMLine, CMOperator, CMStop, CMVehicle, CMRealtime, CMMunicipality, CMPattern, CMScheduledDeparture, CMAlert,
 } from '@portugal-hoje/core'
 
 // ── Municipalities (endpoint only exists on v1, not v2) ────────────────────
@@ -96,6 +96,18 @@ export function useStopRealtime(stopId: string | null) {
     enabled: Boolean(stopId),
     staleTime: 15 * 1000,
     refetchInterval: 30 * 1000,
+    retry: 1,
+  })
+}
+
+// ── Alertas da rede (dinâmico, sem persistência; atualiza a cada 5 min, WEB-015) ──
+
+export function useCarrisAlerts() {
+  return useQuery({
+    queryKey: ['cm', 'alerts'],
+    queryFn: () => carrisClient.getAlerts(),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     retry: 1,
   })
 }

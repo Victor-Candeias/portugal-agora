@@ -38,7 +38,7 @@ status: active
 | WEB-012 | Carris: horários programados via GTFS (trips/schedules) | done | 2026-07-15 |  | medium | 2026-10-09 |  | WEB-011 | [WEB-012](../specs/mobile/web-012-spec.md) |
 | WEB-013 | Carris: chegadas em tempo real (fetch direto, mantém-se) | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-010 |  |
 | WEB-014 | Carris: localização de veículos em tempo real (fetch direto, mantém-se) | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-010 |  |
-| WEB-015 | Carris: alertas da rede (desvios, obras, interrupções) | backlog | 2026-07-15 |  | medium |  |  | WEB-010 |  |
+| WEB-015 | Carris: alertas da rede (desvios, obras, interrupções) | done | 2026-07-15 |  | medium | 2026-10-09 |  | WEB-010 | [WEB-015](../specs/mobile/web-015-spec.md) |
 | WEB-016 | Carris: identificação de operadores via GTFS (agency.txt + routes.txt) | done | 2026-07-15 |  | medium | 2026-07-15 |  | WEB-010, WEB-011 |  |
 | WEB-017 | Carris: migrar apps (web/mobile/android-auto) para consumir API própria | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-011, WEB-012, WEB-013, WEB-014, WEB-015, WEB-016 |  |
 | WEB-018 | Turismo: integrar SIGTUR/TravelBI (ArcGIS REST) e criar tab/página Turismo | done | 2026-07-17 |  | medium | 2026-07-17 |  |  | [WEB-018](../specs/mobile/web-018-spec.md) |
