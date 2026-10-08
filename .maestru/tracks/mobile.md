@@ -17,7 +17,7 @@ status: active
 | ID | Title | Status | Created | Owner | Priority | Completed | Template | Blocked By | Spec |
 |---|---|---|---|---|---|---|---|---|---|
 | AA-001 | App Android Auto — Portugal Hoje | done | 2026-07-12 | developer | high | 2026-07-12 |  |  | [AA-001](../specs/mobile/aa-001-spec.md) |
-| MOB-001 | Mobile: setup de build Android (JDK 17, EAS, eas.json, lockfile) | in-progress | 2026-10-08 | developer | high |  |  |  | [MOB-001](../specs/mobile/mob-001-spec.md) |
+| MOB-001 | Mobile: setup de build Android (JDK 17, EAS, eas.json, lockfile) | done | 2026-10-08 | developer | high | 2026-10-08 |  |  | [MOB-001](../specs/mobile/mob-001-spec.md) |
 | MOB-002 | Mobile: mover lógica partilhável do web para packages/core | backlog | 2026-10-08 | developer | high |  |  |  |  |
 | MOB-003 | Mobile: camada SQLite nativa (expo-sqlite) + download/cache dos .sqlite | backlog | 2026-10-08 | developer | high |  |  | MOB-001 |  |
 | MOB-004 | Mobile: componente de mapa nativo (react-native-maps) | backlog | 2026-10-08 | developer | medium |  |  | MOB-001 |  |

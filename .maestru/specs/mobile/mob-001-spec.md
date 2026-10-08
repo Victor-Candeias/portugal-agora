@@ -41,7 +41,7 @@ Preparar `apps/mobile` (Expo SDK 57 / RN 0.86) para builds Android locais e via 
 - `gradlew assembleDebug` (JDK 17, x86_64) OK; app instalada e a correr no emulador `Pixel_10a` com Metro — dashboard carrega preços DGEG via `@portugal-hoje/core`.
 
 ### Pendente
-- `eas init` exige conta Expo (login interativo) para gravar o `projectId` real.
+- Nenhum para builds locais. O `eas init` (conta Expo, só para EAS Build na cloud) passou para o MOB-007.
 
 ## Impacted Files
 
