@@ -44,7 +44,7 @@ A app `apps/android-auto` (AA-001) compilava mas **não aparecia no Android Auto
 
 ### Validação
 - `assembleDebug` e `assembleRelease` (R8) compilam; manifest final contém serviço, categoria POI, meta-data e `targetSdkVersion=36`; mapping R8 sem campos de modelos renomeados.
-- `lintVitalAnalyzeRelease` falha no ambiente local por causa do JDK 25 (`IllegalArgumentException: 25.0.2` no lint do AGP 8.3.2) — problema de ambiente, não de código; resolve-se com JDK 17 (MOB-001).
+- `lintVitalAnalyzeRelease` falha no ambiente local por causa do JDK 25 (`IllegalArgumentException: 25.0.2` no lint do AGP 8.3.2) — problema de ambiente, não de código. **Confirmado em MOB-001:** com JDK 17 o `assembleRelease` completo (incluindo `lintVitalRelease`) passa.
 - Teste em DHU/carro pendente (sem dispositivo ligado).
 
 ## Impacted Files
