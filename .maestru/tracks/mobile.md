@@ -35,7 +35,7 @@ status: active
 | WEB-009 | Carris Linhas: expandir carreira ao clicar para ver mais informacao | done | 2026-07-15 |  | low | 2026-07-15 |  |  |  |
 | WEB-010 | Carris: pipeline de build SQLite (WASM) + modelo de dados | done | 2026-07-15 |  | critical | 2026-07-15 |  |  |  |
 | WEB-011 | Carris: sincronização de dados estáticos (linhas, paragens, rotas, patterns, shapes) | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-010 |  |
-| WEB-012 | Carris: horários programados via GTFS (trips/schedules) | backlog | 2026-07-15 |  | medium |  |  | WEB-011 |  |
+| WEB-012 | Carris: horários programados via GTFS (trips/schedules) | done | 2026-07-15 |  | medium | 2026-10-09 |  | WEB-011 | [WEB-012](../specs/mobile/web-012-spec.md) |
 | WEB-013 | Carris: chegadas em tempo real (fetch direto, mantém-se) | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-010 |  |
 | WEB-014 | Carris: localização de veículos em tempo real (fetch direto, mantém-se) | done | 2026-07-15 |  | high | 2026-07-15 |  | WEB-010 |  |
 | WEB-015 | Carris: alertas da rede (desvios, obras, interrupções) | backlog | 2026-07-15 |  | medium |  |  | WEB-010 |  |

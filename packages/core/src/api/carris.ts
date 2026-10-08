@@ -1,7 +1,7 @@
 // Carris Metropolitana — cliente agnóstico de plataforma (MOB-002).
 //
-// Dados estáticos (linhas, paragens, patterns, operadores) vêm do `.sqlite` gerado em build/CI
-// (apps/web/scripts/build-carris-db.mjs, WEB-010/011/016), consultado via `QueryAll` injetado
+// Dados estáticos (linhas, paragens, patterns, operadores, horários GTFS) vêm do `.sqlite` gerado em build/CI
+// (apps/web/scripts/build-carris-db.mjs, WEB-010/011/012/016), consultado via `QueryAll` injetado
 // pela app. Dados dinâmicos (veículos, chegadas, municípios) vêm da API oficial, que tem
 // `Access-Control-Allow-Origin: *` — `fetch` direto tanto no browser como no nativo.
 import type { QueryAll } from '../sqlite.js'
@@ -97,6 +97,70 @@ export interface CMPattern {
 }
 
 export type CMNearbyStop = CMStop & { distKm: number }
+
+/** Partida programada (GTFS, WEB-012). */
+export interface CMScheduledDeparture {
+  line_id: string
+  pattern_id: string
+  headsign: string
+  /** Segundos desde a meia-noite (hora de Lisboa) do dia pedido; ≥ 86400 = madrugada do dia seguinte. */
+  seconds: number
+  /** HH:MM (0–23h). */
+  time: string
+}
+
+const LISBON_TZ = 'Europe/Lisbon'
+const lisbonFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: LISBON_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+})
+
+/** Dia de serviço (YYYYMMDD) e segundos desde a meia-noite, na hora de Lisboa. */
+export function lisbonServiceDay(at: Date = new Date()): { date: number; seconds: number } {
+  const p = Object.fromEntries(lisbonFormatter.formatToParts(at).map(x => [x.type, x.value]))
+  return {
+    date: Number(`${p.year}${p.month}${p.day}`),
+    seconds: Number(p.hour) * 3600 + Number(p.minute) * 60 + Number(p.second),
+  }
+}
+
+function shiftServiceDate(date: number, days: number): number {
+  const d = new Date(Date.UTC(Math.floor(date / 10000), (Math.floor(date / 100) % 100) - 1, (date % 100) + days))
+  return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate()
+}
+
+/** Inverso do `deltaEncode` do build: 1.º valor absoluto, seguintes como diferença ao anterior. */
+function deltaDecode(csv: string): number[] {
+  if (!csv) return []
+  let acc = 0
+  return csv.split(',').map((v, i) => (acc = i === 0 ? Number(v) : acc + Number(v)))
+}
+
+export function formatScheduleTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600) % 24
+  const m = Math.floor((seconds % 3600) / 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/**
+ * Converte horas GTFS (relativas ao dia de serviço, podem passar de 24h) para o dia pedido:
+ * viagens do próprio dia mantêm-se; as do dia anterior só contam a partir das 24h.
+ */
+function toDayDepartures(
+  rows: { line_id: string; pattern_id: string; headsign: string; date: number; offset: number; start_times: string }[],
+  date: number,
+): CMScheduledDeparture[] {
+  const result: CMScheduledDeparture[] = []
+  for (const r of rows) {
+    const shift = r.date === date ? 0 : -86400
+    for (const start of deltaDecode(r.start_times)) {
+      const seconds = start + r.offset + shift
+      if (seconds < 0) continue
+      result.push({ line_id: r.line_id, pattern_id: r.pattern_id, headsign: r.headsign, seconds, time: formatScheduleTime(seconds) })
+    }
+  }
+  return result.sort((a, b) => a.seconds - b.seconds)
+}
 
 export interface CarrisClientOptions {
   /** Executor SQL sobre o `.sqlite` estático da Carris (sql.js no web, expo-sqlite no nativo). */
@@ -220,6 +284,45 @@ export function createCarrisClient(options: CarrisClientOptions) {
         facilities: JSON.parse(s.facilities || '[]') as string[],
         operational_status: s.operational_status,
       }))
+    },
+
+    /**
+     * Partidas programadas numa paragem para um dia de serviço (YYYYMMDD, por omissão hoje em
+     * Lisboa), a partir dos horários GTFS no `.sqlite` (WEB-012). Exclui a paragem terminal.
+     */
+    async getStopSchedule(stopId: string, date: number = lisbonServiceDay().date): Promise<CMScheduledDeparture[]> {
+      const rows = await queryAll<{
+        stop_index: number; line_id: string; pattern_id: string; headsign: string
+        segments: string; start_times: string; date: number
+      }>(
+        `SELECT ss.stop_index, p.line_id, p.pattern_id, p.headsign, p.segments, d.start_times, sd.date
+         FROM sequence_stops ss
+         JOIN stop_sequences sq ON sq.id = ss.sequence_id
+         JOIN trip_profiles p ON p.sequence_id = ss.sequence_id
+         JOIN profile_departures d ON d.profile_id = p.id
+         JOIN service_dates sd ON sd.service_id = d.service_id
+         WHERE ss.stop_id = ? AND sd.date IN (?, ?) AND ss.stop_index < sq.stop_count - 1`,
+        [stopId, date, shiftServiceDate(date, -1)],
+      )
+      return toDayDepartures(rows.map(r => ({
+        ...r,
+        offset: r.segments ? r.segments.split(',').slice(0, r.stop_index).reduce((acc, v) => acc + Number(v), 0) : 0,
+      })), date)
+    },
+
+    /** Partidas programadas de uma linha (hora na 1.ª paragem de cada percurso) num dia de serviço. */
+    async getLineSchedule(lineId: string, date: number = lisbonServiceDay().date): Promise<CMScheduledDeparture[]> {
+      const rows = await queryAll<{
+        line_id: string; pattern_id: string; headsign: string; start_times: string; date: number
+      }>(
+        `SELECT p.line_id, p.pattern_id, p.headsign, d.start_times, sd.date
+         FROM trip_profiles p
+         JOIN profile_departures d ON d.profile_id = p.id
+         JOIN service_dates sd ON sd.service_id = d.service_id
+         WHERE p.line_id = ? AND sd.date IN (?, ?)`,
+        [lineId, date, shiftServiceDate(date, -1)],
+      )
+      return toDayDepartures(rows.map(r => ({ ...r, offset: 0 })), date)
     },
 
     /** Veículos com posição conhecida, opcionalmente filtrados por linha. */

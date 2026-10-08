@@ -1,9 +1,12 @@
 // Gera apps/web/public/data/carris.sqlite com os dados "praticamente estáticos"
-// da Carris Metropolitana (linhas, paragens, rotas, patterns, operadores via GTFS).
+// da Carris Metropolitana (linhas, paragens, rotas, patterns, operadores e horários via GTFS).
 // Corre em Node no momento do build/CI — nunca em runtime no browser.
-// Ver WEB-010/011/016 (.maestru/tracks/mobile/).
+// Ver WEB-010/011/012/016 (.maestru/tracks/mobile/).
+//
+// CARRIS_GTFS_ZIP=/caminho/gtfs.zip evita voltar a descarregar o GTFS (~90 MB) em desenvolvimento.
 import fs from 'node:fs'
 import path from 'node:path'
+import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import JSZip from 'jszip'
@@ -16,6 +19,8 @@ const OUT_FILE = path.join(OUT_DIR, 'carris.sqlite')
 const BASE_V1 = 'https://api.carrismetropolitana.pt/v1'
 const BASE_V2 = 'https://api.carrismetropolitana.pt/v2'
 const PATTERN_CONCURRENCY = 6
+// Janela do calendário de horários (o .sqlite é regenerado diariamente no CI).
+const SCHEDULE_WINDOW_DAYS = 60
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -60,24 +65,156 @@ function parseCsv(text) {
   return Papa.parse(text, { header: true, skipEmptyLines: true }).data
 }
 
-async function loadOperators() {
-  console.log('→ a obter GTFS (agency.txt + routes.txt) para operadores...')
-  const zipBuffer = await fetchArrayBuffer(`${BASE_V2}/gtfs`)
-  const zip = await JSZip.loadAsync(zipBuffer)
+async function loadGtfsZip() {
+  const localZip = process.env.CARRIS_GTFS_ZIP
+  if (localZip) {
+    console.log(`→ a ler GTFS local (${localZip})...`)
+    return JSZip.loadAsync(fs.readFileSync(localZip))
+  }
+  console.log('→ a obter GTFS (/v2/gtfs)...')
+  return JSZip.loadAsync(await fetchArrayBuffer(`${BASE_V2}/gtfs`))
+}
 
+async function loadOperators(zip) {
   const agencyFile = zip.file('agency.txt')
   const routesFile = zip.file('routes.txt')
   if (!agencyFile || !routesFile) {
     console.warn('  aviso: agency.txt/routes.txt não encontrados no GTFS — operadores ficam vazios.')
-    return { agencies: [], routeAgency: new Map() }
+    return { agencies: [], routeAgency: new Map(), routeLine: new Map() }
   }
 
   const agencies = parseCsv(await agencyFile.async('string'))
   const routes = parseCsv(await routesFile.async('string'))
   const routeAgency = new Map(routes.map(r => [r.route_id, r.agency_id]))
-  return { agencies, routeAgency }
+  const routeLine = new Map(routes.map(r => [r.route_id, r.route_short_name]))
+  return { agencies, routeAgency, routeLine }
 }
 
+// IDs do GTFS vêm prefixados com o plano/operador (ex. `[LA77N]1001_0_1`); a API usa `1001_0_1`.
+function stripGtfsPrefix(id) {
+  return id.replace(/^(\[[^\]]*\])+/, '')
+}
+
+function gtfsTimeToSeconds(t) {
+  const [h, m, s] = t.split(':').map(Number)
+  return h * 3600 + m * 60 + (s || 0)
+}
+
+function yyyymmdd(date) {
+  return Number(date.toISOString().slice(0, 10).replaceAll('-', ''))
+}
+
+/** CSV com o 1.º valor absoluto e os seguintes como diferença ao anterior (valores ordenados). */
+function deltaEncode(values) {
+  return values.map((v, i) => (i === 0 ? v : v - values[i - 1])).join(',')
+}
+
+/**
+ * Horários programados (WEB-012) a partir do GTFS — a API não tem /v2/schedules nem /v2/trips.
+ *
+ * O stop_times.txt tem ~860 MB / 11 M linhas, por isso é lido em streaming e comprimido:
+ * - `stop_sequences`/`sequence_stops`: sequências de paragens distintas (lookup por paragem);
+ * - `trip_profiles`: pattern + sequência + tempos entre paragens consecutivas (s), deduplicados
+ *   (~270 k viagens partilham poucos milhares de perfis);
+ * - `profile_departures`: horas de partida da 1.ª paragem (s desde a meia-noite do dia de
+ *   serviço, podem passar de 24h) por perfil e serviço, em CSV delta-encoded;
+ * - `services`/`service_dates`: calendário de ontem a +SCHEDULE_WINDOW_DAYS dias.
+ * As viagens são lidas por ordem (o stop_times vem agrupado por trip_id).
+ */
+async function loadSchedules(zip, routeLine) {
+  const tripsFile = zip.file('trips.txt')
+  const stopTimesFile = zip.file('stop_times.txt')
+  const calendarFile = zip.file('calendar_dates.txt')
+  if (!tripsFile || !stopTimesFile || !calendarFile) {
+    console.warn('  aviso: trips/stop_times/calendar_dates em falta no GTFS — horários ficam vazios.')
+    return null
+  }
+
+  const cutoff = yyyymmdd(new Date(Date.now() - 24 * 60 * 60 * 1000))
+  const horizon = yyyymmdd(new Date(Date.now() + SCHEDULE_WINDOW_DAYS * 24 * 60 * 60 * 1000))
+  const serviceIds = new Map()
+  const serviceDates = []
+  for (const row of parseCsv(await calendarFile.async('string'))) {
+    if (row.exception_type !== '1') continue
+    const date = Number(row.date)
+    if (date < cutoff || date > horizon) continue
+    if (!serviceIds.has(row.service_id)) serviceIds.set(row.service_id, serviceIds.size + 1)
+    serviceDates.push([date, serviceIds.get(row.service_id)])
+  }
+
+  const trips = new Map()
+  for (const t of parseCsv(await tripsFile.async('string'))) {
+    const serviceId = serviceIds.get(t.service_id)
+    if (!serviceId) continue
+    trips.set(t.trip_id, {
+      serviceId,
+      lineId: routeLine.get(t.route_id) ?? stripGtfsPrefix(t.route_id).split('_')[0],
+      patternId: stripGtfsPrefix(t.pattern_id),
+      headsign: t.trip_headsign,
+    })
+  }
+
+  const sequences = new Map()
+  const profiles = new Map()
+  const departures = new Map()
+  let current = null
+  let stops = []
+  let times = []
+  let tripCount = 0
+  const finishTrip = () => {
+    const trip = current && trips.get(current)
+    if (!trip || times.length === 0) return
+    const stopsKey = stops.join(',')
+    let sequence = sequences.get(stopsKey)
+    if (!sequence) {
+      sequence = { id: sequences.size + 1, stopIds: [...stops] }
+      sequences.set(stopsKey, sequence)
+    }
+    const segments = times.slice(1).map((t, i) => t - times[i]).join(',')
+    const key = `${trip.patternId}|${trip.headsign}|${sequence.id}|${segments}`
+    let profile = profiles.get(key)
+    if (!profile) {
+      profile = {
+        id: profiles.size + 1, lineId: trip.lineId, patternId: trip.patternId, headsign: trip.headsign,
+        sequenceId: sequence.id, segments,
+      }
+      profiles.set(key, profile)
+    }
+    const depKey = `${profile.id}|${trip.serviceId}`
+    const list = departures.get(depKey) ?? []
+    list.push(times[0])
+    departures.set(depKey, list)
+    tripCount++
+  }
+
+  const rl = readline.createInterface({ input: stopTimesFile.nodeStream('nodebuffer'), crlfDelay: Infinity })
+  let col = null
+  for await (const line of rl) {
+    if (!line) continue
+    if (!col) {
+      const header = line.replace(/^\uFEFF/, '').split(',')
+      col = Object.fromEntries(header.map((h, i) => [h, i]))
+      continue
+    }
+    const f = line.includes('"') ? Papa.parse(line).data[0] : line.split(',')
+    const tripId = f[col.trip_id]
+    if (tripId !== current) {
+      finishTrip()
+      current = tripId
+      stops = []
+      times = []
+    }
+    if (!trips.has(tripId)) continue
+    stops.push(f[col.stop_id])
+    times.push(gtfsTimeToSeconds(f[col.departure_time] || f[col.arrival_time]))
+  }
+  finishTrip()
+
+  return {
+    serviceIds, serviceDates, sequences: [...sequences.values()], profiles: [...profiles.values()],
+    departures, tripCount,
+  }
+}
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
   if (fs.existsSync(OUT_FILE)) fs.rmSync(OUT_FILE)
@@ -141,10 +278,41 @@ async function main() {
       distance REAL
     );
     CREATE INDEX idx_pattern_path_pattern ON pattern_path(pattern_id);
+
+    CREATE TABLE services (id INTEGER PRIMARY KEY, gtfs_id TEXT);
+    CREATE TABLE service_dates (
+      date INTEGER,
+      service_id INTEGER,
+      PRIMARY KEY (date, service_id)
+    ) WITHOUT ROWID;
+    CREATE TABLE stop_sequences (id INTEGER PRIMARY KEY, stop_count INTEGER);
+    CREATE TABLE sequence_stops (
+      stop_id TEXT,
+      sequence_id INTEGER,
+      stop_index INTEGER,
+      PRIMARY KEY (stop_id, sequence_id, stop_index)
+    ) WITHOUT ROWID;
+    CREATE TABLE trip_profiles (
+      id INTEGER PRIMARY KEY,
+      line_id TEXT,
+      pattern_id TEXT,
+      headsign TEXT,
+      sequence_id INTEGER,
+      segments TEXT
+    );
+    CREATE INDEX idx_trip_profiles_line ON trip_profiles(line_id);
+    CREATE INDEX idx_trip_profiles_sequence ON trip_profiles(sequence_id);
+    CREATE TABLE profile_departures (
+      profile_id INTEGER,
+      service_id INTEGER,
+      start_times TEXT,
+      PRIMARY KEY (profile_id, service_id)
+    ) WITHOUT ROWID;
   `)
 
   // ── Operadores (GTFS) ────────────────────────────────────────────────
-  const { agencies, routeAgency } = await loadOperators()
+  const zip = await loadGtfsZip()
+  const { agencies, routeAgency, routeLine } = await loadOperators(zip)
   const insertOperator = db.prepare(
     'INSERT OR REPLACE INTO operators (id, name, website, timezone) VALUES (?, ?, ?, ?)',
   )
@@ -230,6 +398,44 @@ async function main() {
     if (done % 200 === 0) console.log(`  ${done}/${patternIds.length} patterns processados...`)
   })
   console.log(`  ${patternIds.length} patterns processados.`)
+
+  // ── Horários programados (GTFS stop_times, WEB-012) ─────────────────
+  console.log('→ a processar horários (trips/stop_times/calendar_dates do GTFS)...')
+  const schedules = await loadSchedules(zip, routeLine)
+  if (schedules) {
+    const insertService = db.prepare('INSERT INTO services (id, gtfs_id) VALUES (?, ?)')
+    const insertServiceDate = db.prepare('INSERT OR IGNORE INTO service_dates (date, service_id) VALUES (?, ?)')
+    const insertSequence = db.prepare('INSERT INTO stop_sequences (id, stop_count) VALUES (?, ?)')
+    const insertSequenceStop = db.prepare(
+      'INSERT OR IGNORE INTO sequence_stops (stop_id, sequence_id, stop_index) VALUES (?, ?, ?)',
+    )
+    const insertProfile = db.prepare(
+      'INSERT INTO trip_profiles (id, line_id, pattern_id, headsign, sequence_id, segments) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    const insertDeparture = db.prepare(
+      'INSERT INTO profile_departures (profile_id, service_id, start_times) VALUES (?, ?, ?)',
+    )
+    db.transaction(() => {
+      for (const [gtfsId, id] of schedules.serviceIds) insertService.run(id, gtfsId)
+      for (const [date, serviceId] of schedules.serviceDates) insertServiceDate.run(date, serviceId)
+      for (const s of schedules.sequences) {
+        insertSequence.run(s.id, s.stopIds.length)
+        s.stopIds.forEach((stopId, i) => insertSequenceStop.run(stopId, s.id, i))
+      }
+      for (const p of schedules.profiles) {
+        insertProfile.run(p.id, p.lineId, p.patternId, p.headsign, p.sequenceId, p.segments)
+      }
+      for (const [key, starts] of schedules.departures) {
+        const [profileId, serviceId] = key.split('|').map(Number)
+        insertDeparture.run(profileId, serviceId, deltaEncode(starts.sort((a, b) => a - b)))
+      }
+    })()
+    console.log(
+      `  ${schedules.tripCount} viagens → ${schedules.profiles.length} perfis, ` +
+      `${schedules.sequences.length} sequências, ${schedules.serviceIds.size} serviços, ` +
+      `${schedules.serviceDates.length} datas.`,
+    )
+  }
 
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('generated_at', new Date().toISOString())
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('source', 'api.carrismetropolitana.pt v1/v2 + gtfs')

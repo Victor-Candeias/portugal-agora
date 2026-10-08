@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { findNearbyStops } from '@portugal-hoje/core'
+import { findNearbyStops, lisbonServiceDay } from '@portugal-hoje/core'
 import { carrisClient } from '@/lib/clients'
 
 // Lógica de dados (queries ao `.sqlite` estático e pedidos à API Carris) vive em
 // packages/core/src/api/carris.ts (MOB-002). Aqui ficam apenas os hooks React Query do web.
 export type {
-  CMLine, CMOperator, CMStop, CMVehicle, CMRealtime, CMMunicipality, CMPattern,
+  CMLine, CMOperator, CMStop, CMVehicle, CMRealtime, CMMunicipality, CMPattern, CMScheduledDeparture,
 } from '@portugal-hoje/core'
 
 // ── Municipalities (endpoint only exists on v1, not v2) ────────────────────
@@ -96,6 +96,30 @@ export function useStopRealtime(stopId: string | null) {
     enabled: Boolean(stopId),
     staleTime: 15 * 1000,
     refetchInterval: 30 * 1000,
+    retry: 1,
+  })
+}
+
+// ── Horários programados (GTFS → .sqlite local, WEB-012) ──────────────────
+
+export function useStopSchedule(stopId: string | null) {
+  const { date } = lisbonServiceDay()
+  return useQuery({
+    queryKey: ['cm', 'stop-schedule', stopId, date],
+    queryFn: () => carrisClient.getStopSchedule(stopId!, date),
+    enabled: Boolean(stopId),
+    staleTime: Infinity,
+    retry: 1,
+  })
+}
+
+export function useLineSchedule(lineId: string | null) {
+  const { date } = lisbonServiceDay()
+  return useQuery({
+    queryKey: ['cm', 'line-schedule', lineId, date],
+    queryFn: () => carrisClient.getLineSchedule(lineId!, date),
+    enabled: Boolean(lineId),
+    staleTime: Infinity,
     retry: 1,
   })
 }

@@ -10,9 +10,10 @@ import type { Station, Train, TmlAlert } from '@/hooks/useTransportes'
 import {
   useCarrisVehicles, useCarrisLines, useCarrisLinesMap,
   useCarrisStops, useNearbyStops, useStopRealtime, useCarrisLinePatterns,
-  useCarrisOperators,
+  useCarrisOperators, useStopSchedule, useLineSchedule,
 } from '@/hooks/useCarris'
-import type { CMVehicle, CMStop, CMRealtime, CMLine } from '@/hooks/useCarris'
+import type { CMVehicle, CMStop, CMRealtime, CMLine, CMScheduledDeparture } from '@/hooks/useCarris'
+import { lisbonServiceDay } from '@portugal-hoje/core'
 import 'leaflet/dist/leaflet.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -860,7 +861,17 @@ function LinesSubTab() {
 
 function LineDetails({ line, muniNames, stops }: { line: CMLine; muniNames: Map<string, string>; stops: CMStop[] }) {
   const { data: patterns = [], isLoading } = useCarrisLinePatterns(line.pattern_ids)
+  const { data: schedule = [], isError: scheduleError } = useLineSchedule(line.id)
   const stopsMap = useMemo(() => new Map(stops.map(s => [s.id, s])), [stops])
+  const scheduleByPattern = useMemo(() => {
+    const map = new Map<string, CMScheduledDeparture[]>()
+    for (const d of schedule) {
+      const arr = map.get(d.pattern_id) ?? []
+      arr.push(d)
+      map.set(d.pattern_id, arr)
+    }
+    return map
+  }, [schedule])
 
   const municipalityNames = line.municipality_ids
     .map(mid => muniNames.get(mid) ?? mid)
@@ -881,6 +892,7 @@ function LineDetails({ line, muniNames, stops }: { line: CMLine; muniNames: Map<
       {patterns.map(p => {
         const firstStop = stopsMap.get(p.path[0]?.stop_id)
         const lastStop = stopsMap.get(p.path[p.path.length - 1]?.stop_id)
+        const departures = scheduleByPattern.get(p.id) ?? []
         return (
           <div key={p.id} className="text-xs bg-slate-50 rounded-lg p-2.5">
             <p className="font-semibold text-slate-700">
@@ -890,6 +902,19 @@ function LineDetails({ line, muniNames, stops }: { line: CMLine; muniNames: Map<
               {firstStop?.long_name ?? '—'} → {lastStop?.long_name ?? '—'}
             </p>
             <p className="text-slate-400 mt-1">{p.path.length} paragens</p>
+            {!scheduleError && (
+              <div className="mt-1.5">
+                <p className="text-slate-500">
+                  <span className="font-semibold">Partidas hoje:</span>{' '}
+                  {departures.length === 0 ? 'sem horários programados' : departures.length}
+                </p>
+                {departures.length > 0 && (
+                  <p className="mt-0.5 max-h-20 overflow-y-auto tabular-nums text-slate-600 leading-relaxed">
+                    {departures.map(d => d.time).join(' · ')}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )
       })}
@@ -987,6 +1012,39 @@ function StopArrivals({ stop }: { stop: CMStop }) {
         )
       })}
       {detailLineId && <LineInfoModal lineId={detailLineId} onClose={() => setDetailLineId(null)} />}
+      <StopSchedule stop={stop} />
+    </div>
+  )
+}
+
+// ── Horários programados numa paragem (GTFS → .sqlite local, WEB-012) ─────
+
+function StopSchedule({ stop }: { stop: CMStop }) {
+  const { data: schedule = [], isLoading, isError } = useStopSchedule(stop.id)
+  const linesMap = useCarrisLinesMap()
+  const nowSeconds = lisbonServiceDay().seconds
+  const upcoming = schedule.filter(d => d.seconds >= nowSeconds).slice(0, 8)
+
+  return (
+    <div className="pt-2 mt-2 border-t border-slate-100 space-y-1.5">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Horários programados (hoje)</p>
+      {isLoading && <p className="text-xs text-slate-400">A carregar horários…</p>}
+      {isError && <p className="text-xs text-slate-400">Horários indisponíveis.</p>}
+      {!isLoading && !isError && upcoming.length === 0 && (
+        <p className="text-xs text-slate-400">Sem mais partidas programadas hoje.</p>
+      )}
+      {upcoming.map((d, idx) => (
+        <div key={`${d.pattern_id}-${d.seconds}-${idx}`} className="flex items-center gap-2 text-xs">
+          <span
+            className="px-1.5 py-0.5 rounded text-white font-bold flex-shrink-0"
+            style={{ backgroundColor: linesMap.get(d.line_id)?.color ?? '#64748b' }}
+          >
+            {d.line_id}
+          </span>
+          <span className="flex-1 truncate text-slate-700">{d.headsign}</span>
+          <span className="flex-shrink-0 tabular-nums text-slate-500">{d.time}</span>
+        </div>
+      ))}
     </div>
   )
 }
