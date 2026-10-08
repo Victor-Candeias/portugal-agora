@@ -23,7 +23,7 @@ status: active
 | MOB-004 | Mobile: componente de mapa nativo (react-native-maps) | backlog | 2026-10-08 | developer | medium |  |  | MOB-001 |  |
 | MOB-005 | Mobile: ecrãs em falta (Proteção Civil, Hospitais, Transportes, Metro Porto, Serviços Públicos, Código Postal) | backlog | 2026-10-08 | developer | high |  |  | MOB-002, MOB-003, MOB-004 |  |
 | MOB-006 | Android Auto: corrigir manifest, HostValidator, signing e targetSdk | done | 2026-10-08 | developer | high | 2026-10-08 |  |  | [MOB-006](../specs/mobile/mob-006-spec.md) |
-| MOB-007 | Mobile: CI de build Android + publicação em teste interno no Google Play | backlog | 2026-10-08 | developer | medium |  |  | MOB-001 |  |
+| MOB-007 | Mobile: CI de build Android + publicação em teste interno no Google Play | in-progress | 2026-10-08 | developer | medium |  |  | MOB-001 | [MOB-007](../specs/mobile/mob-007-spec.md) |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |
 | WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |

@@ -9,6 +9,7 @@
     "scheme": "portugal-hoje",
     "plugins": [
       "expo-router",
+      "./plugins/withReleaseSigning",
       [
         "expo-location",
         {

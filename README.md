@@ -104,7 +104,7 @@ cd apps/mobile
 npx expo run:android --variant release  # build nativo local (requer JDK 17 + Android SDK)
 ```
 
-### Mobile com EAS Build
+### Mobile com EAS Build (opcional)
 
 Perfis em `apps/mobile/eas.json`:
 
@@ -129,3 +129,26 @@ npx eas-cli build -p android --profile development
 npx eas-cli build -p android --profile preview
 npx eas-cli build -p android --profile production
 ```
+
+### Mobile no CI (GitHub Actions) e Google Play
+
+`.github/workflows/android.yml` (manual em *Actions → Android (mobile) → Run workflow*, ou ao fazer push de uma tag `mobile-v*`) faz `expo prebuild` + Gradle, sem conta Expo, e publica o AAB e o APK como artefactos. O `versionCode` é o número da execução (`ANDROID_VERSION_CODE`).
+
+A assinatura de release vem do config plugin `apps/mobile/plugins/withReleaseSigning.js`, que lê as mesmas variáveis do `apps/android-auto` (`ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`); sem elas o release usa a debug keystore.
+
+Secrets do repositório:
+
+| Secret | Uso |
+|---|---|
+| `APIABERTA_KEY` | `EXPO_PUBLIC_APIABERTA_KEY` embutida no bundle |
+| `ANDROID_KEYSTORE_BASE64` | upload keystore em base64 (`base64 -w0 upload.jks`) |
+| `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | credenciais da upload key |
+| `PLAY_SERVICE_ACCOUNT_JSON` | service account com acesso à app na Play Console (só para publicar) |
+
+Criar a upload key (uma vez, guardar fora do repositório):
+
+```bash
+keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Para publicar, escolher a faixa (`internal`, `alpha`, `beta`) no *Run workflow*; enquanto a app nunca tiver sido revista pelo Google o estado tem de ser `draft`. O primeiro AAB tem de ser carregado manualmente na Play Console (a API não cria a app). Política de privacidade: https://victor-candeias.github.io/portugal-agora/privacidade.html (`apps/web/public/privacidade.html`).
