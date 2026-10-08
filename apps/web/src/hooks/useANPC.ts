@@ -1,60 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
+import { anpcClient } from '@/lib/clients'
 
-const BASE = 'https://api.apiaberta.pt/v1'
-const API_KEY = import.meta.env.VITE_APIABERTA_KEY ?? ''
-
-async function apiFetch(path: string) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'X-API-Key': API_KEY },
-  })
-  if (!res.ok) throw new Error(`ANPC API: ${res.status}`)
-  return res.json()
-}
-
-export interface AnpcIncident {
-  id: string
-  date: string
-  datetime: string
-  type: string
-  type_code: string
-  status: string
-  active: boolean
-  location: {
-    district: string
-    freguesia: string
-    address: string
-    region: string
-    subregion: string
-    lat: number
-    lng: number
-  }
-  resources: {
-    ground: number
-    aerial: number
-    water: number
-  }
-}
-
-export interface AnpcSummary {
-  total_active: number
-  as_of: string
-  by_district: { district: string; count: number }[]
-  by_type: { type: string; count: number }[]
-}
+// Lógica de dados em packages/core/src/api/anpc.ts (MOB-002); API key injetada em src/lib/clients.ts.
+export type { AnpcIncident, AnpcSummary, AnpcIncidentsResponse } from '@portugal-hoje/core'
 
 export function useAnpcIncidents() {
-  return useQuery<{ count: number; as_of: string; data: AnpcIncident[] }>({
+  return useQuery({
     queryKey: ['anpc', 'incidents'],
-    queryFn: () => apiFetch('/anpc/incidents'),
+    queryFn: () => anpcClient.getIncidents(),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   })
 }
 
 export function useAnpcSummary() {
-  return useQuery<AnpcSummary>({
+  return useQuery({
     queryKey: ['anpc', 'summary'],
-    queryFn: () => apiFetch('/anpc/summary'),
+    queryFn: () => anpcClient.getSummary(),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   })

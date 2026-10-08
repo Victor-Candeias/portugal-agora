@@ -9,6 +9,7 @@
 // Dados dinâmicos (chegadas, veículos, alertas) NÃO passam por aqui — continuam
 // a ser pedidos em tempo real às APIs oficiais (ver useCarris.ts).
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js'
+import type { SqlParam } from '@portugal-hoje/core'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 
 const DB_URL = `${import.meta.env.BASE_URL}data/carris.sqlite`
@@ -32,10 +33,10 @@ export function getStaticDb(): Promise<SqlJsDatabase> {
   return dbPromise
 }
 
-/** Corre uma query SELECT e devolve as linhas como objetos tipados. */
+/** Corre uma query SELECT e devolve as linhas como objetos tipados (implementa `QueryAll` do core). */
 export async function queryAll<T = Record<string, unknown>>(
   sql: string,
-  params: (string | number | null)[] = [],
+  params: SqlParam[] = [],
 ): Promise<T[]> {
   const db = await getStaticDb()
   const stmt = db.prepare(sql)
@@ -47,15 +48,4 @@ export async function queryAll<T = Record<string, unknown>>(
   } finally {
     stmt.free()
   }
-}
-
-export interface DbMeta {
-  generated_at: string | null
-  source: string | null
-}
-
-export async function getStaticDbMeta(): Promise<DbMeta> {
-  const rows = await queryAll<{ key: string; value: string }>('SELECT key, value FROM meta')
-  const map = new Map(rows.map(r => [r.key, r.value]))
-  return { generated_at: map.get('generated_at') ?? null, source: map.get('source') ?? null }
 }

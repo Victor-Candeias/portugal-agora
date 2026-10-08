@@ -14,6 +14,12 @@ portugal-hoje/
 └── pnpm-workspace.yaml
 ```
 
+O `packages/core` é agnóstico de plataforma (sem `import.meta`, `window` ou `document`): cada
+cliente recebe a configuração por injeção (`create*Client({ ... })` — API key, base URLs/proxy,
+executor SQL `QueryAll` para os `.sqlite` estáticos). A app web configura-os em
+`apps/web/src/lib/clients.ts` (sql.js/WASM, proxy CORS do comboios.live); os hooks React Query de
+cada app são apenas camadas finas sobre esses clientes. No nativo usa-se `fetch` direto (sem proxy).
+
 ## Pré-requisitos
 
 - Node.js 20+

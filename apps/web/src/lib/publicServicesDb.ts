@@ -5,6 +5,7 @@
 // como asset estático em `/data/public-services.sqlite`, consultado no browser via SQLite
 // compilado para WebAssembly (sql.js), sem pedidos de rede repetidos.
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js'
+import type { SqlParam } from '@portugal-hoje/core'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 
 const DB_URL = `${import.meta.env.BASE_URL}data/public-services.sqlite`
@@ -28,10 +29,10 @@ export function getPublicServicesDb(): Promise<SqlJsDatabase> {
   return dbPromise
 }
 
-/** Corre uma query SELECT e devolve as linhas como objetos tipados. */
+/** Corre uma query SELECT e devolve as linhas como objetos tipados (implementa `QueryAll` do core). */
 export async function publicServicesQueryAll<T = Record<string, unknown>>(
   sql: string,
-  params: (string | number | null)[] = [],
+  params: SqlParam[] = [],
 ): Promise<T[]> {
   const db = await getPublicServicesDb()
   const stmt = db.prepare(sql)
@@ -43,15 +44,4 @@ export async function publicServicesQueryAll<T = Record<string, unknown>>(
   } finally {
     stmt.free()
   }
-}
-
-export interface PublicServicesDbMeta {
-  generated_at: string | null
-  source: string | null
-}
-
-export async function getPublicServicesDbMeta(): Promise<PublicServicesDbMeta> {
-  const rows = await publicServicesQueryAll<{ key: string; value: string }>('SELECT key, value FROM meta')
-  const map = new Map(rows.map(r => [r.key, r.value]))
-  return { generated_at: map.get('generated_at') ?? null, source: map.get('source') ?? null }
 }

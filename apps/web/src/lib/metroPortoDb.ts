@@ -10,6 +10,7 @@
 // Base de dados separada da Carris (ficheiro `.sqlite` distinto) para não misturar os dois
 // domínios de dados e para que cada um possa evoluir/atualizar-se independentemente.
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js'
+import type { SqlParam } from '@portugal-hoje/core'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 
 const DB_URL = `${import.meta.env.BASE_URL}data/metro-porto.sqlite`
@@ -33,10 +34,10 @@ export function getMetroPortoDb(): Promise<SqlJsDatabase> {
   return dbPromise
 }
 
-/** Corre uma query SELECT e devolve as linhas como objetos tipados. */
+/** Corre uma query SELECT e devolve as linhas como objetos tipados (implementa `QueryAll` do core). */
 export async function metroPortoQueryAll<T = Record<string, unknown>>(
   sql: string,
-  params: (string | number | null)[] = [],
+  params: SqlParam[] = [],
 ): Promise<T[]> {
   const db = await getMetroPortoDb()
   const stmt = db.prepare(sql)
@@ -48,15 +49,4 @@ export async function metroPortoQueryAll<T = Record<string, unknown>>(
   } finally {
     stmt.free()
   }
-}
-
-export interface MetroPortoDbMeta {
-  generated_at: string | null
-  source: string | null
-}
-
-export async function getMetroPortoDbMeta(): Promise<MetroPortoDbMeta> {
-  const rows = await metroPortoQueryAll<{ key: string; value: string }>('SELECT key, value FROM meta')
-  const map = new Map(rows.map(r => [r.key, r.value]))
-  return { generated_at: map.get('generated_at') ?? null, source: map.get('source') ?? null }
 }
