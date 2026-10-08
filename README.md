@@ -71,6 +71,18 @@ pnpm lint             # oxlint
 O `apps/mobile/metro.config.js` faz o Metro resolver os imports `./x.js` do `packages/core` para os
 ficheiros `.ts` correspondentes.
 
+### Dados estáticos no mobile (`.sqlite`)
+
+Os `.sqlite` da Carris, Metro do Porto e Serviços Públicos (gerados no CI e publicados no GitHub
+Pages) são consultados no nativo com `expo-sqlite` — `apps/mobile/lib/staticDb.ts` implementa o
+`QueryAll` do core e `apps/mobile/lib/clients.ts` instancia os clientes. Na primeira utilização cada
+ficheiro é descarregado para `Paths.document/static-db/` (é preciso rede uma vez; sem rede a consulta
+falha com `StaticDbUnavailableError`, com mensagem para o utilizador) e depois funciona offline. Em
+segundo plano, no máximo a cada 6 h, verifica o ETag do ficheiro publicado; uma versão com
+`meta.generated_at` mais recente fica pendente e é aplicada no próximo arranque (ou em `reload()`).
+A origem pode ser alterada com `EXPO_PUBLIC_STATIC_DATA_URL` (por omissão
+`https://victor-candeias.github.io/portugal-agora/data/`).
+
 ## Funcionalidades
 
 | Ecrã | Dados |
