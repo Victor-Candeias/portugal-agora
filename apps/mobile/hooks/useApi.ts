@@ -49,6 +49,15 @@ export function useWeatherForecast(municipality?: string) {
   })
 }
 
+export function useWeatherObservation(lat?: number, lng?: number) {
+  return useQuery({
+    queryKey: ['weather', 'observation', lat, lng],
+    queryFn: () => apiClient.getWeatherObservation({ lat, lng }),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!(lat && lng),
+  })
+}
+
 export function useEvStations(lat?: number, lng?: number) {
   return useQuery({
     queryKey: ['ev', 'stations', lat, lng],

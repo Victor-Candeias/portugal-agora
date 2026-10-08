@@ -1,6 +1,5 @@
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
 import { useEvStations } from '../../hooks/useApi'
-import type { EvStation } from '@portugal-hoje/core'
 
 export default function EV() {
   const { data, isLoading, refetch } = useEvStations(38.716, -9.139)

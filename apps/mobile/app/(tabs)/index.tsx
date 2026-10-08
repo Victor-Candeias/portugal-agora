@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { ScrollView, View, Text, StyleSheet } from 'react-native'
 import { useFuelPrices } from '../../hooks/useApi'
 import { useWeatherForecast } from '../../hooks/useApi'
 import { useCivilProtectionAlerts } from '../../hooks/useApi'
@@ -34,7 +34,7 @@ export default function Dashboard() {
   const { data: alertsData } = useCivilProtectionAlerts()
   const { data: ratesData } = useInterestRates()
 
-  const cheapest = fuelData?.data[0]
+  const cheapest = fuelData?.[0]
   const today = weatherData?.data[0]
   const alerts = alertsData?.data ?? []
   const euribor = ratesData?.data.find(r => r.type.includes('3m') || r.type.includes('3M'))
@@ -57,7 +57,7 @@ export default function Dashboard() {
           emoji="⛽"
           title="Gasolina 95"
           value={cheapest ? formatPrice(cheapest.price_eur) : '—'}
-          subtitle={cheapest?.station_name ?? 'A carregar...'}
+          subtitle={cheapest?.Nome ?? 'A carregar...'}
           color="#16a34a"
         />
         <SummaryCard

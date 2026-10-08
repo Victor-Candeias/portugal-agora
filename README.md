@@ -21,6 +21,10 @@ portugal-hoje/
 - Chave da API Aberta — [registar em app.apiaberta.pt](https://app.apiaberta.pt)
 - Para builds Android (mobile e android-auto): **JDK 17** (`JAVA_HOME` a apontar para ele — o JDK 25
   faz falhar o lint do Android Gradle Plugin) e Android SDK (`ANDROID_HOME`) com API 36
+- Mobile no Windows: **CMake 3.31.6** no Android SDK (`sdkmanager "cmake/3.31.6"`) e, em
+  `apps/mobile/android/local.properties` (gerado, não versionado), `cmake.dir=<ANDROID_HOME>\\cmake\\3.31.6`.
+  O CMake 3.22.1 por omissão falha nos módulos C++ (`ninja: manifest 'build.ninja' still dirty`)
+  devido aos caminhos longos do pnpm.
 
 ## Instalação
 
@@ -52,9 +56,14 @@ pnpm dev:web          # http://localhost:5173
 
 # Mobile
 cd apps/mobile
-npx expo start        # QR code para Expo Go
+pnpm android          # expo run:android — development build no emulador/dispositivo (expo-dev-client)
+pnpm start            # Metro (para um development build já instalado)
 pnpm typecheck        # tsc --noEmit
+pnpm lint             # oxlint
 ```
+
+O `apps/mobile/metro.config.js` faz o Metro resolver os imports `./x.js` do `packages/core` para os
+ficheiros `.ts` correspondentes.
 
 ## Funcionalidades
 
@@ -83,6 +92,7 @@ Perfis em `apps/mobile/eas.json`:
 
 | Perfil | Saída | Uso |
 |---|---|---|
+| `development` | APK com `expo-dev-client` (distribuição interna) | desenvolvimento com Metro |
 | `preview` | APK (distribuição interna) | testar em dispositivos |
 | `production` | AAB, `versionCode` incrementado remotamente | Google Play |
 
@@ -97,9 +107,7 @@ npx eas-cli init       # cria o projeto EAS e grava extra.eas.projectId no app.j
 Builds:
 
 ```bash
+npx eas-cli build -p android --profile development
 npx eas-cli build -p android --profile preview
 npx eas-cli build -p android --profile production
 ```
-
-Development builds (`developmentClient`) exigem `expo-dev-client` (`npx expo install expo-dev-client`)
-e um perfil `development` no `eas.json`.

@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "ignorePatterns": ["android/**", "ios/**", "metro.config.js"],
+  "rules": {
+    "react/rules-of-hooks": "error"
+  }
+}
