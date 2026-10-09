@@ -60,7 +60,7 @@ status: active
 | WEB-030 | Economia: gráficos de séries históricas INE/Eurostat (/ine/stats) | done | 2026-10-09 | developer | medium | 2026-10-09 |  | WEB-028 | [WEB-030](../specs/mobile/web-030-spec.md) |
 | WEB-031 | Contratos Públicos: nova secção com dados BASE (/base/contracts) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-031](../specs/mobile/web-031-spec.md) |
 | WEB-032 | Fundos PRR/PT2030: nova secção (/prr, /pt2030) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
-| WEB-033 | Ferramenta: validador de NIF (/nif/validate) | backlog | 2026-10-09 | developer | low |  |  |  |  |
+| WEB-033 | Ferramenta: validador de NIF (/nif/validate) | done | 2026-10-09 | developer | low | 2026-10-09 |  |  |  |
 | WEB-034 | Geo: filtro por freguesia (/geo/parishes) | backlog | 2026-10-09 | developer | low |  |  |  |  |
 | WEB-035 | Combustível: preços por posto com raio a partir do GPS (/fuel/stations) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-036 | Combustível (web e mobile): corrigir ordenação por distância (título, destaque, seletor Preço/Distância e raio) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |

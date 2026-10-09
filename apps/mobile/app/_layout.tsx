@@ -33,6 +33,7 @@ export default function RootLayout() {
           <Stack.Screen name="metro-porto" options={{ title: 'Metro do Porto' }} />
           <Stack.Screen name="servicos-publicos" options={{ title: 'Serviços Públicos' }} />
           <Stack.Screen name="codigo-postal" options={{ title: 'Código Postal' }} />
+          <Stack.Screen name="nif" options={{ title: 'Validar NIF' }} />
           <Stack.Screen name="contratos/index" options={{ title: 'Contratos Públicos' }} />
           <Stack.Screen name="contratos/[id]" options={{ title: 'Contrato' }} />
         </Stack>

@@ -117,7 +117,7 @@ preciso refazer o development build (`pnpm android`).
 
 A raiz (`apps/mobile/app/_layout.tsx`) é um `Stack`. As tabs (Início, Combustível, Tempo, EV, Economia,
 Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Hospitais, Transportes (CP,
-Carris, TML), Metro do Porto, Serviços Públicos, Código Postal e Contratos Públicos (`app/contratos/index.tsx`
+Carris, TML), Metro do Porto, Serviços Públicos, Código Postal, Validar NIF (`app/nif.tsx`) e Contratos Públicos (`app/contratos/index.tsx`
 e o detalhe `app/contratos/[id].tsx`) — são rotas da stack e abrem
 a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
 risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave).
@@ -143,6 +143,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
 | 📮 Código Postal | Distrito/concelho/localidade, artérias (moradas.dev) e mapa aproximado da localidade (Open-Meteo geocoding) |
+| 🪪 Validar NIF | Validação local (`validateNif` no core): 9 dígitos, prefixo atribuído pela AT e dígito de controlo MOD 11, com o tipo de entidade. Sem pedidos de rede |
 | 📑 Contratos Públicos | Contratos do BASE.gov.pt: mais recentes, pesquisa por texto/entidade/NIF e detalhe (preço, data, procedimento, entidade adjudicante e adjudicatário, link para o portal BASE) (resumo no Início, no web) |
 
 ## Build para produção

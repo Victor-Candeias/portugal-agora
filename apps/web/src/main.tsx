@@ -12,6 +12,7 @@ import { Hospitais } from '@/pages/Hospitais'
 import { Transportes } from '@/pages/Transportes'
 import { Economia } from '@/pages/Economia'
 import { CodigoPostal } from '@/pages/CodigoPostal'
+import { Nif } from '@/pages/Nif'
 import { Turismo } from '@/pages/Turismo'
 import { MetroPorto } from '@/pages/MetroPorto'
 import { ServicosPublicos } from '@/pages/ServicosPublicos'
@@ -43,6 +44,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="transportes" element={<Transportes />} />
             <Route path="economia"    element={<Economia />} />
             <Route path="codigo-postal" element={<CodigoPostal />} />
+            <Route path="nif" element={<Nif />} />
             <Route path="turismo" element={<Turismo />} />
             <Route path="metro-porto" element={<MetroPorto />} />
             <Route path="servicos-publicos" element={<ServicosPublicos />} />
