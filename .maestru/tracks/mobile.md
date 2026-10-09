@@ -25,7 +25,9 @@ status: active
 | MOB-006 | Android Auto: corrigir manifest, HostValidator, signing e targetSdk | done | 2026-10-08 | developer | high | 2026-10-08 |  |  | [MOB-006](../specs/mobile/mob-006-spec.md) |
 | MOB-007 | Mobile: CI de build Android + publicação em teste interno no Google Play | done | 2026-10-08 | developer | medium | 2026-10-09 |  | MOB-001 | [MOB-007](../specs/mobile/mob-007-spec.md) |
 | MOB-008 | Mobile: atualizar rotas da API Aberta (Tempo, EV, Economia, risco de incêndio) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [MOB-008](../specs/mobile/mob-008-spec.md) |
+| MOB-009 | Mobile: novo ícone e splash (Portugal_Agora.png) + APK de release com nome e versão | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | MOB-010 | Combustível (mobile): ordenar postos pela localização do utilizador, com seletor Preço/Distância | done | 2026-10-09 | developer | high | 2026-10-09 |  |  |  |
+| MOB-011 | Tempo (mobile): cidade IPMA mais próxima e tempo atual pela localização do utilizador | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |
 | WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
@@ -50,4 +52,18 @@ status: active
 | WEB-022 | Metro do Porto: pipeline GTFS->SQLite (WASM) + página de estações/próximas partidas | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-023 | Serviços Públicos: PSP/GNR via Overpass (SQLite/WASM) + página perto de mim | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-024 | Metro do Porto: corrigir URL do portal (dadosabertos.cm-porto.pt) e seleção do GTFS mais recente | done | 2026-10-08 | developer | high | 2026-10-08 |  |  |  |
+| WEB-025 | Tempo: avisos meteorológicos do IPMA via API Aberta (/ipma/warnings) | backlog | 2026-10-09 | developer | high |  |  |  |  |
+| WEB-026 | Proteção Civil: comunicados da ANPC via API Aberta (/anpc/warnings) | backlog | 2026-10-09 | developer | high |  |  |  |  |
+| WEB-027 | Proteção Civil: mapa de focos de incêndio por satélite (NASA FIRMS via /nasafirms/hotspots) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-028 | Web: página Economia (BdP + INE via API Aberta) em vez de ComingSoon | backlog | 2026-10-09 | developer | high |  |  |  |  |
+| WEB-029 | Web: página EV (tarifas CEME + simulador) em vez de ComingSoon | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-030 | Economia: gráficos de séries históricas INE/Eurostat (/ine/stats) | backlog | 2026-10-09 | developer | medium |  |  | WEB-028 |  |
+| WEB-031 | Contratos Públicos: nova secção com dados BASE (/base/contracts) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-032 | Fundos PRR/PT2030: nova secção (/prr, /pt2030) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-033 | Ferramenta: validador de NIF (/nif/validate) | backlog | 2026-10-09 | developer | low |  |  |  |  |
+| WEB-034 | Geo: filtro por freguesia (/geo/parishes) | backlog | 2026-10-09 | developer | low |  |  |  |  |
+| WEB-035 | Combustível: preços por posto com raio a partir do GPS (/fuel/stations) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-036 | Combustível (web): corrigir ordenação por distância (título, destaque, seletor Preço/Distância e raio) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-037 | Header: botão para voltar ao Início, à direita na linha Portugal-Hoje, quando fora do menu principal | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-038 | Código Postal: trocar geoapi.pt por moradas.dev (resolver HTTP 429) | backlog | 2026-10-09 | developer | high |  |  |  |  |
 <!-- /maestru:work-items-list -->
