@@ -122,13 +122,13 @@ risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave)
 
 ## Funcionalidades
 
-Os ecrãs abaixo existem no web e no mobile, exceto EV, que no web ainda está por fazer.
+Os ecrãs abaixo existem no web e no mobile.
 
 | Ecrã | Dados |
 |---|---|
 | ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
 | 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
-| ⚡ EV | Tarifas de carregamento dos CEME + simulador do custo por carregamento |
+| ⚡ EV | Tarifas de carregamento dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |

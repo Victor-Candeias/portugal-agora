@@ -56,7 +56,7 @@ status: active
 | WEB-026 | Proteção Civil: comunicados da ANPC via API Aberta (/anpc/warnings) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-026](../specs/mobile/web-026-spec.md) |
 | WEB-027 | Proteção Civil: mapa de focos de incêndio por satélite (NASA FIRMS via /nasafirms/hotspots) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-027](../specs/mobile/web-027-spec.md) |
 | WEB-028 | Web: página Economia (BdP + INE via API Aberta) em vez de ComingSoon | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-028](../specs/mobile/web-028-spec.md) |
-| WEB-029 | Web: página EV (tarifas CEME + simulador) em vez de ComingSoon | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-029 | Web: página EV (tarifas CEME + simulador) em vez de ComingSoon | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-029](../specs/mobile/web-029-spec.md) |
 | WEB-030 | Economia: gráficos de séries históricas INE/Eurostat (/ine/stats) | backlog | 2026-10-09 | developer | medium |  |  | WEB-028 |  |
 | WEB-031 | Contratos Públicos: nova secção com dados BASE (/base/contracts) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-032 | Fundos PRR/PT2030: nova secção (/prr, /pt2030) | backlog | 2026-10-09 | developer | medium |  |  |  |  |

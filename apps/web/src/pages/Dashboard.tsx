@@ -6,6 +6,7 @@ import { useFuelPrices } from '@/hooks/useFuel'
 import { useIpmaForecast, useIpmaWarnings } from '@/hooks/useIPMA'
 import { useAnpcSummary } from '@/hooks/useANPC'
 import { useBdpRates } from '@/hooks/useEconomia'
+import { useCheapestEvTariffs } from '@/hooks/useEv'
 import {
   formatBdpPeriod, formatPrice, formatRate, FUEL_LABELS, maxWarningLevel, WARNING_LEVEL_LABELS, type FuelType, type WarningLevel,
 } from '@portugal-hoje/core'
@@ -20,24 +21,7 @@ const WARNING_CARD_CLASS: Record<WarningLevel, string> = {
   red: 'bg-red-50 border-red-300',
 }
 
-function ComingSoonCard({
-  to, icon: Icon, title, source,
-}: { to: string; icon: React.ElementType; title: string; source: string }) {
-  return (
-    <Link to={to} className="block">
-      <Card className="h-full opacity-60 hover:opacity-80 transition-opacity">
-        <div className="flex items-start justify-between mb-3">
-          <div className="p-2 rounded-lg bg-slate-200">
-            <Icon size={20} className="text-slate-500" />
-          </div>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Em breve</span>
-        </div>
-        <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">{title}</p>
-        <p className="text-sm text-slate-400 mt-1">{source}</p>
-      </Card>
-    </Link>
-  )
-}
+const EV_CARD_KWH = 30
 
 export function Dashboard() {
   const { data: fuel95 } = useFuelPrices('gasoline_95', 11)
@@ -47,6 +31,7 @@ export function Dashboard() {
   const { data: anpcSummary } = useAnpcSummary()
   const { data: warnings } = useIpmaWarnings()
   const { data: rates } = useBdpRates()
+  const { data: evCost } = useCheapestEvTariffs(EV_CARD_KWH)
 
   const fuelMap: Partial<Record<FuelType, typeof fuel95>> = {
     gasoline_95: fuel95,
@@ -59,6 +44,7 @@ export function Dashboard() {
   const warningLevel = maxWarningLevel(warnings ?? [])
   const ecbDeposit = rates?.data.find(r => r.key === 'ecb_deposit')
   const estr = rates?.data.find(r => r.key === 'estr')
+  const cheapestEv = evCost?.data[0]
 
   return (
     <div className="space-y-6">
@@ -164,6 +150,30 @@ export function Dashboard() {
           </Link>
         )}
 
+        {/* Carregamento EV (WEB-029) */}
+        {cheapestEv && (
+          <Link to="/ev" className="block mb-4">
+            <Card className="hover:shadow-md transition-shadow bg-amber-50 border-amber-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-amber-100">
+                    <Zap size={20} className="text-amber-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Carregamento EV · CEME mais barato</p>
+                    <p className="text-2xl font-bold text-amber-700 tabular-nums">{formatPrice(cheapestEv.price_per_kwh_eur)}/kWh</p>
+                    <p className="text-sm text-slate-600 truncate">{cheapestEv.ceme}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-700 font-medium text-right shrink-0">
+                  {EV_CARD_KWH} kWh ≈ {cheapestEv.total_cost_eur.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
+                </p>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">Fonte: ERSE/OMIE · sem tarifas OPC/EGME</p>
+            </Card>
+          </Link>
+        )}
+
         {/* Fuel */}
         {!fuel95 && !fuel98 && !diesel && <LoadingBox />}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -190,17 +200,6 @@ export function Dashboard() {
               </Link>
             )
           })}
-        </div>
-      </div>
-
-      {/* Coming soon */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-          <span className="w-2 h-2 bg-amber-400 rounded-full inline-block"></span>
-          Em breve
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          <ComingSoonCard to="/ev"       icon={Zap}       title="Carregamento EV" source="MOBI.E" />
         </div>
       </div>
     </div>
