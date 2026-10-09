@@ -1,11 +1,11 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import { useFuelPrices } from '../../hooks/useApi'
-import { DEFAULT_CITY_ID, useIpmaForecasts } from '../../hooks/useTempo'
+import { DEFAULT_CITY_ID, useIpmaForecasts, useIpmaWarnings } from '../../hooks/useTempo'
 import { useBdpRates } from '../../hooks/useEconomia'
 import { useAnpcSummary } from '../../hooks/useAnpc'
 import { SECTIONS } from '../../lib/sections'
-import { formatPrice } from '@portugal-hoje/core'
+import { formatPrice, maxWarningLevel, WARNING_LEVEL_COLORS, WARNING_LEVEL_LABELS } from '@portugal-hoje/core'
 
 // Os hrefs vêm de lib/sections.ts e coincidem com ficheiros em app/; as rotas tipadas não estão ativas.
 const go = (href: string) => router.push(href as never)
@@ -45,12 +45,15 @@ export default function Dashboard() {
   const { data: weatherData } = useIpmaForecasts()
   const { data: anpcData } = useAnpcSummary()
   const { data: ratesData } = useBdpRates()
+  const { data: warnings } = useIpmaWarnings()
 
   const cheapest = fuelData?.[0]
   const today = weatherData?.find(c => c.cityId === DEFAULT_CITY_ID)?.forecasts[0]
   const activeIncidents = anpcData?.total_active ?? 0
   const topDistrict = anpcData?.by_district?.[0]
   const ecbDeposit = ratesData?.data.find(r => r.key === 'ecb_deposit')
+  const warningLevel = maxWarningLevel(warnings ?? [])
+  const topWarning = warnings?.[0]
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -98,6 +101,18 @@ export default function Dashboard() {
           color={activeIncidents > 0 ? '#ef4444' : '#16a34a'}
           href="/protecao-civil"
         />
+        <SummaryCard
+          emoji={warnings && warnings.length > 0 ? '⚠️' : '✅'}
+          title="Avisos IPMA"
+          value={!warnings ? '—' : warnings.length > 0 ? `${warnings.length} ativos` : 'Sem avisos'}
+          subtitle={
+            topWarning
+              ? `${WARNING_LEVEL_LABELS[warningLevel]} · ${topWarning.type} · ${topWarning.areaName}`
+              : 'Avisos meteorológicos'
+          }
+          color={WARNING_LEVEL_COLORS[warningLevel].accent}
+          href="/tempo"
+        />
       </View>
 
       <Text style={styles.sectionTitle}>Todas as secções</Text>
@@ -118,6 +133,7 @@ export default function Dashboard() {
         {[
           { label: 'Combustível', ok: !!fuelData },
           { label: 'Meteorologia', ok: !!weatherData },
+          { label: 'Avisos IPMA', ok: !!warnings },
           { label: 'ANPC', ok: !!anpcData },
           { label: 'Banco de Portugal', ok: !!ratesData },
         ].map(({ label, ok }) => (

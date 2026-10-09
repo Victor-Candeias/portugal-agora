@@ -1,4 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
+import { ipmaClient } from '@portugal-hoje/core'
+
+// Avisos meteorológicos ativos (amarelo/laranja/vermelho), open-data do IPMA (WEB-025).
+export function useIpmaWarnings() {
+  return useQuery({
+    queryKey: ['ipma', 'warnings'],
+    queryFn: () => ipmaClient.getWarnings(),
+    staleTime: 15 * 60 * 1000,
+  })
+}
 
 const BASE = 'https://api.ipma.pt/open-data'
 

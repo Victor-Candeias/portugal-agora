@@ -5,6 +5,9 @@ import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { useDistricts, useMunicipalities } from '@/hooks/useGeo'
 import { useOpenMeteoGeocode, useOpenMeteoForecast } from '@/hooks/useOpenMeteo'
+import { useIpmaWarnings } from '@/hooks/useIPMA'
+import { IpmaWarnings } from '@/components/IpmaWarnings'
+import { filterWarningsByDistrict } from '@portugal-hoje/core'
 
 const DEFAULT_DISTRICT_ID = 11 // Lisboa
 const DEFAULT_MUNICIPALITY_NAME = 'Lisboa'
@@ -28,6 +31,11 @@ export function Tempo() {
 
   const { data: districts } = useDistricts()
   const { data: municipalities } = useMunicipalities(districtId)
+  const warnings = useIpmaWarnings()
+
+  // Com localização não há distrito escolhido: mostram-se os avisos do país.
+  const districtName = districts?.find(d => d.Id === districtId)?.Descritivo
+  const districtWarnings = filterWarningsByDistrict(warnings.data ?? [], districtName)
 
   // Sem localização: escolhe Lisboa (distrito + município) por defeito assim que a lista carregar.
   useEffect(() => {
@@ -164,6 +172,13 @@ export function Tempo() {
           </div>
         </div>
       </Card>
+
+      <IpmaWarnings
+        warnings={districtWarnings}
+        regionLabel={districtName ?? 'Portugal'}
+        isLoading={warnings.isLoading}
+        isError={warnings.isError}
+      />
 
       {!userLocation && !municipalityName && (
         <p className="text-slate-400 text-sm text-center py-8">

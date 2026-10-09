@@ -89,6 +89,17 @@ export interface IneIndicator {
   value: number
 }
 
+/** Entrada de `/ipma/warnings` (sem nível de aviso; ver `ipmaClient.getWarnings()` no core). */
+export interface ApiAbertaIpmaWarning {
+  id: string
+  type: string
+  text: string
+  startTime: string
+  endTime: string
+  /** Código de área do IPMA (ex.: `BRG`). */
+  region: string
+}
+
 interface ListResponse<T> {
   meta: { page: number; limit: number; total: number; pages: number }
   data: T[]
@@ -165,6 +176,11 @@ export class ApiAbertaClient {
 
   async getIpmaForecast(cityId: number | string): Promise<IpmaCityForecast> {
     return this.get(`/ipma/forecasts/${cityId}`)
+  }
+
+  // Ainda sem uso nas apps: a rota não tem o nível do aviso e só tem algumas regiões (WEB-025).
+  async getIpmaWarnings(params?: { region?: string }): Promise<{ count: number; data: ApiAbertaIpmaWarning[] }> {
+    return this.get('/ipma/warnings', params)
   }
 
   // ── EV (tarifas de carregamento CEME) ────────────────────────────────────

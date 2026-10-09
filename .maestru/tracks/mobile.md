@@ -52,7 +52,7 @@ status: active
 | WEB-022 | Metro do Porto: pipeline GTFS->SQLite (WASM) + página de estações/próximas partidas | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-023 | Serviços Públicos: PSP/GNR via Overpass (SQLite/WASM) + página perto de mim | done | 2026-07-19 |  | medium | 2026-07-19 |  |  |  |
 | WEB-024 | Metro do Porto: corrigir URL do portal (dadosabertos.cm-porto.pt) e seleção do GTFS mais recente | done | 2026-10-08 | developer | high | 2026-10-08 |  |  |  |
-| WEB-025 | Tempo: avisos meteorológicos do IPMA via API Aberta (/ipma/warnings) | backlog | 2026-10-09 | developer | high |  |  |  |  |
+| WEB-025 | Tempo: avisos meteorológicos do IPMA via API Aberta (/ipma/warnings) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-025](../specs/mobile/web-025-spec.md) |
 | WEB-026 | Proteção Civil: comunicados da ANPC via API Aberta (/anpc/warnings) | backlog | 2026-10-09 | developer | high |  |  |  |  |
 | WEB-027 | Proteção Civil: mapa de focos de incêndio por satélite (NASA FIRMS via /nasafirms/hotspots) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-028 | Web: página Economia (BdP + INE via API Aberta) em vez de ComingSoon | backlog | 2026-10-09 | developer | high |  |  |  |  |

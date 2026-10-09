@@ -3,12 +3,21 @@ import { Fuel, CloudSun, Zap, BarChart3 } from 'lucide-react'
 import { Card } from '@/components/Card'
 import { LoadingBox } from '@/components/Feedback'
 import { useFuelPrices } from '@/hooks/useFuel'
-import { useIpmaForecast } from '@/hooks/useIPMA'
+import { useIpmaForecast, useIpmaWarnings } from '@/hooks/useIPMA'
 import { useAnpcSummary } from '@/hooks/useANPC'
-import { formatPrice, FUEL_LABELS, type FuelType } from '@portugal-hoje/core'
+import {
+  formatPrice, FUEL_LABELS, maxWarningLevel, WARNING_LEVEL_LABELS, type FuelType, type WarningLevel,
+} from '@portugal-hoje/core'
 
 const LIVE_FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel']
 const LISBOA_ID = 1110600
+
+const WARNING_CARD_CLASS: Record<WarningLevel, string> = {
+  green: 'bg-green-50 border-green-200',
+  yellow: 'bg-yellow-50 border-yellow-300',
+  orange: 'bg-orange-50 border-orange-300',
+  red: 'bg-red-50 border-red-300',
+}
 
 function ComingSoonCard({
   to, icon: Icon, title, source,
@@ -35,6 +44,7 @@ export function Dashboard() {
   const { data: diesel }  = useFuelPrices('diesel', 11)
   const { data: forecasts } = useIpmaForecast(LISBOA_ID)
   const { data: anpcSummary } = useAnpcSummary()
+  const { data: warnings } = useIpmaWarnings()
 
   const fuelMap: Partial<Record<FuelType, typeof fuel95>> = {
     gasoline_95: fuel95,
@@ -44,6 +54,7 @@ export function Dashboard() {
 
   const today = forecasts?.[0]
   const totalIncidents = anpcSummary?.total_active ?? 0
+  const warningLevel = maxWarningLevel(warnings ?? [])
 
   return (
     <div className="space-y-6">
@@ -77,6 +88,30 @@ export function Dashboard() {
                   </div>
                 </div>
                 <p className="text-xs text-sky-600 font-medium">💧 {today.precipitaProb}%</p>
+              </div>
+            </Card>
+          </Link>
+        )}
+
+        {/* Avisos IPMA */}
+        {warnings && (
+          <Link to="/tempo" className="block mb-4">
+            <Card className={`hover:shadow-md transition-shadow ${WARNING_CARD_CLASS[warningLevel]}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{warnings.length > 0 ? '⚠️' : '✅'}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Avisos meteorológicos · IPMA</p>
+                  <p className="font-bold text-slate-900">
+                    {warnings.length > 0
+                      ? `${warnings.length} aviso${warnings.length > 1 ? 's' : ''} · nível máximo ${WARNING_LEVEL_LABELS[warningLevel].toLowerCase()}`
+                      : 'Sem avisos ativos'}
+                  </p>
+                  {warnings.length > 0 && (
+                    <p className="text-sm text-slate-600 truncate">
+                      {warnings.slice(0, 3).map(w => `${w.type} · ${w.areaName}`).join(' | ')}
+                    </p>
+                  )}
+                </div>
               </div>
             </Card>
           </Link>

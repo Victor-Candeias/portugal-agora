@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import { ScrollView, View, Text, StyleSheet } from 'react-native'
-import { formatDate, type IpmaDailyForecast } from '@portugal-hoje/core'
-import { DEFAULT_CITY_ID, useCurrentWeather, useIpmaForecasts } from '../../hooks/useTempo'
-import { Card, ChipRow, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
+import {
+  districtFromIpmaCityId,
+  filterWarningsByDistrict,
+  formatDate,
+  formatWarningTime,
+  WARNING_LEVEL_COLORS,
+  WARNING_LEVEL_LABELS,
+  type IpmaDailyForecast,
+  type IpmaWarning,
+} from '@portugal-hoje/core'
+import { DEFAULT_CITY_ID, useCurrentWeather, useIpmaForecasts, useIpmaWarnings } from '../../hooks/useTempo'
+import { Badge, Card, ChipRow, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
 
 const LISBOA = { name: 'Lisboa', latitude: 38.766, longitude: -9.1286 }
 
@@ -34,10 +43,14 @@ export default function Tempo() {
     ? { name: city.cityName, latitude: city.latitude, longitude: city.longitude }
     : LISBOA
   const current = useCurrentWeather(place.latitude, place.longitude)
+  const warnings = useIpmaWarnings()
+  const district = districtFromIpmaCityId(cityId) ?? 'Lisboa'
+  const districtWarnings = filterWarningsByDistrict(warnings.data ?? [], district)
 
   const refresh = () => {
     void forecasts.refetch()
     void current.refetch()
+    void warnings.refetch()
   }
 
   return (
@@ -46,7 +59,7 @@ export default function Tempo() {
         title="🌤️ Meteorologia"
         subtitle={`Previsão IPMA · ${place.name}`}
         onRefresh={refresh}
-        refreshing={forecasts.isFetching || current.isFetching}
+        refreshing={forecasts.isFetching || current.isFetching || warnings.isFetching}
       />
 
       {cities.length > 0 && (
@@ -78,6 +91,13 @@ export default function Tempo() {
         </View>
       )}
 
+      <WarningsCard
+        district={district}
+        warnings={districtWarnings}
+        isLoading={warnings.isLoading}
+        isError={warnings.isError}
+      />
+
       {forecasts.isLoading && <LoadingView color="#0ea5e9" />}
       {forecasts.isError && <ErrorView error={forecasts.error} onRetry={() => void forecasts.refetch()} />}
 
@@ -104,6 +124,48 @@ export default function Tempo() {
         </>
       )}
     </ScrollView>
+  )
+}
+
+function WarningsCard({
+  district,
+  warnings,
+  isLoading,
+  isError,
+}: {
+  district: string
+  warnings: IpmaWarning[]
+  isLoading: boolean
+  isError: boolean
+}) {
+  return (
+    <Card>
+      <SectionTitle>⚠️ Avisos IPMA · {district}</SectionTitle>
+      {isLoading && <Text style={uiStyles.small}>A carregar avisos…</Text>}
+      {isError && <Text style={styles.warningError}>Não foi possível carregar os avisos do IPMA.</Text>}
+      {!isLoading && !isError && warnings.length === 0 && (
+        <Text style={styles.noWarnings}>✅ Sem avisos meteorológicos ativos.</Text>
+      )}
+      {warnings.map(w => (
+        <View key={w.id} style={styles.warningRow}>
+          <Badge
+            label={WARNING_LEVEL_LABELS[w.level]}
+            color={WARNING_LEVEL_COLORS[w.level].color}
+            background={WARNING_LEVEL_COLORS[w.level].background}
+          />
+          <View style={styles.warningInfo}>
+            <Text style={styles.warningType}>
+              {w.type}
+              {w.areaName !== district ? <Text style={styles.warningArea}> · {w.areaName}</Text> : null}
+            </Text>
+            <Text style={uiStyles.small}>
+              {formatWarningTime(w.startTime)} → {formatWarningTime(w.endTime)}
+            </Text>
+            {w.text ? <Text style={styles.warningText}>{w.text}</Text> : null}
+          </View>
+        </View>
+      ))}
+    </Card>
   )
 }
 
@@ -171,4 +233,17 @@ const styles = StyleSheet.create({
   forecastInfo: { flex: 1 },
   forecastDesc: { fontSize: 13, color: '#374151' },
   forecastTemp: { fontSize: 13, fontWeight: '600' },
+  warningRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  warningInfo: { flex: 1 },
+  warningType: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
+  warningArea: { fontWeight: '400', color: '#64748b' },
+  warningText: { fontSize: 12, color: '#475569', marginTop: 2 },
+  warningError: { fontSize: 12, color: '#dc2626' },
+  noWarnings: { fontSize: 13, color: '#15803d' },
 })

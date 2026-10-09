@@ -65,6 +65,7 @@ nenhum valor `demo`).
 | Previsão do tempo (capitais de distrito, ~3 dias) | API Aberta — `/ipma/forecasts` | sim |
 | Tempo atual | Open-Meteo (`api.open-meteo.com`) | não |
 | Risco de incêndio rural | IPMA open-data — RCM por concelho (`rcm-d0.json`), agregado por distrito | não |
+| Avisos meteorológicos (amarelo/laranja/vermelho) | IPMA open-data — `warnings_www.json` (a rota `/ipma/warnings` da API Aberta não traz o nível nem todas as regiões) | não |
 | Tarifas de carregamento EV (CEME) | API Aberta — `/ev/tariffs`, `/ev/tariffs/cheapest` | sim |
 | Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
 | Indicadores de Portugal | API Aberta — `/ine/latest` (Eurostat) | sim |
@@ -124,7 +125,7 @@ Os ecrãs abaixo existem no web e no mobile, exceto EV e Economia, que no web ai
 | Ecrã | Dados |
 |---|---|
 | ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
-| 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) |
+| 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tarifas de carregamento dos CEME + simulador do custo por carregamento |
 | 🔥 Proteção Civil | Ocorrências ANPC + risco de incêndio por distrito (RCM IPMA) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat |
