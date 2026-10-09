@@ -69,15 +69,57 @@ export const FIRE_RISK_COLORS = {
 const ptNumber = (value: number, digits = 1) =>
   new Intl.NumberFormat('pt-PT', { maximumFractionDigits: digits }).format(value)
 
-// Indicadores de /ine/latest (Eurostat) → rótulo PT + formatação (MOB-008)
-export const INE_INDICATORS: Record<string, { label: string; format: (value: number) => string }> = {
-  population: { label: 'População residente', format: (v) => ptNumber(v, 0) },
-  gdp: { label: 'PIB', format: (v) => `${ptNumber(v / 1000, 1)} mil M€` },
-  gdp_per_capita: { label: 'PIB per capita', format: (v) => `${ptNumber(v, 0)} €` },
-  inflation: { label: 'Inflação (IHPC)', format: (v) => `${ptNumber(v)}%` },
-  unemployment_rate: { label: 'Taxa de desemprego', format: (v) => `${ptNumber(v)}%` },
-  birth_rate: { label: 'Natalidade', format: (v) => `${ptNumber(v)} ‰` },
-  death_rate: { label: 'Mortalidade', format: (v) => `${ptNumber(v)} ‰` },
+// Indicadores de /ine/latest e /ine/stats (Eurostat) → rótulo PT + formatação (MOB-008).
+// `short` é a versão compacta para os eixos dos gráficos (WEB-030).
+export const INE_INDICATORS: Record<string, { label: string; format: (value: number) => string; short: (value: number) => string }> = {
+  population: { label: 'População residente', format: (v) => ptNumber(v, 0), short: (v) => `${ptNumber(v / 1e6, 2)} M` },
+  gdp: { label: 'PIB', format: (v) => `${ptNumber(v / 1000, 1)} mil M€`, short: (v) => `${ptNumber(v / 1000, 0)} mil M€` },
+  gdp_per_capita: { label: 'PIB per capita', format: (v) => `${ptNumber(v, 0)} €`, short: (v) => `${ptNumber(v / 1000, 1)} mil €` },
+  inflation: { label: 'Inflação (IHPC)', format: (v) => `${ptNumber(v)}%`, short: (v) => `${ptNumber(v)}%` },
+  unemployment_rate: { label: 'Taxa de desemprego', format: (v) => `${ptNumber(v)}%`, short: (v) => `${ptNumber(v)}%` },
+  birth_rate: { label: 'Natalidade', format: (v) => `${ptNumber(v)} ‰`, short: (v) => `${ptNumber(v)} ‰` },
+  death_rate: { label: 'Mortalidade', format: (v) => `${ptNumber(v)} ‰`, short: (v) => `${ptNumber(v)} ‰` },
+}
+
+/** Valor de um indicador INE com a formatação PT; indicadores desconhecidos usam número simples. */
+export function formatIneValue(indicator: string, value: number, variant: 'full' | 'short' = 'full'): string {
+  const meta = INE_INDICATORS[indicator]
+  if (!meta) return ptNumber(value, 2)
+  return variant === 'short' ? meta.short(value) : meta.format(value)
+}
+
+export type IneRange = '10' | '20' | '30' | 'all'
+
+const INE_RANGES: { value: IneRange; label: string; years: number | null }[] = [
+  { value: '10', label: '10 anos', years: 10 },
+  { value: '20', label: '20 anos', years: 20 },
+  { value: '30', label: '30 anos', years: 30 },
+  { value: 'all', label: 'Tudo', years: null },
+]
+
+/** Intervalos de anos que fazem sentido para um indicador (sem os que já cobrem a série toda). */
+export function ineRangeOptions(years: { count: number }): { value: IneRange; label: string }[] {
+  return INE_RANGES
+    .filter(r => r.years === null || r.years < years.count)
+    .map(({ value, label }) => ({ value, label }))
+}
+
+/** Primeiro ano de um intervalo, terminando no último ano com dados. */
+export function ineRangeStart(range: IneRange, years: { from: number; to: number }): number {
+  const span = INE_RANGES.find(r => r.value === range)?.years
+  return span ? Math.max(years.from, years.to - span + 1) : years.from
+}
+
+/** Último valor, mínimo e máximo de uma série anual (`null` se vazia). */
+export function summarizeIneSeries<T extends { year: number; value: number }>(points: T[]): { last: T; min: T; max: T } | null {
+  if (points.length === 0) return null
+  let min = points[0]
+  let max = points[0]
+  for (const p of points) {
+    if (p.value < min.value) min = p
+    if (p.value > max.value) max = p
+  }
+  return { last: points[points.length - 1], min, max }
 }
 
 // Rótulos curtos das taxas de /bdp/rates e /bdp/lending-rates (o `label_pt` da API fica como descrição).

@@ -27,3 +27,26 @@ export function useIneLatest() {
     staleTime: 24 * 60 * 60 * 1000,
   })
 }
+
+// Indicadores INE/Eurostat disponíveis e anos com dados (WEB-030).
+export function useIneIndicators() {
+  return useQuery({
+    queryKey: ['ine', 'indicators'],
+    queryFn: () => apiClient.getIneIndicators(),
+    staleTime: 24 * 60 * 60 * 1000,
+  })
+}
+
+// Série anual de um indicador desde `from` (o 1.º ano de /ine/indicators; sem ele a API começa em 2000).
+// O intervalo de anos escolhido é recortado no ecrã, sem novo pedido.
+export function useIneSeries(indicator: string | null, from?: number) {
+  return useQuery({
+    queryKey: ['ine', 'stats', indicator, from],
+    queryFn: async () => {
+      const res = await apiClient.getIneStats({ indicator: indicator!, from })
+      return res.data.find(s => s.indicator === indicator) ?? null
+    },
+    enabled: !!indicator,
+    staleTime: 24 * 60 * 60 * 1000,
+  })
+}

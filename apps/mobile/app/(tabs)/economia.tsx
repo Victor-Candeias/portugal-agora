@@ -1,7 +1,11 @@
-import { ScrollView, View, Text, StyleSheet } from 'react-native'
-import { BDP_RATE_LABELS, formatBdpPeriod, formatRate, INE_INDICATORS, type BdpRate } from '@portugal-hoje/core'
-import { useBdpLendingRates, useBdpRates, useIneLatest } from '../../hooks/useEconomia'
-import { Card, EmptyText, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
+import { useState } from 'react'
+import { Pressable, ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import {
+  BDP_RATE_LABELS, formatBdpPeriod, formatIneValue, formatRate, INE_INDICATORS, ineRangeOptions, ineRangeStart,
+  summarizeIneSeries, type BdpRate, type IneRange, type IneSeriesPoint,
+} from '@portugal-hoje/core'
+import { useBdpLendingRates, useBdpRates, useIneIndicators, useIneLatest, useIneSeries } from '../../hooks/useEconomia'
+import { Card, ChipRow, EmptyText, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
 
 const COLOR = '#6366f1'
 
@@ -9,6 +13,8 @@ export default function Economia() {
   const rates = useBdpRates()
   const lending = useBdpLendingRates()
   const ine = useIneLatest()
+  const indicators = useIneIndicators()
+  const [selected, setSelected] = useState<string | null>(null)
 
   const refresh = () => {
     void rates.refetch()
@@ -56,23 +62,144 @@ export default function Economia() {
       {ine.data && ine.data.data.length > 0 && (
         <Card>
           <SectionTitle>{ine.data.source}</SectionTitle>
+          <Text style={[uiStyles.small, styles.hint]}>Toque num indicador para ver a série histórica.</Text>
           {ine.data.data.map(ind => {
             const meta = INE_INDICATORS[ind.indicator]
+            const open = selected === ind.indicator
             return (
-              <View key={ind.indicator} style={styles.row}>
-                <View style={styles.rowInfo}>
-                  <Text style={styles.rowName}>{meta?.label ?? ind.label}</Text>
-                  <Text style={uiStyles.small}>{ind.year}</Text>
-                </View>
-                <Text style={styles.rowValue}>
-                  {meta ? meta.format(ind.value) : ind.value.toLocaleString('pt-PT')}
-                </Text>
+              <View key={ind.indicator}>
+                <TouchableOpacity
+                  style={[styles.row, open && styles.rowOpen]}
+                  onPress={() => setSelected(open ? null : ind.indicator)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: open }}
+                >
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowName}>{meta?.label ?? ind.label}</Text>
+                    <Text style={uiStyles.small}>{ind.year}</Text>
+                  </View>
+                  <Text style={styles.rowValue}>{formatIneValue(ind.indicator, ind.value)}</Text>
+                  <Text style={styles.chevron}>{open ? '▴' : '▾'}</Text>
+                </TouchableOpacity>
+                {open && <IneSeriesPanel key={ind.indicator} indicator={ind.indicator} indicators={indicators} />}
               </View>
             )
           })}
         </Card>
       )}
     </ScrollView>
+  )
+}
+
+// Série histórica de um indicador com seletor de intervalo de anos (WEB-030).
+// Gráfico de barras feito com Views, para não precisar de uma biblioteca nativa de gráficos.
+function IneSeriesPanel({ indicator, indicators }: {
+  indicator: string
+  indicators: ReturnType<typeof useIneIndicators>
+}) {
+  const settled = indicators.isSuccess || indicators.isError
+  const info = indicators.data?.data.find(i => i.indicator === indicator)
+  const series = useIneSeries(settled ? indicator : null, info?.years.from)
+  const [range, setRange] = useState<IneRange>('20')
+  const [pickedYear, setPickedYear] = useState<number | null>(null)
+
+  if (!settled || series.isLoading) return <LoadingView color={COLOR} />
+  if (series.isError) return <ErrorView error={series.error} onRetry={() => void series.refetch()} />
+  const points = series.data?.data ?? []
+  if (points.length === 0) return <EmptyText>Sem série histórica para este indicador</EmptyText>
+
+  const years = { from: points[0].year, to: points[points.length - 1].year, count: points.length }
+  const options = ineRangeOptions(years)
+  const preset: IneRange = options.some(o => o.value === range) ? range : 'all'
+  const from = ineRangeStart(preset, years)
+  const visible = points.filter(p => p.year >= from)
+  const summary = summarizeIneSeries(visible)
+  const picked = visible.find(p => p.year === pickedYear) ?? summary?.last
+
+  return (
+    <View style={styles.panel}>
+      <ChipRow
+        options={options}
+        value={preset}
+        onChange={v => v && setRange(v)}
+        allLabel={null}
+        color={COLOR}
+      />
+      {picked && (
+        <Text style={styles.picked}>
+          {picked.year}: <Text style={styles.pickedValue}>{formatIneValue(indicator, picked.value)}</Text>
+        </Text>
+      )}
+      <BarChart points={visible} selectedYear={picked?.year ?? null} onSelect={setPickedYear} />
+      {summary && (
+        <Text style={[uiStyles.small, styles.summary]}>
+          Mínimo {formatIneValue(indicator, summary.min.value)} ({summary.min.year}) · máximo{' '}
+          {formatIneValue(indicator, summary.max.value)} ({summary.max.year})
+        </Text>
+      )}
+      {series.data && (
+        <Text style={uiStyles.small}>Fonte: {series.data.source} ({series.data.source_dataset})</Text>
+      )}
+    </View>
+  )
+}
+
+const CHART_HEIGHT = 140
+
+function BarChart({ points, selectedYear, onSelect }: {
+  points: IneSeriesPoint[]
+  selectedYear: number | null
+  onSelect: (year: number) => void
+}) {
+  const values = points.map(p => p.value)
+  let lo = Math.min(...values)
+  let hi = Math.max(...values)
+  const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.1 || 1
+  if (lo < 0) {
+    lo -= pad
+    hi = Math.max(hi, 0) + pad
+  } else {
+    lo = Math.max(0, lo - pad)
+    hi += pad
+  }
+  // As barras partem do zero quando ele está no eixo; senão, do fundo do gráfico.
+  const base = lo <= 0 && hi >= 0 ? 0 : lo
+  const y = (v: number) => ((v - lo) / (hi - lo)) * CHART_HEIGHT
+  const middle = points[Math.floor(points.length / 2)]
+
+  return (
+    <View>
+      <View style={[styles.chart, { height: CHART_HEIGHT }]}>
+        {base > lo && <View style={[styles.zeroLine, { bottom: y(0) }]} />}
+        {points.map(p => {
+          const selected = p.year === selectedYear
+          return (
+            <Pressable
+              key={p.year}
+              style={styles.barSlot}
+              onPress={() => onSelect(p.year)}
+              accessibilityLabel={`${p.year}`}
+            >
+              <View
+                style={[
+                  styles.bar,
+                  {
+                    bottom: y(Math.min(p.value, base)),
+                    height: Math.max(1, Math.abs(y(p.value) - y(base))),
+                    backgroundColor: selected ? COLOR : p.value < 0 ? '#fca5a5' : '#c7d2fe',
+                  },
+                ]}
+              />
+            </Pressable>
+          )
+        })}
+      </View>
+      <View style={styles.xAxis}>
+        <Text style={uiStyles.small}>{points[0].year}</Text>
+        {points.length > 2 && <Text style={uiStyles.small}>{middle.year}</Text>}
+        <Text style={uiStyles.small}>{points[points.length - 1].year}</Text>
+      </View>
+    </View>
   )
 }
 
@@ -112,4 +239,16 @@ const styles = StyleSheet.create({
   rowInfo: { flex: 1 },
   rowName: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
   rowValue: { fontSize: 16, fontWeight: '700', color: '#374151' },
+  rowOpen: { backgroundColor: '#eef2ff', borderRadius: 8, paddingHorizontal: 6, marginHorizontal: -6 },
+  chevron: { fontSize: 14, color: '#94a3b8', width: 14, textAlign: 'center' },
+  hint: { marginBottom: 4 },
+  panel: { paddingTop: 10, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 8 },
+  picked: { fontSize: 13, color: '#64748b' },
+  pickedValue: { fontSize: 16, fontWeight: '700', color: COLOR },
+  chart: { flexDirection: 'row', alignItems: 'stretch', gap: 1, position: 'relative' },
+  barSlot: { flex: 1, position: 'relative' },
+  bar: { position: 'absolute', left: 0, right: 0, borderRadius: 1 },
+  zeroLine: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#94a3b8' },
+  xAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  summary: { marginTop: 2 },
 })

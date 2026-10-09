@@ -68,7 +68,7 @@ nenhum valor `demo`).
 | Avisos meteorológicos (amarelo/laranja/vermelho) | IPMA open-data — `warnings_www.json` (a rota `/ipma/warnings` da API Aberta não traz o nível nem todas as regiões) | não |
 | Tarifas de carregamento EV (CEME) | API Aberta — `/ev/tariffs`, `/ev/tariffs/cheapest` | sim |
 | Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
-| Indicadores de Portugal | API Aberta — `/ine/latest` (Eurostat) | sim |
+| Indicadores de Portugal | API Aberta — `/ine/latest`, `/ine/indicators`, `/ine/stats` (Eurostat; sem `from` a série só começa em 2000) | sim |
 | Focos de calor por satélite (VIIRS/MODIS, Portugal continental, até 7 dias) | API Aberta — `/nasafirms/hotspots` (NASA FIRMS) | sim |
 | Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
 
@@ -130,7 +130,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tarifas de carregamento dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
-| 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat (resumo "Taxa BCE" no Início) |
+| 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat, cada um com gráfico da série histórica e seletor de intervalo de anos (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
 | 🏥 Hospitais | Urgências SNS, ordenadas por distância |
 | 🚆 Transportes | Comboios CP, Carris (veículos, linhas, paragens, alertas) e alertas TML |

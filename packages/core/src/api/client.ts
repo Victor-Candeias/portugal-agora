@@ -100,6 +100,30 @@ export interface IneIndicator {
   value: number
 }
 
+/** Entrada de `/ine/indicators`: indicador disponível e anos com dados. */
+export interface IneIndicatorInfo {
+  indicator: string
+  label: string
+  unit: string
+  dataset: string
+  years: { from: number; to: number; count: number }
+}
+
+export interface IneSeriesPoint {
+  year: number
+  value: number
+}
+
+/** Série anual de um indicador em `/ine/stats`. */
+export interface IneSeries {
+  indicator: string
+  label: string
+  unit: string
+  source: string
+  source_dataset: string
+  data: IneSeriesPoint[]
+}
+
 /** Entrada de `/ipma/warnings` (sem nível de aviso; ver `ipmaClient.getWarnings()` no core). */
 export interface ApiAbertaIpmaWarning {
   id: string
@@ -221,6 +245,16 @@ export class ApiAbertaClient {
   // ── INE / Eurostat ────────────────────────────────────────────────────────
   async getIneLatest(): Promise<{ source: string; fetched_at: string; data: IneIndicator[] }> {
     return this.get('/ine/latest')
+  }
+
+  async getIneIndicators(): Promise<{ data: IneIndicatorInfo[] }> {
+    return this.get('/ine/indicators')
+  }
+
+  // Sem `from`, a API só devolve a partir de 2000 (testado em 2026-10-09, WEB-030).
+  async getIneStats(params: { indicator: string | string[]; from?: number; to?: number }): Promise<{ data: IneSeries[] }> {
+    const indicator = Array.isArray(params.indicator) ? params.indicator.join(',') : params.indicator
+    return this.get('/ine/stats', { indicator, from: params.from, to: params.to })
   }
 
   // ── NASA FIRMS (focos de calor por satélite, Portugal continental) ────────
