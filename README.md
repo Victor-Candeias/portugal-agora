@@ -172,6 +172,21 @@ npx eas-cli build -p android --profile preview
 npx eas-cli build -p android --profile production
 ```
 
+### APK de release local (Windows)
+
+Ícone, ícone adaptativo e splash vêm de `apps/mobile/assets/Portugal_Agora.png` (`icon.png`,
+`android-icon-foreground.png` com a imagem a 68% para caber nas máscaras do Android, `splash-icon.png`
+com o plugin `expo-splash-screen`). O fundo é `#01163a`.
+
+```powershell
+$env:JAVA_HOME = "<JDK 17>"
+# ANDROID_KEYSTORE_PATH / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD definidos
+cd apps/mobile
+npx expo prebuild --platform android --no-install   # recriar android/local.properties (cmake.dir) se for apagado
+cd android; .\gradlew.bat assembleRelease
+# app/build/outputs/apk/release/app-release.apk → copiado para "<nome da app>-<versão>.apk" na mesma pasta
+```
+
 ### Mobile no CI (GitHub Actions) e Google Play
 
 `.github/workflows/android.yml` (manual em *Actions → Android (mobile) → Run workflow*, ou ao fazer push de uma tag `mobile-v*`) faz `expo prebuild` + Gradle, sem conta Expo, e publica o AAB e o APK como artefactos. O `versionCode` é o número da execução (`ANDROID_VERSION_CODE`).
