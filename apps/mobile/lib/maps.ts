@@ -22,6 +22,8 @@ export type MapPoint = {
   longitude: number
   label: string
   description?: string
+  /** Cor do marcador quando não está selecionado (por omissão azul). */
+  color?: string
 }
 
 export const SINGLE_POINT_ZOOM = 15

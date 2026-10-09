@@ -1,4 +1,15 @@
 import type { FuelType, FuelPrice, FuelStation } from '../types/index.js'
+import {
+  NASA_FIRMS_MAX_DAYS,
+  clampFirmsDays,
+  sortFirmsHotspots,
+  type NasaFirmsHotspotsPage,
+  type NasaFirmsHotspotsResponse,
+  type NasaFirmsMeta,
+} from './nasaFirms.js'
+
+// Limite por página usado nos focos da NASA FIRMS (a API aceita valores acima de 100, o valor por omissão).
+const FIRMS_PAGE_LIMIT = 1000
 
 export interface GeoDistrict {
   _id: string
@@ -211,6 +222,25 @@ export class ApiAbertaClient {
   async getIneLatest(): Promise<{ source: string; fetched_at: string; data: IneIndicator[] }> {
     return this.get('/ine/latest')
   }
+
+  // ── NASA FIRMS (focos de calor por satélite, Portugal continental) ────────
+  // Lê todas as páginas e ordena do foco mais recente para o mais antigo (WEB-027).
+  async getNasaFirmsHotspots(params?: { days?: number; source?: string }): Promise<NasaFirmsHotspotsResponse> {
+    const days = clampFirmsDays(params?.days ?? NASA_FIRMS_MAX_DAYS)
+    const query = { days, source: params?.source, limit: FIRMS_PAGE_LIMIT }
+    const first = await this.get<NasaFirmsHotspotsPage>('/nasafirms/hotspots', { ...query, page: 1 })
+    const all = [...(first.data ?? [])]
+    for (let page = 2; page <= (first.meta?.pages ?? 1); page++) {
+      const next = await this.get<NasaFirmsHotspotsPage>('/nasafirms/hotspots', { ...query, page })
+      all.push(...(next.data ?? []))
+    }
+    return { days, total: first.meta?.total ?? all.length, data: sortFirmsHotspots(all) }
+  }
+
+  async getNasaFirmsMeta(): Promise<NasaFirmsMeta> {
+    return this.get('/nasafirms/meta')
+  }
+
   // ── Geo ───────────────────────────────────────────────────────────────────
   async getDistricts(): Promise<{ count: number; data: GeoDistrict[] }> {
     return this.get('/geo/districts')

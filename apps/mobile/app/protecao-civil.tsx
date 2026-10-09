@@ -3,11 +3,21 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import {
   FIRE_RISK_COLORS,
   FIRE_RISK_LABELS,
+  FIRMS_AGE_COLORS,
+  FIRMS_AGE_LABELS,
+  NASA_FIRMS_DAY_OPTIONS,
+  NASA_FIRMS_MAX_DAYS,
+  PORTUGAL_MAINLAND_BOUNDS,
+  describeFirmsHotspot,
+  firmsAge,
+  firmsDaysLabel,
   formatAnpcWarningDate,
   formatDate,
+  formatFirmsAcquisition,
   type AnpcIncident,
+  type FirmsAge,
 } from '@portugal-hoje/core'
-import { useAnpcIncidents, useAnpcSummary, useAnpcWarnings, useFireRisk } from '../hooks/useAnpc'
+import { useAnpcIncidents, useAnpcSummary, useAnpcWarnings, useFireRisk, useNasaFirmsHotspots } from '../hooks/useAnpc'
 import { PointsMap, SinglePointMap, type MapPoint } from '../components/PointsMap'
 import {
   Badge,
@@ -26,6 +36,11 @@ import {
 
 const PAGE_SIZE = 20
 const WARNINGS_STEP = 5
+// Cada marcador do MapLibre é uma View: na época de incêndios mostram-se só os focos mais recentes.
+const MAX_HOTSPOT_MARKERS = 300
+const FIRMS_AGES: FirmsAge[] = ['recent', 'day', 'older']
+const { west, south, east, north } = PORTUGAL_MAINLAND_BOUNDS
+const PORTUGAL_BOUNDS: [number, number, number, number] = [west, south, east, north]
 
 const TYPE_EMOJI: Record<string, string> = {
   'Mato': '🔥',
@@ -59,6 +74,8 @@ export default function ProtecaoCivil() {
   const summary = useAnpcSummary()
   const fireRisk = useFireRisk()
   const warnings = useAnpcWarnings()
+  const [firmsDays, setFirmsDays] = useState<number>(NASA_FIRMS_MAX_DAYS)
+  const hotspots = useNasaFirmsHotspots(firmsDays)
 
   const [district, setDistrict] = useState<string | null>(null)
   const [type, setType] = useState<string | null>(null)
@@ -117,6 +134,7 @@ export default function ProtecaoCivil() {
           void summary.refetch()
           void fireRisk.refetch()
           void warnings.refetch()
+          void hotspots.refetch()
         }}
         refreshing={incidents.isFetching}
       />
@@ -158,6 +176,8 @@ export default function ProtecaoCivil() {
       <FireRiskCard query={fireRisk} />
 
       <WarningsCard query={warnings} />
+
+      <HotspotsCard query={hotspots} days={firmsDays} onDays={setFirmsDays} />
 
       {(summary.data?.by_district?.length ?? 0) > 0 && (
         <Card>
@@ -272,6 +292,87 @@ function WarningsCard({ query }: { query: ReturnType<typeof useAnpcWarnings> }) 
   )
 }
 
+// Focos de calor por satélite (NASA FIRMS via API Aberta, WEB-027).
+function HotspotsCard({
+  query,
+  days,
+  onDays,
+}: {
+  query: ReturnType<typeof useNasaFirmsHotspots>
+  days: number
+  onDays: (days: number) => void
+}) {
+  const [showMap, setShowMap] = useState(false)
+  const items = useMemo(() => query.data?.data ?? [], [query.data])
+  const latest = items[0]
+
+  const points = useMemo<MapPoint[]>(() => {
+    const now = Date.now()
+    return items.slice(0, MAX_HOTSPOT_MARKERS).map(h => ({
+      id: h.id,
+      latitude: h.latitude,
+      longitude: h.longitude,
+      label: `🛰️ Foco de calor · ${formatFirmsAcquisition(h)}`,
+      description: describeFirmsHotspot(h),
+      color: FIRMS_AGE_COLORS[firmsAge(h, now)],
+    }))
+  }, [items])
+
+  return (
+    <Card>
+      <SectionTitle
+        action={
+          items.length > 0 ? (
+            <LinkText label={showMap ? 'Ocultar mapa' : '🗺️ Ver no mapa'} onPress={() => setShowMap(v => !v)} />
+          ) : undefined
+        }
+      >
+        🛰️ Focos de calor por satélite
+      </SectionTitle>
+      <ChipRow
+        options={NASA_FIRMS_DAY_OPTIONS.map(d => ({ value: String(d), label: d === 1 ? '1 dia' : `${d} dias` }))}
+        value={String(days)}
+        onChange={v => v && onDays(Number(v))}
+        allLabel={null}
+        color="#ea580c"
+      />
+      {query.isLoading && <LoadingView color="#ea580c" />}
+      {query.isError && <ErrorView error={query.error} onRetry={() => void query.refetch()} />}
+      {query.isSuccess && (
+        <Text style={styles.hotspotsCount}>
+          {items.length === 0
+            ? `Sem focos de calor detetados ${firmsDaysLabel(days)}.`
+            : `${items.length} foco${items.length > 1 ? 's' : ''} de calor ${firmsDaysLabel(days)}`}
+          {latest ? <Text style={uiStyles.small}> · último às {formatFirmsAcquisition(latest)}</Text> : null}
+        </Text>
+      )}
+      {showMap && items.length > 0 && (
+        <>
+          <PointsMap points={points} bounds={PORTUGAL_BOUNDS} height={320} style={uiStyles.map} />
+          {items.length > MAX_HOTSPOT_MARKERS && (
+            <Text style={uiStyles.small}>A mostrar no mapa os {MAX_HOTSPOT_MARKERS} focos mais recentes.</Text>
+          )}
+          <View style={styles.legend}>
+            {FIRMS_AGES.map(age => (
+              <View key={age} style={styles.legendItem}>
+                <View style={[styles.riskDot, { backgroundColor: FIRMS_AGE_COLORS[age] }]} />
+                <Text style={uiStyles.small}>{FIRMS_AGE_LABELS[age]}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+      <Text style={styles.hotspotsNote}>
+        ⚠️ Um foco de calor é uma anomalia térmica detetada por satélite e não é necessariamente um incêndio
+        confirmado (pode ser uma queimada, uma fonte industrial, etc.).
+      </Text>
+      <Text style={[uiStyles.small, styles.warningSource]}>
+        Fonte: NASA FIRMS (VIIRS/MODIS) via API Aberta · Portugal continental · atualizado a cada 30 min · horas de Portugal
+      </Text>
+    </Card>
+  )
+}
+
 function IncidentRow({ incident: inc }: { incident: AnpcIncident }) {
   const [showMap, setShowMap] = useState(false)
   const colors = statusColors(inc.status)
@@ -327,6 +428,20 @@ const styles = StyleSheet.create({
   warning: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   warningText: { fontSize: 13, color: '#334155', marginTop: 4, lineHeight: 18 },
   warningSource: { marginTop: 8, color: '#94a3b8' },
+  hotspotsCount: { fontSize: 13, color: '#334155', marginBottom: 8 },
+  hotspotsNote: {
+    fontSize: 12,
+    color: '#92400e',
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   incident: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   incidentRow: { flexDirection: 'row', gap: 10 },
   incidentEmoji: { fontSize: 22 },

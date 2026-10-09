@@ -1,10 +1,20 @@
 import { useState } from 'react'
-import { formatAnpcWarningDate } from '@portugal-hoje/core'
+import {
+  FIRMS_AGE_COLORS,
+  FIRMS_AGE_LABELS,
+  NASA_FIRMS_DAY_OPTIONS,
+  NASA_FIRMS_MAX_DAYS,
+  firmsDaysLabel,
+  formatAnpcWarningDate,
+  formatFirmsAcquisition,
+  type FirmsAge,
+} from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox, Spinner } from '@/components/Feedback'
+import { HotspotsMap } from '@/components/HotspotsMap'
 import { Pagination } from '@/components/Pagination'
 import { SinglePointMap } from '@/components/SinglePointMap'
-import { useAnpcIncidents, useAnpcSummary, useAnpcWarnings } from '@/hooks/useANPC'
+import { useAnpcIncidents, useAnpcSummary, useAnpcWarnings, useNasaFirmsHotspots } from '@/hooks/useANPC'
 
 const PAGE_SIZE = 20
 const WARNINGS_STEP = 5
@@ -46,6 +56,8 @@ export function ProtecaoCivil() {
   const { data: incidents, isLoading: incLoading, isError: incError, error: incErr, refetch } = useAnpcIncidents()
   const { data: summary, isLoading: sumLoading } = useAnpcSummary()
   const warnings = useAnpcWarnings()
+  const [firmsDays, setFirmsDays] = useState<number>(NASA_FIRMS_MAX_DAYS)
+  const hotspots = useNasaFirmsHotspots(firmsDays)
 
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -81,7 +93,7 @@ export function ProtecaoCivil() {
           </p>
         </div>
         <button
-          onClick={() => { void refetch(); void warnings.refetch() }}
+          onClick={() => { void refetch(); void warnings.refetch(); void hotspots.refetch() }}
           className="text-sm bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 transition-colors"
         >
           Atualizar
@@ -120,6 +132,8 @@ export function ProtecaoCivil() {
       )}
 
       <AnpcWarningsCard query={warnings} />
+
+      <FirmsHotspotsCard query={hotspots} days={firmsDays} onDays={setFirmsDays} />
 
       {/* Summary by district */}
       {(summary?.by_district?.length ?? 0) > 0 && (
@@ -304,6 +318,78 @@ function AnpcWarningsCard({ query }: { query: ReturnType<typeof useAnpcWarnings>
           </button>
         )}
       </div>
+    </Card>
+  )
+}
+
+const FIRMS_AGES: FirmsAge[] = ['recent', 'day', 'older']
+
+// Focos de calor por satélite (NASA FIRMS via API Aberta, WEB-027).
+function FirmsHotspotsCard({
+  query,
+  days,
+  onDays,
+}: {
+  query: ReturnType<typeof useNasaFirmsHotspots>
+  days: number
+  onDays: (days: number) => void
+}) {
+  const items = query.data?.data ?? []
+  const latest = items[0]
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <CardTitle>🛰️ Focos de calor por satélite</CardTitle>
+        <div className="flex gap-1">
+          {NASA_FIRMS_DAY_OPTIONS.map(d => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => onDays(d)}
+              className={`text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${
+                days === d
+                  ? 'bg-orange-600 border-orange-600 text-white'
+                  : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {d === 1 ? '1 dia' : `${d} dias`}
+            </button>
+          ))}
+        </div>
+      </div>
+      {query.isLoading && (
+        <div className="flex justify-center py-4">
+          <Spinner />
+        </div>
+      )}
+      {query.isError && <p className="text-sm text-red-600">Não foi possível carregar os focos de calor da NASA FIRMS.</p>}
+      {query.isSuccess && (
+        <>
+          <p className="text-sm text-slate-700 mb-3">
+            {items.length === 0
+              ? `Sem focos de calor detetados ${firmsDaysLabel(days)}.`
+              : `${items.length} foco${items.length > 1 ? 's' : ''} de calor ${firmsDaysLabel(days)}`}
+            {latest && <span className="text-slate-500"> · último às {formatFirmsAcquisition(latest)}</span>}
+          </p>
+          <HotspotsMap hotspots={items} />
+          <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+            {FIRMS_AGES.map(age => (
+              <span key={age} className="flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: FIRMS_AGE_COLORS[age] }} />
+                {FIRMS_AGE_LABELS[age]}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+        ⚠️ Um foco de calor é uma anomalia térmica detetada por satélite e não é necessariamente um incêndio
+        confirmado (pode ser uma queimada, uma fonte industrial, etc.).
+      </p>
+      <p className="text-xs text-slate-400 mt-2">
+        Fonte: NASA FIRMS (VIIRS/MODIS) via API Aberta · Portugal continental · atualizado a cada 30 min · horas de Portugal
+      </p>
     </Card>
   )
 }

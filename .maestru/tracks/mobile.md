@@ -54,7 +54,7 @@ status: active
 | WEB-024 | Metro do Porto: corrigir URL do portal (dadosabertos.cm-porto.pt) e seleção do GTFS mais recente | done | 2026-10-08 | developer | high | 2026-10-08 |  |  |  |
 | WEB-025 | Tempo: avisos meteorológicos do IPMA via API Aberta (/ipma/warnings) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-025](../specs/mobile/web-025-spec.md) |
 | WEB-026 | Proteção Civil: comunicados da ANPC via API Aberta (/anpc/warnings) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-026](../specs/mobile/web-026-spec.md) |
-| WEB-027 | Proteção Civil: mapa de focos de incêndio por satélite (NASA FIRMS via /nasafirms/hotspots) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
+| WEB-027 | Proteção Civil: mapa de focos de incêndio por satélite (NASA FIRMS via /nasafirms/hotspots) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-027](../specs/mobile/web-027-spec.md) |
 | WEB-028 | Web: página Economia (BdP + INE via API Aberta) em vez de ComingSoon | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-028](../specs/mobile/web-028-spec.md) |
 | WEB-029 | Web: página EV (tarifas CEME + simulador) em vez de ComingSoon | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-030 | Economia: gráficos de séries históricas INE/Eurostat (/ine/stats) | backlog | 2026-10-09 | developer | medium |  |  | WEB-028 |  |

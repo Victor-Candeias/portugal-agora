@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ipmaClient } from '@portugal-hoje/core'
+import { apiClient } from '../lib/api'
 import { anpcClient } from '../lib/clients'
 
 export function useAnpcIncidents() {
@@ -25,6 +26,15 @@ export function useAnpcWarnings() {
   return useQuery({
     queryKey: ['anpc', 'warnings'],
     queryFn: () => anpcClient.getWarnings(),
+    staleTime: 15 * 60 * 1000,
+  })
+}
+
+// Focos de calor por satélite (NASA FIRMS via API Aberta, WEB-027); o conector atualiza a cada 30 min.
+export function useNasaFirmsHotspots(days: number) {
+  return useQuery({
+    queryKey: ['nasafirms', 'hotspots', days],
+    queryFn: () => apiClient.getNasaFirmsHotspots({ days }),
     staleTime: 15 * 60 * 1000,
   })
 }

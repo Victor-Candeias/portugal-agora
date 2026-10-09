@@ -69,6 +69,7 @@ nenhum valor `demo`).
 | Tarifas de carregamento EV (CEME) | API Aberta — `/ev/tariffs`, `/ev/tariffs/cheapest` | sim |
 | Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
 | Indicadores de Portugal | API Aberta — `/ine/latest` (Eurostat) | sim |
+| Focos de calor por satélite (VIIRS/MODIS, Portugal continental, até 7 dias) | API Aberta — `/nasafirms/hotspots` (NASA FIRMS) | sim |
 | Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
@@ -128,7 +129,7 @@ Os ecrãs abaixo existem no web e no mobile, exceto EV, que no web ainda está p
 | ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
 | 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tarifas de carregamento dos CEME + simulador do custo por carregamento |
-| 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) |
+| 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
 | 🏥 Hospitais | Urgências SNS, ordenadas por distância |
