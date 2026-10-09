@@ -36,6 +36,7 @@ export default function RootLayout() {
           <Stack.Screen name="nif" options={{ title: 'Validar NIF' }} />
           <Stack.Screen name="contratos/index" options={{ title: 'Contratos Públicos' }} />
           <Stack.Screen name="contratos/[id]" options={{ title: 'Contrato' }} />
+          <Stack.Screen name="fundos" options={{ title: 'Fundos PRR / PT2030' }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

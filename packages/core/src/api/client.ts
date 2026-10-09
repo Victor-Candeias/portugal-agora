@@ -8,6 +8,7 @@ import {
   type NasaFirmsMeta,
 } from './nasaFirms.js'
 import { BASE_CONTRACTS_MAX_LIMIT, type BaseContract, type BaseContractsPage } from './base.js'
+import { PRR_PROJECTS_MAX_LIMIT, type PrrProject, type PrrProjectsPage, type PrrSummary, type Pt2030Summary } from './fundos.js'
 
 // Limite por página usado nos focos da NASA FIRMS (a API aceita valores acima de 100, o valor por omissão).
 const FIRMS_PAGE_LIMIT = 1000
@@ -308,6 +309,32 @@ export class ApiAbertaClient {
       date: res.date,
       type: res.type,
     }
+  }
+
+  // ── Fundos PRR / PT2030 (WEB-032) ─────────────────────────────────────────
+  async getPrrSummary(): Promise<PrrSummary> {
+    return this.get('/prr/summary')
+  }
+
+  async getPrrProjects(params?: { q?: string; component?: string; page?: number; limit?: number }): Promise<PrrProjectsPage> {
+    const limit = params?.limit === undefined ? undefined : Math.min(params.limit, PRR_PROJECTS_MAX_LIMIT)
+    return this.get('/prr/projects', { q: params?.q, component: params?.component, page: params?.page, limit })
+  }
+
+  /** Todos os investimentos do PRR (61 em 2026-10), lendo as páginas que houver. */
+  async getAllPrrProjects(): Promise<PrrProject[]> {
+    const first = await this.getPrrProjects({ page: 1, limit: PRR_PROJECTS_MAX_LIMIT })
+    const all = [...(first.data ?? [])]
+    const pages = Math.ceil((first.total ?? all.length) / (first.limit || PRR_PROJECTS_MAX_LIMIT))
+    for (let page = 2; page <= pages; page++) {
+      const next = await this.getPrrProjects({ page, limit: PRR_PROJECTS_MAX_LIMIT })
+      all.push(...(next.data ?? []))
+    }
+    return all
+  }
+
+  async getPt2030Summary(): Promise<Pt2030Summary> {
+    return this.get('/pt2030/summary')
   }
 
   // ── Geo ───────────────────────────────────────────────────────────────────
