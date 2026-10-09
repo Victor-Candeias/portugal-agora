@@ -2,6 +2,7 @@
 // Aqui fica tudo o que é específico do web: `import.meta.env`, proxies CORS, assets servidos
 // por BASE_URL e o motor SQLite em WASM (sql.js). Os hooks em src/hooks só usam estes clientes.
 import {
+  ApiAbertaClient,
   createAnpcClient,
   createCarrisClient,
   createCodigoPostalClient,
@@ -39,3 +40,6 @@ export const tmlClient = createTmlClient()
 export const codigoPostalClient = createCodigoPostalClient()
 
 export const anpcClient = createAnpcClient({ apiKey: import.meta.env.VITE_APIABERTA_KEY ?? '' })
+
+// Sem chave, o cliente falha cada pedido com uma mensagem clara (MOB-008).
+export const apiClient = new ApiAbertaClient({ apiKey: import.meta.env.VITE_APIABERTA_KEY ?? '' })

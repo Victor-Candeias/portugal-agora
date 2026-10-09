@@ -80,6 +80,33 @@ export const INE_INDICATORS: Record<string, { label: string; format: (value: num
   death_rate: { label: 'Mortalidade', format: (v) => `${ptNumber(v)} ‰` },
 }
 
+// Rótulos curtos das taxas de /bdp/rates e /bdp/lending-rates (o `label_pt` da API fica como descrição).
+export const BDP_RATE_LABELS: Record<string, string> = {
+  ecb_deposit: 'BCE · Depósito',
+  ecb_mro: 'BCE · Refinanciamento',
+  ecb_marginal_lending: 'BCE · Cedência marginal',
+  estr: '€STR',
+  tba: 'TBA (BdP)',
+  housing_loans: 'Crédito à habitação',
+  consumer_loans: 'Crédito ao consumo',
+  other_loans: 'Outros empréstimos',
+  all_loans: 'Todos os empréstimos',
+  term_deposits: 'Depósitos a prazo (≤1 ano)',
+}
+
+/** Taxa em percentagem, ex.: `2,50%`, `2,439%`. */
+export function formatRate(value: number): string {
+  return `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(value)}%`
+}
+
+/** Período de referência de uma taxa do BdP: mês por extenso nas mensais, data curta nas diárias. */
+export function formatBdpPeriod(rate: { ref_date: string; frequency: string }): string {
+  if (rate.frequency === 'monthly') {
+    return new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' }).format(new Date(rate.ref_date))
+  }
+  return formatDate(rate.ref_date)
+}
+
 export function haversineDistance(
   lat1: number,
   lng1: number,

@@ -1,26 +1,9 @@
 import { ScrollView, View, Text, StyleSheet } from 'react-native'
-import { formatDate, INE_INDICATORS, type BdpRate } from '@portugal-hoje/core'
+import { BDP_RATE_LABELS, formatBdpPeriod, formatRate, INE_INDICATORS, type BdpRate } from '@portugal-hoje/core'
 import { useBdpLendingRates, useBdpRates, useIneLatest } from '../../hooks/useEconomia'
 import { Card, EmptyText, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
 
 const COLOR = '#6366f1'
-
-// Rótulos curtos para os cartões (o `label_pt` da API fica como descrição)
-const RATE_SHORT_LABELS: Record<string, string> = {
-  ecb_deposit: 'BCE · Depósito',
-  ecb_mro: 'BCE · Refinanciamento',
-  ecb_marginal_lending: 'BCE · Cedência marginal',
-  estr: '€STR',
-  tba: 'TBA (BdP)',
-  housing_loans: 'Crédito à habitação',
-  consumer_loans: 'Crédito ao consumo',
-  other_loans: 'Outros empréstimos',
-  all_loans: 'Todos os empréstimos',
-  term_deposits: 'Depósitos a prazo (≤1 ano)',
-}
-
-const formatRate = (value: number) =>
-  `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(value)}%`
 
 export default function Economia() {
   const rates = useBdpRates()
@@ -57,8 +40,8 @@ export default function Economia() {
           {lending.data.data.map(r => (
             <View key={r.key} style={styles.row}>
               <View style={styles.rowInfo}>
-                <Text style={styles.rowName}>{RATE_SHORT_LABELS[r.key] ?? r.label_pt}</Text>
-                <Text style={uiStyles.small}>{formatPeriod(r)}</Text>
+                <Text style={styles.rowName}>{BDP_RATE_LABELS[r.key] ?? r.label_pt}</Text>
+                <Text style={uiStyles.small}>{formatBdpPeriod(r)}</Text>
               </View>
               <Text style={styles.rowValue}>{formatRate(r.value)}</Text>
             </View>
@@ -93,20 +76,13 @@ export default function Economia() {
   )
 }
 
-function formatPeriod(rate: BdpRate) {
-  if (rate.frequency === 'monthly') {
-    return new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' }).format(new Date(rate.ref_date))
-  }
-  return formatDate(rate.ref_date)
-}
-
 function RateCard({ rate }: { rate: BdpRate }) {
   return (
     <View style={styles.rateCard}>
-      <Text style={styles.rateType} numberOfLines={1}>{RATE_SHORT_LABELS[rate.key] ?? rate.label_pt}</Text>
+      <Text style={styles.rateType} numberOfLines={1}>{BDP_RATE_LABELS[rate.key] ?? rate.label_pt}</Text>
       <Text style={styles.rateValue}>{formatRate(rate.value)}</Text>
       <Text style={styles.rateDesc} numberOfLines={2}>{rate.label_pt}</Text>
-      <Text style={styles.ratePeriod}>{formatPeriod(rate)}</Text>
+      <Text style={styles.ratePeriod}>{formatBdpPeriod(rate)}</Text>
     </View>
   )
 }

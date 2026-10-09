@@ -5,8 +5,9 @@ import { LoadingBox } from '@/components/Feedback'
 import { useFuelPrices } from '@/hooks/useFuel'
 import { useIpmaForecast, useIpmaWarnings } from '@/hooks/useIPMA'
 import { useAnpcSummary } from '@/hooks/useANPC'
+import { useBdpRates } from '@/hooks/useEconomia'
 import {
-  formatPrice, FUEL_LABELS, maxWarningLevel, WARNING_LEVEL_LABELS, type FuelType, type WarningLevel,
+  formatBdpPeriod, formatPrice, formatRate, FUEL_LABELS, maxWarningLevel, WARNING_LEVEL_LABELS, type FuelType, type WarningLevel,
 } from '@portugal-hoje/core'
 
 const LIVE_FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel']
@@ -45,6 +46,7 @@ export function Dashboard() {
   const { data: forecasts } = useIpmaForecast(LISBOA_ID)
   const { data: anpcSummary } = useAnpcSummary()
   const { data: warnings } = useIpmaWarnings()
+  const { data: rates } = useBdpRates()
 
   const fuelMap: Partial<Record<FuelType, typeof fuel95>> = {
     gasoline_95: fuel95,
@@ -55,6 +57,8 @@ export function Dashboard() {
   const today = forecasts?.[0]
   const totalIncidents = anpcSummary?.total_active ?? 0
   const warningLevel = maxWarningLevel(warnings ?? [])
+  const ecbDeposit = rates?.data.find(r => r.key === 'ecb_deposit')
+  const estr = rates?.data.find(r => r.key === 'estr')
 
   return (
     <div className="space-y-6">
@@ -139,6 +143,27 @@ export function Dashboard() {
           </Card>
         </Link>
 
+        {/* Economia (WEB-028) */}
+        {ecbDeposit && (
+          <Link to="/economia" className="block mb-4">
+            <Card className="hover:shadow-md transition-shadow bg-indigo-50 border-indigo-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-indigo-100">
+                    <BarChart3 size={20} className="text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Economia · Taxa BCE</p>
+                    <p className="text-2xl font-bold text-indigo-700 tabular-nums">{formatRate(ecbDeposit.value)}</p>
+                    <p className="text-sm text-slate-600">Facilidade de depósito · {formatBdpPeriod(ecbDeposit)}</p>
+                  </div>
+                </div>
+                {estr && <p className="text-xs text-indigo-600 font-medium">€STR {formatRate(estr.value)}</p>}
+              </div>
+            </Card>
+          </Link>
+        )}
+
         {/* Fuel */}
         {!fuel95 && !fuel98 && !diesel && <LoadingBox />}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -176,7 +201,6 @@ export function Dashboard() {
         </h2>
         <div className="grid grid-cols-2 gap-3">
           <ComingSoonCard to="/ev"       icon={Zap}       title="Carregamento EV" source="MOBI.E" />
-          <ComingSoonCard to="/economia" icon={BarChart3} title="Economia"        source="INE · BdP" />
         </div>
       </div>
     </div>
