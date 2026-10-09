@@ -12,7 +12,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # Necessário para ler o secret VITE_APIABERTA_KEY do ambiente github-pages.
-    environment: github-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v5
