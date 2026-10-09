@@ -38,7 +38,7 @@ export default function CodigoPostal() {
 
   return (
     <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content} keyboardShouldPersistTaps="handled">
-      <ScreenHeader title="📮 Código Postal" subtitle="Pesquise informação por código postal · Fonte: geoapi.pt" />
+      <ScreenHeader title="📮 Código Postal" subtitle="Pesquise informação por código postal · Fonte: moradas.dev" />
 
       <Card>
         <View style={styles.form}>
@@ -85,13 +85,20 @@ export default function CodigoPostal() {
               </View>
             )}
             {showMap && hasCoords && (
-              <SinglePointMap
-                latitude={lat}
-                longitude={lng}
-                label={`${data.CP} · ${data['Designação Postal']}`}
-                height={260}
-                style={uiStyles.cardMap}
-              />
+              <>
+                <SinglePointMap
+                  latitude={lat}
+                  longitude={lng}
+                  label={`${data.CP} · ${data['Designação Postal']}`}
+                  height={260}
+                  style={uiStyles.cardMap}
+                />
+                <Text style={styles.mapNote}>
+                  Localização aproximada (
+                  {data.centroPrecisao === 'concelho' ? `concelho de ${data.Concelho}` : `localidade de ${data.Localidade}`}
+                  ) · Open-Meteo geocoding
+                </Text>
+              </>
             )}
           </Card>
 
@@ -163,6 +170,7 @@ const styles = StyleSheet.create({
   streetName: { fontSize: 13, fontWeight: '500', color: '#1e293b' },
   streetMeta: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, marginTop: 2 },
   meta: { fontSize: 11, color: COLORS.faint },
+  mapNote: { fontSize: 11, color: COLORS.faint, marginTop: 6 },
   placeholder: { alignItems: 'center', paddingVertical: 48 },
   placeholderEmoji: { fontSize: 44, marginBottom: 8 },
   placeholderText: { fontSize: 13, color: COLORS.faint },

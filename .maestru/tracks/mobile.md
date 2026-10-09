@@ -65,5 +65,5 @@ status: active
 | WEB-035 | Combustível: preços por posto com raio a partir do GPS (/fuel/stations) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-036 | Combustível (web): corrigir ordenação por distância (título, destaque, seletor Preço/Distância e raio) | backlog | 2026-10-09 | developer | medium |  |  |  |  |
 | WEB-037 | Header: botão para voltar ao Início, à direita na linha Portugal-Hoje, quando fora do menu principal | backlog | 2026-10-09 | developer | medium |  |  |  |  |
-| WEB-038 | Código Postal: trocar geoapi.pt por moradas.dev (resolver HTTP 429) | backlog | 2026-10-09 | developer | high |  |  |  |  |
+| WEB-038 | Código Postal: trocar geoapi.pt por moradas.dev (resolver HTTP 429) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-038](../specs/mobile/web-038-spec.md) |
 <!-- /maestru:work-items-list -->

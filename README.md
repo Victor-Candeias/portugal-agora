@@ -69,6 +69,7 @@ nenhum valor `demo`).
 | Tarifas de carregamento EV (CEME) | API Aberta — `/ev/tariffs`, `/ev/tariffs/cheapest` | sim |
 | Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
 | Indicadores de Portugal | API Aberta — `/ine/latest` (Eurostat) | sim |
+| Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -134,7 +135,7 @@ Os ecrãs abaixo existem no web e no mobile, exceto EV, que no web ainda está p
 | 🚆 Transportes | Comboios CP, Carris (veículos, linhas, paragens, alertas) e alertas TML |
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
-| 📮 Código Postal | Distrito/concelho/localidade, artérias e mapa (geoapi.pt) |
+| 📮 Código Postal | Distrito/concelho/localidade, artérias (moradas.dev) e mapa aproximado da localidade (Open-Meteo geocoding) |
 
 ## Build para produção
 

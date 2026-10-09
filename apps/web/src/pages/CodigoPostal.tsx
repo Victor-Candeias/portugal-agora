@@ -43,7 +43,7 @@ export function CodigoPostal() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">📮 Código Postal</h1>
-        <p className="text-slate-500 text-sm mt-1">Pesquise informação por código postal · Fonte: geoapi.pt</p>
+        <p className="text-slate-500 text-sm mt-1">Pesquise informação por código postal · Fonte: moradas.dev</p>
       </div>
 
       {/* Search form */}
@@ -120,12 +120,17 @@ export function CodigoPostal() {
             </div>
 
             {showMap && lat && lng && (
-              <SinglePointMap
-                lat={lat}
-                lon={lng}
-                label={`${data.CP} · ${data['Designação Postal']}`}
-                className="mt-4 w-full h-64 rounded-xl border border-slate-200 overflow-hidden"
-              />
+              <>
+                <SinglePointMap
+                  lat={lat}
+                  lon={lng}
+                  label={`${data.CP} · ${data['Designação Postal']}`}
+                  className="mt-4 w-full h-64 rounded-xl border border-slate-200 overflow-hidden"
+                />
+                <p className="text-xs text-slate-400 mt-2">
+                  Localização aproximada ({data.centroPrecisao === 'concelho' ? `concelho de ${data.Concelho}` : `localidade de ${data.Localidade}`}) · Open-Meteo geocoding
+                </p>
+              </>
             )}
           </Card>
 
