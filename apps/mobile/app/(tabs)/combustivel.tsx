@@ -1,12 +1,35 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Modal, FlatList, SafeAreaView,
 } from 'react-native'
 import { useFuelPrices, useDistricts, useMunicipalities } from '../../hooks/useApi'
-import { formatPrice, FUEL_LABELS, FUEL_COLORS, type FuelType } from '@portugal-hoje/core'
+import { useUserLocation } from '../../hooks/useUserLocation'
+import { ChipRow, SegmentedTabs, formatDistance } from '../../components/ui'
+import {
+  formatPrice, haversineDistance, FUEL_LABELS, FUEL_COLORS, type DgegStation, type FuelType,
+} from '@portugal-hoje/core'
 
 const FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel', 'diesel_plus', 'lpg']
+
+type SortBy = 'price' | 'distance'
+const SORT_TABS: { value: SortBy; label: string }[] = [
+  { value: 'price', label: '💶 Preço' },
+  { value: 'distance', label: '🧭 Distância' },
+]
+
+const RADIUS_OPTIONS = [10, 25, 50]
+const DEFAULT_RADIUS_KM = 25
+const MAX_SHOWN = 50
+
+type StationRow = DgegStation & { distKm: number | null }
+
+function hasCoords(s: DgegStation) {
+  return Number.isFinite(s.Latitude) && Number.isFinite(s.Longitude) && !(s.Latitude === 0 && s.Longitude === 0)
+}
+
+const byDistance = (a: StationRow, b: StationRow) => (a.distKm ?? Infinity) - (b.distKm ?? Infinity)
+const byPrice = (a: StationRow, b: StationRow) => a.price_eur - b.price_eur
 
 type PickerItem = { Id: number; Descritivo: string }
 
@@ -64,7 +87,46 @@ export default function Combustivel() {
   const { data: municipalities = [] } = useMunicipalities(districtId)
   const { data: stations = [], isLoading, isError } = useFuelPrices(fuelType, districtId, municipalityId)
 
-  const minPrice = stations[0]?.price_eur
+  const location = useUserLocation()
+  const coords = location.coords
+  const [sortBy, setSortBy] = useState<SortBy>('price')
+  const [radiusKm, setRadiusKm] = useState<number | null>(DEFAULT_RADIUS_KM)
+
+  // Por omissão: Distância com localização, Preço sem ela.
+  useEffect(() => {
+    if (location.status === 'granted') setSortBy('distance')
+  }, [location.status])
+
+  const effectiveSort: SortBy = coords ? sortBy : 'price'
+  const radiusActive = Boolean(coords) && radiusKm !== null
+
+  const rows = useMemo<StationRow[]>(() => {
+    const withDist: StationRow[] = stations.map(s => ({
+      ...s,
+      distKm: coords && hasCoords(s) ? haversineDistance(coords.latitude, coords.longitude, s.Latitude, s.Longitude) : null,
+    }))
+    // O raio é aplicado no cliente para não renderizar os postos do país inteiro.
+    const inRadius = coords && radiusKm !== null
+      ? withDist.filter(s => s.distKm !== null && s.distKm <= radiusKm)
+      : withDist
+    return inRadius.sort(
+      effectiveSort === 'distance'
+        ? (a, b) => byDistance(a, b) || byPrice(a, b)
+        : (a, b) => byPrice(a, b) || byDistance(a, b),
+    )
+  }, [stations, coords, radiusKm, effectiveSort])
+
+  const prices = rows.map(s => s.price_eur).filter(Number.isFinite)
+  const minPrice = prices.length ? Math.min(...prices) : undefined
+  const nearestKm = rows.reduce<number | null>(
+    (min, s) => (s.distKm !== null && (min === null || s.distKm < min) ? s.distKm : min),
+    null,
+  )
+
+  function handleUseLocation() {
+    setSortBy('distance')
+    void location.request()
+  }
 
   function handleSelectDistrict(item: PickerItem | null) {
     setDistrictId(item?.Id)
@@ -99,6 +161,39 @@ export default function Combustivel() {
         ))}
       </ScrollView>
 
+      <View style={styles.locationCard}>
+        <Text style={styles.locationTitle}>
+          {coords
+            ? 'A usar a sua localização.'
+            : 'Permita a localização para ver os postos mais perto de si.'}
+        </Text>
+        <Text style={styles.locationHint}>
+          {location.status === 'loading' && 'A pedir acesso à localização…'}
+          {location.status === 'denied' && 'Localização não autorizada. Postos ordenados por preço.'}
+          {location.status === 'granted' && 'Pode combinar com o filtro de distrito/município.'}
+        </Text>
+        <TouchableOpacity
+          style={[styles.locationBtn, location.status === 'loading' && styles.locationBtnDisabled]}
+          onPress={handleUseLocation}
+          disabled={location.status === 'loading'}
+        >
+          <Text style={styles.locationBtnText}>🧭 Usar a minha localização</Text>
+        </TouchableOpacity>
+      </View>
+
+      {coords && (
+        <>
+          <Text style={styles.sectionLabel}>Ordenar por</Text>
+          <SegmentedTabs tabs={SORT_TABS} value={sortBy} onChange={setSortBy} />
+          <Text style={styles.sectionLabel}>Raio</Text>
+          <ChipRow
+            options={RADIUS_OPTIONS.map(r => ({ value: String(r), label: `${r} km` }))}
+            value={radiusKm === null ? null : String(radiusKm)}
+            onChange={v => setRadiusKm(v === null ? null : Number(v))}
+          />
+        </>
+      )}
+
       {/* Filtros de localização */}
       <View style={styles.filterCol}>
         <TouchableOpacity style={styles.filterBtn} onPress={() => setShowDistricts(true)}>
@@ -118,15 +213,23 @@ export default function Combustivel() {
         )}
       </View>
 
-      {stations.length > 0 && (
+      {rows.length > 0 && (
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Mais barato</Text>
-            <Text style={[styles.statValue, { color: '#16a34a' }]}>{formatPrice(minPrice)}</Text>
+            <Text style={[styles.statValue, { color: '#16a34a' }]}>
+              {minPrice !== undefined ? formatPrice(minPrice) : '—'}
+            </Text>
           </View>
+          {nearestKm !== null && (
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Mais próximo</Text>
+              <Text style={[styles.statValue, { color: '#2563eb' }]}>{formatDistance(nearestKm)}</Text>
+            </View>
+          )}
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Encontrados</Text>
-            <Text style={styles.statValue}>{stations.length}</Text>
+            <Text style={styles.statValue}>{rows.length}</Text>
           </View>
         </View>
       )}
@@ -138,25 +241,53 @@ export default function Combustivel() {
         </View>
       )}
 
-      {stations.slice(0, 50).map((s, i) => (
-        <View key={`${s.Id}-${i}`} style={styles.stationRow}>
-          <View style={[styles.rank, { backgroundColor: i === 0 ? '#16a34a' : i < 3 ? '#65a30d' : '#94a3b8' }]}>
-            <Text style={styles.rankText}>{i + 1}</Text>
+      {!isLoading && !isError && rows.length > 0 && (
+        <Text style={styles.listTitle}>
+          Postos ordenados por {effectiveSort === 'distance' ? 'distância' : 'preço'}
+          {radiusActive ? ` · até ${radiusKm} km` : ''}
+          {rows.length > MAX_SHOWN ? ` · primeiros ${MAX_SHOWN}` : ''}
+        </Text>
+      )}
+
+      {!isLoading && !isError && rows.length === 0 && (
+        <Text style={styles.emptyText}>
+          {radiusActive && stations.length > 0
+            ? `Nenhum posto a menos de ${radiusKm} km. Aumente o raio.`
+            : 'Nenhum posto encontrado.'}
+        </Text>
+      )}
+
+      {rows.slice(0, MAX_SHOWN).map((s, i) => {
+        const isCheapest = minPrice !== undefined && s.price_eur === minPrice
+        const rankColor = effectiveSort === 'distance'
+          ? (i === 0 ? '#2563eb' : i < 3 ? '#60a5fa' : '#94a3b8')
+          : (i === 0 ? '#16a34a' : i < 3 ? '#65a30d' : '#94a3b8')
+        return (
+          <View key={`${s.Id}-${i}`} style={styles.stationRow}>
+            <View style={[styles.rank, { backgroundColor: rankColor }]}>
+              <Text style={styles.rankText}>{i + 1}</Text>
+            </View>
+            <View style={styles.stationInfo}>
+              <Text style={styles.stationName} numberOfLines={1}>{s.Nome}</Text>
+              <Text style={styles.stationLocation}>📍 {s.Municipio}, {s.Distrito}</Text>
+              {s.distKm !== null && (
+                <Text style={styles.stationDistance}>🧭 {formatDistance(s.distKm)}</Text>
+              )}
+            </View>
+            <View style={styles.priceBox}>
+              <Text style={[styles.price, isCheapest && { color: '#16a34a' }]}>
+                {formatPrice(s.price_eur)}
+              </Text>
+              {isCheapest && effectiveSort === 'distance' && (
+                <Text style={styles.cheapestTag}>mais barato</Text>
+              )}
+              {minPrice !== undefined && s.price_eur > minPrice && (
+                <Text style={styles.priceDiff}>+{formatPrice(s.price_eur - minPrice)}</Text>
+              )}
+            </View>
           </View>
-          <View style={styles.stationInfo}>
-            <Text style={styles.stationName} numberOfLines={1}>{s.Nome}</Text>
-            <Text style={styles.stationLocation}>📍 {s.Municipio}, {s.Distrito}</Text>
-          </View>
-          <View style={styles.priceBox}>
-            <Text style={[styles.price, i === 0 && { color: '#16a34a' }]}>
-              {formatPrice(s.price_eur)}
-            </Text>
-            {i > 0 && minPrice && (
-              <Text style={styles.priceDiff}>+{formatPrice(s.price_eur - minPrice)}</Text>
-            )}
-          </View>
-        </View>
-      ))}
+        )
+      })}
 
       <SelectModal
         visible={showDistricts}
@@ -190,6 +321,27 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   typeBtnText: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  locationCard: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  locationTitle: { fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 2 },
+  locationHint: { fontSize: 12, color: '#64748b' },
+  locationBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    backgroundColor: '#16a34a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  locationBtnDisabled: { opacity: 0.6 },
+  locationBtnText: { color: 'white', fontWeight: '600', fontSize: 13 },
+  sectionLabel: { fontSize: 11, fontWeight: '600', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 },
   filterCol: { gap: 10, marginBottom: 16 },
   filterBtn: {
     backgroundColor: 'white',
@@ -215,6 +367,8 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginTop: 4 },
   errorBox: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 12 },
   errorText: { color: '#dc2626', fontSize: 14 },
+  listTitle: { fontSize: 12, color: '#64748b', fontWeight: '600', marginBottom: 8 },
+  emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginVertical: 24 },
   stationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -236,7 +390,9 @@ const styles = StyleSheet.create({
   stationInfo: { flex: 1 },
   stationName: { fontWeight: '600', color: '#0f172a', fontSize: 14 },
   stationLocation: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  stationDistance: { fontSize: 12, color: '#2563eb', fontWeight: '600', marginTop: 2 },
   priceBox: { alignItems: 'flex-end' },
+  cheapestTag: { fontSize: 10, color: '#16a34a', fontWeight: '700', marginTop: 1 },
   price: { fontSize: 17, fontWeight: '700', color: '#0f172a' },
   priceDiff: { fontSize: 11, color: '#ef4444', marginTop: 1 },
 })
