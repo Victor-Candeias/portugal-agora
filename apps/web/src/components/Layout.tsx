@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Link } from 'react-router-dom'
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom'
 import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag, Hospital, Train, MailOpen, Palmtree, TrainFront, Shield, FileText } from 'lucide-react'
 import { useAnpcSummary } from '@/hooks/useANPC'
 
@@ -21,6 +21,7 @@ const NAV = [
 export function Layout() {
   const { data: summary } = useAnpcSummary()
   const total = summary?.total_active ?? 0
+  const isHome = useLocation().pathname === '/'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -33,9 +34,21 @@ export function Layout() {
 
       {/* Header */}
       <header className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2">
-          <span className="text-2xl">🇵🇹</span>
-          <span className="font-bold text-lg text-green-700">Portugal-Hoje</span>
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+          <Link to="/" className="flex items-center gap-2" aria-label="Portugal-Hoje — Início">
+            <span className="text-2xl">🇵🇹</span>
+            <span className="font-bold text-lg text-green-700">Portugal-Hoje</span>
+          </Link>
+          {/* Atalho para o Início em todas as páginas exceto o próprio Início (WEB-037). */}
+          {!isHome && (
+            <Link
+              to="/"
+              className="text-sm font-semibold text-green-700 hover:text-green-800 px-2 py-1 rounded-md hover:bg-green-50 transition-colors"
+              aria-label="Ir para o Início"
+            >
+              🏠 Início
+            </Link>
+          )}
         </div>
       </header>
 

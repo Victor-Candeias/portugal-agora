@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { HomeHeaderButton } from '../components/HomeHeaderButton'
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 2, refetchOnWindowFocus: false },
@@ -10,6 +12,7 @@ const queryClient = new QueryClient({
 
 // Stack raiz: as 6 tabs ficam no grupo `(tabs)` e as restantes secções abrem por cima, com botão
 // Voltar (13 secções não cabem numa barra de tabs). A grelha "Todas as secções" do Início liga a todas.
+// Todos os headers (exceto o Início) têm à direita o botão "🏠 Início" (WEB-037).
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -20,6 +23,7 @@ export default function RootLayout() {
             headerTintColor: '#16a34a',
             headerTitleStyle: { color: '#0f172a' },
             contentStyle: { backgroundColor: '#f8fafc' },
+            headerRight: () => <HomeHeaderButton mode="stack" />,
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

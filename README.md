@@ -122,6 +122,10 @@ e o detalhe `app/contratos/[id].tsx`) — são rotas da stack e abrem
 a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
 risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave).
 
+Fora do Início, todos os headers têm à direita o botão "🏠 Início"
+(`apps/mobile/components/HomeHeaderButton.tsx`). No web, o header (`apps/web/src/components/Layout.tsx`)
+tem o mesmo botão e o logótipo também leva ao Início.
+
 ## Funcionalidades
 
 Os ecrãs abaixo existem no web e no mobile.
