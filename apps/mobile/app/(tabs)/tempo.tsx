@@ -1,17 +1,30 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ScrollView, View, Text, StyleSheet } from 'react-native'
 import {
   districtFromIpmaCityId,
   filterWarningsByDistrict,
   formatDate,
   formatWarningTime,
+  haversineDistance,
   WARNING_LEVEL_COLORS,
   WARNING_LEVEL_LABELS,
   type IpmaDailyForecast,
   type IpmaWarning,
 } from '@portugal-hoje/core'
 import { DEFAULT_CITY_ID, useCurrentWeather, useIpmaForecasts, useIpmaWarnings } from '../../hooks/useTempo'
-import { Badge, Card, ChipRow, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
+import { useUserLocation } from '../../hooks/useUserLocation'
+import {
+  Badge,
+  Card,
+  ChipRow,
+  ErrorView,
+  LinkText,
+  LoadingView,
+  ScreenHeader,
+  SectionTitle,
+  formatDistance,
+  uiStyles,
+} from '../../components/ui'
 
 const LISBOA = { name: 'Lisboa', latitude: 38.766, longitude: -9.1286 }
 
@@ -35,13 +48,36 @@ export function ipmaEmoji(description: string): string {
 
 export default function Tempo() {
   const forecasts = useIpmaForecasts()
-  const [cityId, setCityId] = useState<string>(String(DEFAULT_CITY_ID))
+  const location = useUserLocation()
+  const coords = location.status === 'granted' ? location.coords : null
+  // null = automático: cidade IPMA mais próxima com localização, Lisboa sem ela.
+  const [manualCityId, setManualCityId] = useState<string | null>(null)
 
-  const cities = forecasts.data ?? []
+  const cities = useMemo(() => {
+    const list = forecasts.data ?? []
+    if (!coords) return list.map(c => ({ ...c, distKm: null as number | null }))
+    return list
+      .map(c => ({
+        ...c,
+        distKm:
+          Number.isFinite(c.latitude) && Number.isFinite(c.longitude)
+            ? haversineDistance(coords.latitude, coords.longitude, c.latitude, c.longitude)
+            : null,
+      }))
+      .sort((a, b) => (a.distKm ?? Infinity) - (b.distKm ?? Infinity))
+  }, [forecasts.data, coords])
+
+  const nearest = coords ? cities.find(c => c.distKm !== null) : undefined
+  const autoCityId = nearest ? String(nearest.cityId) : String(DEFAULT_CITY_ID)
+  const cityId = manualCityId ?? autoCityId
   const city = cities.find(c => String(c.cityId) === cityId)
-  const place = city
-    ? { name: city.cityName, latitude: city.latitude, longitude: city.longitude }
-    : LISBOA
+  // Sem cidade escolhida à mão, o "Agora" usa as coordenadas exatas do utilizador.
+  const atUserLocation = coords !== null && manualCityId === null
+  const place = atUserLocation
+    ? { name: 'A sua localização', latitude: coords.latitude, longitude: coords.longitude }
+    : city
+      ? { name: city.cityName, latitude: city.latitude, longitude: city.longitude }
+      : LISBOA
   const current = useCurrentWeather(place.latitude, place.longitude)
   const warnings = useIpmaWarnings()
   const district = districtFromIpmaCityId(cityId) ?? 'Lisboa'
@@ -57,20 +93,43 @@ export default function Tempo() {
     <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content}>
       <ScreenHeader
         title="🌤️ Meteorologia"
-        subtitle={`Previsão IPMA · ${place.name}`}
+        subtitle={`Previsão IPMA · ${city?.cityName ?? LISBOA.name}${atUserLocation && city ? ' (mais próxima)' : ''}`}
         onRefresh={refresh}
         refreshing={forecasts.isFetching || current.isFetching || warnings.isFetching}
       />
 
       {cities.length > 0 && (
         <ChipRow
-          options={cities.map(c => ({ value: String(c.cityId), label: c.cityName }))}
+          options={cities.map(c => ({
+            value: String(c.cityId),
+            label: c.distKm !== null ? `${c.cityName} · ${formatDistance(c.distKm)}` : c.cityName,
+          }))}
           value={cityId}
-          onChange={v => v && setCityId(v)}
+          // Escolher a cidade automática volta ao modo "A sua localização".
+          onChange={v => v && setManualCityId(v === autoCityId ? null : v)}
           allLabel={null}
           color="#0ea5e9"
         />
       )}
+
+      <View style={styles.locationRow}>
+        {location.status === 'loading' && <Text style={uiStyles.small}>A obter localização…</Text>}
+        {atUserLocation && nearest && (
+          <Text style={uiStyles.small}>🧭 Cidade IPMA mais próxima de si: {nearest.cityName}</Text>
+        )}
+        {coords && !atUserLocation && (
+          <LinkText label="🧭 Voltar à minha localização" onPress={() => setManualCityId(null)} />
+        )}
+        {location.status === 'denied' && (
+          <LinkText
+            label="🧭 Usar a minha localização"
+            onPress={() => {
+              setManualCityId(null)
+              void location.request()
+            }}
+          />
+        )}
+      </View>
 
       {current.data && (
         <View style={styles.currentCard}>
@@ -205,6 +264,7 @@ const styles = StyleSheet.create({
   currentDetails: { flexDirection: 'row', gap: 16, marginTop: 8 },
   currentDetail: { color: '#e0f2fe', fontSize: 14 },
   currentSource: { color: '#bae6fd', fontSize: 10, marginTop: 8, textAlign: 'right' },
+  locationRow: { marginBottom: 12 },
   daysRow: { marginBottom: 16 },
   dayCard: {
     backgroundColor: 'white',
