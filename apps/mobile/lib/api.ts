@@ -1,5 +1,6 @@
 import { ApiAbertaClient } from '@portugal-hoje/core'
 
-const apiKey = process.env.EXPO_PUBLIC_APIABERTA_KEY ?? 'demo'
+// Sem chave, o cliente falha cada pedido com uma mensagem clara (MOB-008).
+const apiKey = process.env.EXPO_PUBLIC_APIABERTA_KEY ?? ''
 
 export const apiClient = new ApiAbertaClient({ apiKey })

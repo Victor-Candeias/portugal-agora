@@ -43,16 +43,33 @@ pnpm install
 ## Configuração
 
 ```bash
-# Web
+# Web (Vite lê apps/web/.env ou apps/web/.env.local)
 cp .env.example apps/web/.env.local
 # Editar apps/web/.env.local:
 # VITE_APIABERTA_KEY=ak_...
 
-# Mobile
-cp apps/mobile/.env.example apps/mobile/.env.local
-# Editar apps/mobile/.env.local:
+# Mobile (Expo lê apps/mobile/.env ou apps/mobile/.env.local)
+cp apps/mobile/.env.example apps/mobile/.env
+# Editar apps/mobile/.env:
 # EXPO_PUBLIC_APIABERTA_KEY=ak_...
 ```
+
+Sem chave, os pedidos à API Aberta falham logo com "Chave da API Aberta em falta" (não é enviado
+nenhum valor `demo`).
+
+### Fontes de dados
+
+| Dados | Fonte | Chave |
+|---|---|---|
+| Combustível, distritos/concelhos, ANPC | API Aberta — `/fuel/*`, `/geo/*`, `/anpc/*` | sim |
+| Previsão do tempo (capitais de distrito, ~3 dias) | API Aberta — `/ipma/forecasts` | sim |
+| Tempo atual | Open-Meteo (`api.open-meteo.com`) | não |
+| Risco de incêndio rural | IPMA open-data — RCM por concelho (`rcm-d0.json`), agregado por distrito | não |
+| Tarifas de carregamento EV (CEME) | API Aberta — `/ev/tariffs`, `/ev/tariffs/cheapest` | sim |
+| Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
+| Indicadores de Portugal | API Aberta — `/ine/latest` (Eurostat) | sim |
+
+A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
 ## Desenvolvimento
 
@@ -98,20 +115,19 @@ A raiz (`apps/mobile/app/_layout.tsx`) é um `Stack`. As tabs (Início, Combust�
 Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Hospitais, Transportes (CP,
 Carris, TML), Metro do Porto, Serviços Públicos e Código Postal — são rotas da stack (`app/*.tsx`) e abrem
 a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
-risco de incêndio da Proteção Civil exige `EXPO_PUBLIC_APIABERTA_KEY`; sem chave, o ecrã mostra-o como
-indisponível e as ocorrências ANPC continuam a funcionar.
+risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave).
 
 ## Funcionalidades
 
-Os ecrãs abaixo existem no web e no mobile.
+Os ecrãs abaixo existem no web e no mobile, exceto EV e Economia, que no web ainda estão por fazer.
 
 | Ecrã | Dados |
 |---|---|
 | ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
-| 🌤️ Tempo | Previsão 5 dias IPMA + observação em tempo real |
-| ⚡ EV | Postos MOBI.E com estado livre/ocupado em tempo real |
-| 🔥 Proteção Civil | Ocorrências ANPC + risco de incêndio por distrito |
-| 📊 Economia | Indicadores INE + taxas BdP (Euribor, BCE) |
+| 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) |
+| ⚡ EV | Tarifas de carregamento dos CEME + simulador do custo por carregamento |
+| 🔥 Proteção Civil | Ocorrências ANPC + risco de incêndio por distrito (RCM IPMA) |
+| 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
 | 🏥 Hospitais | Urgências SNS, ordenadas por distância |
 | 🚆 Transportes | Comboios CP, Carris (veículos, linhas, paragens, alertas) e alertas TML |

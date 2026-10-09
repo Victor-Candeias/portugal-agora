@@ -11,8 +11,8 @@ export type Section = {
 export const SECTIONS: Section[] = [
   { href: '/combustivel', title: 'Combustível', emoji: '⛽', color: '#16a34a', description: 'Preços e postos' },
   { href: '/tempo', title: 'Tempo', emoji: '🌤️', color: '#0ea5e9', description: 'Previsão IPMA' },
-  { href: '/ev', title: 'Carregamento EV', emoji: '⚡', color: '#f59e0b', description: 'Postos de carregamento' },
-  { href: '/economia', title: 'Economia', emoji: '📊', color: '#6366f1', description: 'Taxas e indicadores' },
+  { href: '/ev', title: 'Carregamento EV', emoji: '⚡', color: '#f59e0b',   description: 'Tarifas e simulador' },
+    { href: '/economia', title: 'Economia', emoji: '📊', color: '#6366f1', description: 'Taxas BdP e indicadores' },
   { href: '/turismo', title: 'Turismo', emoji: '🏖️', color: '#7c3aed', description: 'Pontos de interesse' },
   { href: '/protecao-civil', title: 'Proteção Civil', emoji: '🔥', color: '#ea580c', description: 'Ocorrências ANPC' },
   { href: '/hospitais', title: 'Hospitais', emoji: '🏥', color: '#dc2626', description: 'Urgências SNS' },

@@ -1,39 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
+import { getWmoDescription } from '@portugal-hoje/core'
+
+export { getWmoDescription }
 
 const FORECAST_BASE = 'https://api.open-meteo.com/v1/forecast'
 const GEO_BASE = 'https://geocoding-api.open-meteo.com/v1/search'
-
-// WMO weather interpretation codes → descrição PT + emoji
-const WMO_CODES: Record<number, { desc: string; emoji: string }> = {
-  0:  { desc: 'Céu limpo',                 emoji: '☀️' },
-  1:  { desc: 'Maioritariamente limpo',     emoji: '🌤️' },
-  2:  { desc: 'Parcialmente nublado',       emoji: '⛅' },
-  3:  { desc: 'Nublado',                   emoji: '☁️' },
-  45: { desc: 'Nevoeiro',                  emoji: '🌫️' },
-  48: { desc: 'Nevoeiro com geada',        emoji: '🌫️' },
-  51: { desc: 'Chuvisco fraco',            emoji: '🌦️' },
-  53: { desc: 'Chuvisco moderado',         emoji: '🌦️' },
-  55: { desc: 'Chuvisco forte',            emoji: '🌧️' },
-  61: { desc: 'Chuva fraca',              emoji: '🌦️' },
-  63: { desc: 'Chuva moderada',           emoji: '🌧️' },
-  65: { desc: 'Chuva forte',              emoji: '🌧️' },
-  71: { desc: 'Neve fraca',               emoji: '❄️' },
-  73: { desc: 'Neve moderada',            emoji: '❄️' },
-  75: { desc: 'Neve forte',               emoji: '❄️' },
-  77: { desc: 'Granizo',                  emoji: '🌨️' },
-  80: { desc: 'Aguaceiros fracos',         emoji: '🌦️' },
-  81: { desc: 'Aguaceiros moderados',      emoji: '🌧️' },
-  82: { desc: 'Aguaceiros fortes',         emoji: '🌧️' },
-  85: { desc: 'Aguaceiros de neve',        emoji: '🌨️' },
-  86: { desc: 'Aguaceiros de neve fortes', emoji: '🌨️' },
-  95: { desc: 'Trovoada',                 emoji: '⛈️' },
-  96: { desc: 'Trovoada com granizo',      emoji: '⛈️' },
-  99: { desc: 'Trovoada forte com granizo',emoji: '⛈️' },
-}
-
-export function getWmoDescription(code: number) {
-  return WMO_CODES[code] ?? { desc: 'Sem informação', emoji: '🌤️' }
-}
 
 export interface OpenMeteoForecastDay {
   date: string

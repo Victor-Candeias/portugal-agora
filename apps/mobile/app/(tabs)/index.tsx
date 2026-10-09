@@ -1,8 +1,8 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import { useFuelPrices } from '../../hooks/useApi'
-import { useWeatherForecast } from '../../hooks/useApi'
-import { useInterestRates } from '../../hooks/useApi'
+import { DEFAULT_CITY_ID, useIpmaForecasts } from '../../hooks/useTempo'
+import { useBdpRates } from '../../hooks/useEconomia'
 import { useAnpcSummary } from '../../hooks/useAnpc'
 import { SECTIONS } from '../../lib/sections'
 import { formatPrice } from '@portugal-hoje/core'
@@ -42,15 +42,15 @@ function SummaryCard({
 
 export default function Dashboard() {
   const { data: fuelData } = useFuelPrices('gasoline_95')
-  const { data: weatherData } = useWeatherForecast('1110600')
+  const { data: weatherData } = useIpmaForecasts()
   const { data: anpcData } = useAnpcSummary()
-  const { data: ratesData } = useInterestRates()
+  const { data: ratesData } = useBdpRates()
 
   const cheapest = fuelData?.[0]
-  const today = weatherData?.data[0]
+  const today = weatherData?.find(c => c.cityId === DEFAULT_CITY_ID)?.forecasts[0]
   const activeIncidents = anpcData?.total_active ?? 0
   const topDistrict = anpcData?.by_district?.[0]
-  const euribor = ratesData?.data.find(r => r.type.includes('3m') || r.type.includes('3M'))
+  const ecbDeposit = ratesData?.data.find(r => r.key === 'ecb_deposit')
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -77,16 +77,18 @@ export default function Dashboard() {
         <SummaryCard
           emoji="🌤️"
           title="Tempo"
-          value={today ? `${today.temp_max}°C` : '—'}
-          subtitle={today?.description ?? 'A carregar...'}
+          value={today ? `${today.tMax}°C` : '—'}
+          subtitle={today ? `${today.description} · Lisboa` : 'A carregar...'}
           color="#0ea5e9"
+          href="/tempo"
         />
         <SummaryCard
-          emoji="⚡"
-          title="Euribor 3M"
-          value={euribor ? `${euribor.rate.toFixed(2)}%` : '—'}
-          subtitle="Banco de Portugal"
-          color="#f59e0b"
+          emoji="🏦"
+          title="Taxa BCE"
+          value={ecbDeposit ? `${ecbDeposit.value.toFixed(2)}%` : '—'}
+          subtitle="Facilidade de depósito"
+          color="#6366f1"
+          href="/economia"
         />
         <SummaryCard
           emoji="🔥"

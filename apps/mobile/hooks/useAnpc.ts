@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { ipmaClient } from '@portugal-hoje/core'
 import { anpcClient } from '../lib/clients'
-import { apiClient } from '../lib/api'
 
 export function useAnpcIncidents() {
   return useQuery({
@@ -20,13 +20,11 @@ export function useAnpcSummary() {
   })
 }
 
-// Risco de incêndio por distrito (API Aberta). Exige uma chave válida em EXPO_PUBLIC_APIABERTA_KEY;
-// sem ela o pedido dá 401 e o ecrã mostra-o como indisponível, por isso não vale a pena repetir.
-export function useFireRisk() {
+// Risco de incêndio rural (RCM do IPMA, open-data, sem chave) agregado por distrito (MOB-008).
+export function useFireRisk(day: 0 | 1 = 0) {
   return useQuery({
-    queryKey: ['anpc', 'fire-risk'],
-    queryFn: () => apiClient.getFireRisk(),
+    queryKey: ['ipma', 'fire-risk', day],
+    queryFn: () => ipmaClient.getFireRiskByDistrict(day),
     staleTime: 60 * 60 * 1000,
-    retry: false,
   })
 }

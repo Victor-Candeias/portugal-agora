@@ -66,6 +66,20 @@ export const FIRE_RISK_COLORS = {
   extreme: '#7f1d1d',
 } as const
 
+const ptNumber = (value: number, digits = 1) =>
+  new Intl.NumberFormat('pt-PT', { maximumFractionDigits: digits }).format(value)
+
+// Indicadores de /ine/latest (Eurostat) → rótulo PT + formatação (MOB-008)
+export const INE_INDICATORS: Record<string, { label: string; format: (value: number) => string }> = {
+  population: { label: 'População residente', format: (v) => ptNumber(v, 0) },
+  gdp: { label: 'PIB', format: (v) => `${ptNumber(v / 1000, 1)} mil M€` },
+  gdp_per_capita: { label: 'PIB per capita', format: (v) => `${ptNumber(v, 0)} €` },
+  inflation: { label: 'Inflação (IHPC)', format: (v) => `${ptNumber(v)}%` },
+  unemployment_rate: { label: 'Taxa de desemprego', format: (v) => `${ptNumber(v)}%` },
+  birth_rate: { label: 'Natalidade', format: (v) => `${ptNumber(v)} ‰` },
+  death_rate: { label: 'Mortalidade', format: (v) => `${ptNumber(v)} ‰` },
+}
+
 export function haversineDistance(
   lat1: number,
   lng1: number,

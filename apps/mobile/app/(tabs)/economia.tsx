@@ -1,62 +1,118 @@
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator } from 'react-native'
-import { useEconomicIndicators, useInterestRates } from '../../hooks/useApi'
+import { ScrollView, View, Text, StyleSheet } from 'react-native'
+import { formatDate, INE_INDICATORS, type BdpRate } from '@portugal-hoje/core'
+import { useBdpLendingRates, useBdpRates, useIneLatest } from '../../hooks/useEconomia'
+import { Card, EmptyText, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
+
+const COLOR = '#6366f1'
+
+// Rótulos curtos para os cartões (o `label_pt` da API fica como descrição)
+const RATE_SHORT_LABELS: Record<string, string> = {
+  ecb_deposit: 'BCE · Depósito',
+  ecb_mro: 'BCE · Refinanciamento',
+  ecb_marginal_lending: 'BCE · Cedência marginal',
+  estr: '€STR',
+  tba: 'TBA (BdP)',
+  housing_loans: 'Crédito à habitação',
+  consumer_loans: 'Crédito ao consumo',
+  other_loans: 'Outros empréstimos',
+  all_loans: 'Todos os empréstimos',
+  term_deposits: 'Depósitos a prazo (≤1 ano)',
+}
+
+const formatRate = (value: number) =>
+  `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(value)}%`
 
 export default function Economia() {
-  const { data: indData, isLoading: indLoading } = useEconomicIndicators()
-  const { data: ratesData, isLoading: ratesLoading } = useInterestRates()
+  const rates = useBdpRates()
+  const lending = useBdpLendingRates()
+  const ine = useIneLatest()
 
-  const indicators = indData?.data ?? []
-  const rates = ratesData?.data ?? []
+  const refresh = () => {
+    void rates.refetch()
+    void lending.refetch()
+    void ine.refetch()
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>📊 Economia</Text>
-      <Text style={styles.subtitle}>INE · Banco de Portugal</Text>
+    <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content}>
+      <ScreenHeader
+        title="📊 Economia"
+        subtitle="Banco de Portugal · BCE · INE/Eurostat"
+        onRefresh={refresh}
+        refreshing={rates.isFetching || lending.isFetching || ine.isFetching}
+      />
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Taxas de Juro</Text>
-      </View>
-      {ratesLoading && <ActivityIndicator color="#f59e0b" />}
+      <Text style={styles.groupTitle}>Taxas de referência</Text>
+      {rates.isLoading && <LoadingView color={COLOR} />}
+      {rates.isError && <ErrorView error={rates.error} onRetry={() => void rates.refetch()} />}
       <View style={styles.grid}>
-        {rates.map(rate => (
-          <View key={rate.type} style={styles.rateCard}>
-            <Text style={styles.rateType}>{rate.type.replace(/_/g, ' ').toUpperCase()}</Text>
-            <Text style={styles.rateValue}>{rate.rate.toFixed(2)}%</Text>
-            <Text style={styles.ratePeriod}>{rate.period}</Text>
-          </View>
-        ))}
+        {rates.data?.data.map(r => <RateCard key={r.key} rate={r} />)}
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Indicadores INE</Text>
-      </View>
-      {indLoading && <ActivityIndicator color="#f59e0b" />}
-      {indicators.map(ind => (
-        <View key={ind.id} style={styles.indicatorRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.indicatorName}>{ind.name}</Text>
-            <Text style={styles.indicatorPeriod}>{ind.period}</Text>
-          </View>
-          <Text style={styles.indicatorValue}>
-            {ind.unit === '%' ? `${ind.value}%` : `${ind.value.toLocaleString('pt-PT')} ${ind.unit}`}
-          </Text>
-        </View>
-      ))}
+      <Text style={styles.groupTitle}>Crédito e depósitos (novas operações)</Text>
+      {lending.isLoading && <LoadingView color={COLOR} />}
+      {lending.isError && <ErrorView error={lending.error} onRetry={() => void lending.refetch()} />}
+      {lending.data && (
+        <Card>
+          {lending.data.data.map(r => (
+            <View key={r.key} style={styles.row}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowName}>{RATE_SHORT_LABELS[r.key] ?? r.label_pt}</Text>
+                <Text style={uiStyles.small}>{formatPeriod(r)}</Text>
+              </View>
+              <Text style={styles.rowValue}>{formatRate(r.value)}</Text>
+            </View>
+          ))}
+        </Card>
+      )}
 
-      {indicators.length === 0 && !indLoading && (
-        <Text style={styles.empty}>Dados não disponíveis</Text>
+      <Text style={styles.groupTitle}>Indicadores de Portugal</Text>
+      {ine.isLoading && <LoadingView color={COLOR} />}
+      {ine.isError && <ErrorView error={ine.error} onRetry={() => void ine.refetch()} />}
+      {ine.data && ine.data.data.length === 0 && <EmptyText>Dados não disponíveis</EmptyText>}
+      {ine.data && ine.data.data.length > 0 && (
+        <Card>
+          <SectionTitle>{ine.data.source}</SectionTitle>
+          {ine.data.data.map(ind => {
+            const meta = INE_INDICATORS[ind.indicator]
+            return (
+              <View key={ind.indicator} style={styles.row}>
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowName}>{meta?.label ?? ind.label}</Text>
+                  <Text style={uiStyles.small}>{ind.year}</Text>
+                </View>
+                <Text style={styles.rowValue}>
+                  {meta ? meta.format(ind.value) : ind.value.toLocaleString('pt-PT')}
+                </Text>
+              </View>
+            )
+          })}
+        </Card>
       )}
     </ScrollView>
   )
 }
 
+function formatPeriod(rate: BdpRate) {
+  if (rate.frequency === 'monthly') {
+    return new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' }).format(new Date(rate.ref_date))
+  }
+  return formatDate(rate.ref_date)
+}
+
+function RateCard({ rate }: { rate: BdpRate }) {
+  return (
+    <View style={styles.rateCard}>
+      <Text style={styles.rateType} numberOfLines={1}>{RATE_SHORT_LABELS[rate.key] ?? rate.label_pt}</Text>
+      <Text style={styles.rateValue}>{formatRate(rate.value)}</Text>
+      <Text style={styles.rateDesc} numberOfLines={2}>{rate.label_pt}</Text>
+      <Text style={styles.ratePeriod}>{formatPeriod(rate)}</Text>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { padding: 16, paddingBottom: 32 },
-  title: { fontSize: 22, fontWeight: '700', color: '#0f172a' },
-  subtitle: { fontSize: 13, color: '#64748b', marginBottom: 16, marginTop: 2 },
-  sectionHeader: { marginTop: 16, marginBottom: 10 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupTitle: { fontSize: 14, fontWeight: '700', color: '#334155', marginTop: 8, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
   rateCard: {
     backgroundColor: 'white',
@@ -65,20 +121,19 @@ const styles = StyleSheet.create({
     width: '47%',
     elevation: 2,
   },
-  rateType: { fontSize: 10, color: '#64748b', fontWeight: '700', letterSpacing: 0.5 },
-  rateValue: { fontSize: 24, fontWeight: '700', color: '#f59e0b', marginVertical: 4 },
-  ratePeriod: { fontSize: 11, color: '#94a3b8' },
-  indicatorRow: {
+  rateType: { fontSize: 11, color: '#64748b', fontWeight: '700', letterSpacing: 0.3 },
+  rateValue: { fontSize: 22, fontWeight: '700', color: COLOR, marginVertical: 4 },
+  rateDesc: { fontSize: 10, color: '#94a3b8' },
+  ratePeriod: { fontSize: 11, color: '#64748b', marginTop: 4 },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 8,
-    elevation: 1,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 10,
   },
-  indicatorName: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
-  indicatorPeriod: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  indicatorValue: { fontSize: 18, fontWeight: '700', color: '#374151' },
-  empty: { textAlign: 'center', color: '#94a3b8', marginTop: 20, fontSize: 14 },
+  rowInfo: { flex: 1 },
+  rowName: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
+  rowValue: { fontSize: 16, fontWeight: '700', color: '#374151' },
 })

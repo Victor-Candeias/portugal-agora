@@ -1,15 +1,4 @@
-import type {
-  FuelType,
-  FuelPrice,
-  FuelStation,
-  WeatherForecast,
-  WeatherObservation,
-  EvStation,
-  CivilProtectionAlert,
-  FireRisk,
-  EconomicIndicator,
-  InterestRate,
-} from '../types/index.js'
+import type { FuelType, FuelPrice, FuelStation } from '../types/index.js'
 
 export interface GeoDistrict {
   _id: string
@@ -31,27 +20,98 @@ export interface ApiClientOptions {
   baseUrl?: string
 }
 
+export interface IpmaDailyForecast {
+  date: string
+  tMin: number
+  tMax: number
+  description: string
+  precipProb: number
+  windDir: string
+  windSpeed: string
+}
+
+export interface IpmaCityForecast {
+  cityId: number
+  cityName: string
+  district?: string
+  latitude: string | number
+  longitude: string | number
+  forecasts: IpmaDailyForecast[]
+}
+
+export interface EvTariff {
+  ceme: string
+  tariff_type: 'fixed' | 'indexed'
+  period_type: string
+  activation_fee_eur: number
+  notes?: string
+  source_url?: string
+  updated_at: string
+  price_vazio_eur_kwh?: number
+  price_normal_eur_kwh?: number
+  current_price_eur_kwh?: number | null
+  current_omie_eur_kwh?: number | null
+  note?: string
+}
+
+export interface EvChargeCost {
+  ceme: string
+  price_per_kwh_eur: number
+  energy_cost_eur: number
+  activation_fee_eur: number
+  total_cost_eur: number
+  period: string
+}
+
+export interface BdpRate {
+  key: string
+  label: string
+  label_pt: string
+  value: number
+  unit: string
+  ref_date: string
+  frequency: string
+}
+
+export interface BdpRatesResponse {
+  source: string
+  source_url: string
+  count: number
+  synced_at: string
+  data: BdpRate[]
+}
+
+export interface IneIndicator {
+  indicator: string
+  label: string
+  unit: string
+  year: number
+  value: number
+}
+
 interface ListResponse<T> {
   meta: { page: number; limit: number; total: number; pages: number }
   data: T[]
 }
-interface SingleResponse<T> {
-  data: T
-}
 
 export class ApiAbertaClient {
   private readonly baseUrl: string
+  private readonly apiKey: string
   private readonly headers: Record<string, string>
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl ?? 'https://api.apiaberta.pt/v1'
+    this.apiKey = options.apiKey.trim()
     this.headers = {
-      'X-API-Key': options.apiKey,
+      'X-API-Key': this.apiKey,
       'Content-Type': 'application/json',
     }
   }
 
   private async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+    if (!this.apiKey) {
+      throw new ApiError(401, 'Chave da API Aberta em falta (definir *_APIABERTA_KEY no .env)')
+    }
     const url = new URL(`${this.baseUrl}${path}`)
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
@@ -98,62 +158,43 @@ export class ApiAbertaClient {
     return this.get('/fuel/stations', params as any)
   }
 
-  // ── Weather ───────────────────────────────────────────────────────────────
-  async getWeatherForecast(params: {
-    municipality?: string
-    lat?: number
-    lng?: number
-    days?: number
-  }): Promise<ListResponse<WeatherForecast>> {
-    return this.get('/weather/forecast', params as any)
+  // ── IPMA (previsão por capital de distrito, ~3 dias) ─────────────────────
+  async getIpmaForecasts(): Promise<{ cities: number; data: IpmaCityForecast[] }> {
+    return this.get('/ipma/forecasts')
   }
 
-  async getWeatherObservation(params?: {
-    lat?: number
-    lng?: number
-    station?: string
-  }): Promise<SingleResponse<WeatherObservation>> {
-    return this.get('/weather/observations', params as any)
+  async getIpmaForecast(cityId: number | string): Promise<IpmaCityForecast> {
+    return this.get(`/ipma/forecasts/${cityId}`)
   }
 
-  // ── EV ───────────────────────────────────────────────────────────────────
-  async getEvStations(params?: {
-    lat?: number
-    lng?: number
-    radius?: number
-    status?: string
-    page?: number
-    limit?: number
-  }): Promise<ListResponse<EvStation>> {
-    return this.get('/ev/stations', params as any)
+  // ── EV (tarifas de carregamento CEME) ────────────────────────────────────
+  async getEvTariffs(params?: { type?: 'fixed' | 'indexed' }): Promise<{
+    data: EvTariff[]
+    meta: { current_time: string; current_hour: number; current_omie_price_kwh?: number | null }
+  }> {
+    return this.get('/ev/tariffs', params)
   }
 
-  // ── Civil Protection ──────────────────────────────────────────────────────
-  async getCivilProtectionAlerts(params?: {
-    district?: string
-    severity?: string
-  }): Promise<ListResponse<CivilProtectionAlert>> {
-    return this.get('/civil-protection/alerts', params as any)
+  async getCheapestEvTariffs(kwh: number): Promise<{
+    data: EvChargeCost[]
+    meta: { kwh_requested: number; current_time: string; current_period: string; note?: string }
+  }> {
+    return this.get('/ev/tariffs/cheapest', { kwh })
   }
 
-  async getFireRisk(params?: {
-    district?: string
-  }): Promise<ListResponse<FireRisk>> {
-    return this.get('/civil-protection/fire-risk', params as any)
+  // ── Banco de Portugal ─────────────────────────────────────────────────────
+  async getBdpRates(): Promise<BdpRatesResponse> {
+    return this.get('/bdp/rates')
   }
 
-  // ── Economy ───────────────────────────────────────────────────────────────
-  async getEconomicIndicators(params?: {
-    page?: number
-    limit?: number
-  }): Promise<ListResponse<EconomicIndicator>> {
-    return this.get('/statistics/indicators', params as any)
+  async getBdpLendingRates(): Promise<BdpRatesResponse> {
+    return this.get('/bdp/lending-rates')
   }
 
-  async getInterestRates(): Promise<ListResponse<InterestRate>> {
-    return this.get('/finance/rates')
+  // ── INE / Eurostat ────────────────────────────────────────────────────────
+  async getIneLatest(): Promise<{ source: string; fetched_at: string; data: IneIndicator[] }> {
+    return this.get('/ine/latest')
   }
-
   // ── Geo ───────────────────────────────────────────────────────────────────
   async getDistricts(): Promise<{ count: number; data: GeoDistrict[] }> {
     return this.get('/geo/districts')

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { FIRE_RISK_COLORS, FIRE_RISK_LABELS, type AnpcIncident } from '@portugal-hoje/core'
+import { FIRE_RISK_COLORS, FIRE_RISK_LABELS, formatDate, type AnpcIncident } from '@portugal-hoje/core'
 import { useAnpcIncidents, useAnpcSummary, useFireRisk } from '../hooks/useAnpc'
 import { PointsMap, SinglePointMap, type MapPoint } from '../components/PointsMap'
 import {
@@ -214,21 +214,22 @@ function FireRiskCard({ query }: { query: ReturnType<typeof useFireRisk> }) {
   return (
     <Card>
       <SectionTitle>🌡️ Risco de incêndio por distrito</SectionTitle>
-      {query.isLoading && <LoadingView color="#ea580c" />}
-      {query.isError && (
-        <Text style={uiStyles.small}>
-          Indisponível — o risco de incêndio da API Aberta requer uma chave válida em EXPO_PUBLIC_APIABERTA_KEY.
+      {query.data?.date && (
+        <Text style={[uiStyles.small, styles.riskSource]}>
+          IPMA · {formatDate(query.data.date)} · nível máximo dos concelhos de cada distrito
         </Text>
       )}
+      {query.isLoading && <LoadingView color="#ea580c" />}
+      {query.isError && <ErrorView error={query.error} onRetry={() => void query.refetch()} />}
       {query.isSuccess && risks.length === 0 && <Text style={uiStyles.small}>Sem dados de risco para hoje.</Text>}
       {risks.length > 0 && (
         <View style={styles.riskGrid}>
           {risks.map(r => (
-            <View key={r.district_code} style={styles.riskItem}>
-              <View style={[styles.riskDot, { backgroundColor: FIRE_RISK_COLORS[r.risk_level] }]} />
+            <View key={r.district} style={styles.riskItem}>
+              <View style={[styles.riskDot, { backgroundColor: FIRE_RISK_COLORS[r.level] }]} />
               <Text style={styles.riskDistrict} numberOfLines={1}>{r.district}</Text>
-              <Text style={[styles.riskLevel, { color: FIRE_RISK_COLORS[r.risk_level] }]}>
-                {FIRE_RISK_LABELS[r.risk_level]}
+              <Text style={[styles.riskLevel, { color: FIRE_RISK_COLORS[r.level] }]}>
+                {FIRE_RISK_LABELS[r.level]}
               </Text>
             </View>
           ))}
@@ -285,6 +286,7 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
   bannerAction: { marginTop: 10, flexDirection: 'row' },
   riskGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 },
+  riskSource: { marginBottom: 8 },
   riskItem: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8 },
   riskDot: { width: 10, height: 10, borderRadius: 5 },
   riskDistrict: { flex: 1, fontSize: 12, color: '#334155' },
