@@ -38,6 +38,8 @@ jobs:
         env:
           # Fica embutida no bundle público do Pages.
           VITE_APIABERTA_KEY: ${{ secrets.VITE_APIABERTA_KEY }}
+          # Postos de carregamento EV (WEB-040); secret do repositório, embutido no bundle.
+          OPEN_CHARGE_MAP_KEY: ${{ secrets.OPEN_CHARGE_MAP_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

@@ -5,6 +5,8 @@ import path from 'path'
 
 export default defineConfig({
   base: process.env.NODE_ENV === 'production' ? '/portugal-agora/' : '/',
+  // OPEN_CHARGE_MAP_KEY (WEB-040) tem o mesmo nome no web, no mobile e no secret do GitHub.
+  envPrefix: ['VITE_', 'OPEN_CHARGE_MAP_'],
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

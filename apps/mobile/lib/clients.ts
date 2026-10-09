@@ -7,11 +7,13 @@ import {
   createCodigoPostalClient,
   createComboiosClient,
   createMetroPortoClient,
+  createOpenChargeMapClient,
   createPublicServicesClient,
   createSnsClient,
   createTmlClient,
   type PostalCodeGeoMap,
 } from '@portugal-hoje/core'
+import Constants from 'expo-constants'
 // Mapa CP → distrito/município dos hospitais: o mesmo ficheiro estático servido pelo web,
 // empacotado na app (funciona offline, sem pedido extra).
 import postalCodeGeoMap from '../../web/public/cp-distrito.json'
@@ -34,3 +36,9 @@ export const tmlClient = createTmlClient()
 export const codigoPostalClient = createCodigoPostalClient()
 
 export const anpcClient = createAnpcClient({ apiKey: process.env.EXPO_PUBLIC_APIABERTA_KEY ?? '' })
+
+// Postos de carregamento EV (WEB-040). A chave vem do OPEN_CHARGE_MAP_KEY via app.config.js.
+export const openChargeMapClient = createOpenChargeMapClient({
+  apiKey: (Constants.expoConfig?.extra?.openChargeMapKey as string | undefined) ?? '',
+  userAgent: 'PortugalHoje/1.0',
+})

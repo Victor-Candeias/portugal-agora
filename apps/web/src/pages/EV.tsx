@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 import { formatPrice, type EvTariff } from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
+import { EvChargers } from '@/components/EvChargers'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
 import { useCheapestEvTariffs, useEvTariffs } from '@/hooks/useEv'
 
 // Tarifas CEME e simulador de custo via API Aberta (WEB-029), como a tab EV do mobile (MOB-008).
+// Postos de carregamento perto de mim via Open Charge Map (WEB-040).
 const KWH_PRESETS = [10, 20, 30, 50]
 const MAX_KWH = 200
+
+type EvTab = 'chargers' | 'tariffs'
+const TABS: { value: EvTab; label: string }[] = [
+  { value: 'chargers', label: 'Postos perto de mim' },
+  { value: 'tariffs', label: 'Tarifas CEME' },
+]
 
 type TariffFilter = 'all' | 'fixed' | 'indexed'
 const FILTERS: { value: TariffFilter; label: string }[] = [
@@ -25,6 +33,7 @@ const formatEur = (value: number) =>
   new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
 
 export function EV() {
+  const [tab, setTab] = useState<EvTab>('chargers')
   const [kwhInput, setKwhInput] = useState('30')
   const [kwh, setKwh] = useState(30)
   const [filter, setFilter] = useState<TariffFilter>('all')
@@ -65,17 +74,44 @@ export function EV() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">⚡ Carregamento EV</h1>
-          <p className="text-slate-500 text-sm mt-1">Tarifas dos comercializadores (CEME) · ERSE/OMIE</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {tab === 'chargers'
+              ? 'Postos de carregamento · Open Charge Map'
+              : 'Tarifas dos comercializadores (CEME) · ERSE/OMIE'}
+          </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="text-sm bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-60"
-        >
-          {refreshing ? 'A atualizar…' : 'Atualizar'}
-        </button>
+        {tab === 'tariffs' && (
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="text-sm bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-60"
+          >
+            {refreshing ? 'A atualizar…' : 'Atualizar'}
+          </button>
+        )}
       </div>
 
+      <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist">
+        {TABS.map(t => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.value}
+            onClick={() => setTab(t.value)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              tab === t.value ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'chargers' && <EvChargers />}
+
+      {tab === 'tariffs' && (
+      <>
       <Card>
         <CardTitle>Simulador de carregamento</CardTitle>
         <p className="text-sm text-slate-500 mb-3">
@@ -190,6 +226,8 @@ export function EV() {
           />
         )}
       </section>
+      </>
+      )}
     </div>
   )
 }

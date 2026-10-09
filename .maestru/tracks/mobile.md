@@ -70,4 +70,5 @@ status: active
 | WEB-037 | Web e mobile: botão no header para voltar ao Início, fora do ecrã Início | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | WEB-038 | Código Postal: trocar geoapi.pt por moradas.dev (resolver HTTP 429) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  | [WEB-038](../specs/mobile/web-038-spec.md) |
 | WEB-039 | Deploy Pages: passar VITE_APIABERTA_KEY ao build a partir do secret APIABERTA_KEY | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
+| WEB-040 | EV (web e mobile): postos de carregamento perto de mim via Open Charge Map | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-040](../specs/mobile/web-040-spec.md) |
 <!-- /maestru:work-items-list -->

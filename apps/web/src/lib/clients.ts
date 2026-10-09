@@ -8,6 +8,7 @@ import {
   createCodigoPostalClient,
   createComboiosClient,
   createMetroPortoClient,
+  createOpenChargeMapClient,
   createPublicServicesClient,
   createSnsClient,
   createTmlClient,
@@ -40,6 +41,9 @@ export const tmlClient = createTmlClient()
 export const codigoPostalClient = createCodigoPostalClient()
 
 export const anpcClient = createAnpcClient({ apiKey: import.meta.env.VITE_APIABERTA_KEY ?? '' })
+
+// Postos de carregamento EV (WEB-040). Exposta pelo `envPrefix` do vite.config.ts.
+export const openChargeMapClient = createOpenChargeMapClient({ apiKey: import.meta.env.OPEN_CHARGE_MAP_KEY ?? '' })
 
 // Sem chave, o cliente falha cada pedido com uma mensagem clara (MOB-008).
 export const apiClient = new ApiAbertaClient({ apiKey: import.meta.env.VITE_APIABERTA_KEY ?? '' })

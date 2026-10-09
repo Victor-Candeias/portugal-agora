@@ -47,15 +47,17 @@ pnpm install
 cp .env.example apps/web/.env.local
 # Editar apps/web/.env.local:
 # VITE_APIABERTA_KEY=ak_...
+# OPEN_CHARGE_MAP_KEY=...   (postos de carregamento EV — chave em openchargemap.org/site/profile/applications)
 
 # Mobile (Expo lê apps/mobile/.env ou apps/mobile/.env.local)
 cp apps/mobile/.env.example apps/mobile/.env
 # Editar apps/mobile/.env:
 # EXPO_PUBLIC_APIABERTA_KEY=ak_...
+# OPEN_CHARGE_MAP_KEY=...   (passa para a app via apps/mobile/app.config.js → extra.openChargeMapKey)
 ```
 
 Sem chave, os pedidos à API Aberta falham logo com "Chave da API Aberta em falta" (não é enviado
-nenhum valor `demo`).
+nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MAP_KEY`.
 
 ### Fontes de dados
 
@@ -67,6 +69,7 @@ nenhum valor `demo`).
 | Risco de incêndio rural | IPMA open-data — RCM por concelho (`rcm-d0.json`), agregado por distrito | não |
 | Avisos meteorológicos (amarelo/laranja/vermelho) | IPMA open-data — `warnings_www.json` (a rota `/ipma/warnings` da API Aberta não traz o nível nem todas as regiões) | não |
 | Tarifas de carregamento EV (CEME) | API Aberta — `/ev/tariffs`, `/ev/tariffs/cheapest` | sim |
+| Postos de carregamento EV perto de mim | Open Charge Map — `api.openchargemap.io/v3/poi` (raio 5–50 km, até 100 postos, filtro de potência mínima; CC BY 4.0) | sim (`OPEN_CHARGE_MAP_KEY`) |
 | Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
 | Indicadores de Portugal | API Aberta — `/ine/latest`, `/ine/indicators`, `/ine/stats` (Eurostat; sem `from` a série só começa em 2000) | sim |
 | Focos de calor por satélite (VIIRS/MODIS, Portugal continental, até 7 dias) | API Aberta — `/nasafirms/hotspots` (NASA FIRMS) | sim |
@@ -134,7 +137,7 @@ Os ecrãs abaixo existem no web e no mobile.
 |---|---|
 | ⛽ Combustível | Preços DGEG por distrito/município e tipo. Com localização: seletor Preço/Distância, raio de 10/25/50 km/Todos e distância a cada posto |
 | 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
-| ⚡ EV | Tarifas de carregamento dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
+| ⚡ EV | Tab "Postos perto de mim": postos de carregamento (Open Charge Map) ordenados por distância, com raio, potência mínima, tomadas, estado, mapa e direções (fallback Lisboa sem localização). Tab "Tarifas CEME": tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat, cada um com gráfico da série histórica e seletor de intervalo de anos (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
@@ -210,6 +213,7 @@ Secrets do repositório:
 | Secret | Uso |
 |---|---|
 | `APIABERTA_KEY` | `EXPO_PUBLIC_APIABERTA_KEY` embutida no bundle |
+| `OPEN_CHARGE_MAP_KEY` | chave do Open Charge Map (postos EV), embutida no APK (`extra.openChargeMapKey`) e no bundle do Pages |
 | `ANDROID_KEYSTORE_BASE64` | upload keystore em base64 (`base64 -w0 upload.jks`) |
 | `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | credenciais da upload key |
 | `PLAY_SERVICE_ACCOUNT_JSON` | service account com acesso à app na Play Console (só para publicar) |

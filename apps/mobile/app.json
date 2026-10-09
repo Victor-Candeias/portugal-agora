@@ -22,7 +22,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "A app usa a tua localização para mostrar o que está perto de ti: pontos turísticos, hospitais, paragens e serviços públicos."
+          "locationWhenInUsePermission": "A app usa a tua localização para mostrar o que está perto de ti: pontos turísticos, hospitais, paragens, serviços públicos e postos de carregamento."
         }
       ]
     ],

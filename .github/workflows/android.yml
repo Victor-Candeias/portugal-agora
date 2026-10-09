@@ -5,6 +5,7 @@ name: Android (mobile)
 #
 # Secrets (Settings → Secrets and variables → Actions):
 #   APIABERTA_KEY               chave da API Aberta embutida no bundle (EXPO_PUBLIC_APIABERTA_KEY)
+#   OPEN_CHARGE_MAP_KEY         chave do Open Charge Map (postos EV), embutida via app.config.js (extra.openChargeMapKey)
 #   ANDROID_KEYSTORE_BASE64     upload keystore (.jks) em base64; sem ela o release é assinado com a debug keystore
 #   ANDROID_KEYSTORE_PASSWORD
 #   ANDROID_KEY_ALIAS
@@ -41,6 +42,7 @@ jobs:
     env:
       ANDROID_VERSION_CODE: ${{ github.run_number }}
       EXPO_PUBLIC_APIABERTA_KEY: ${{ secrets.APIABERTA_KEY }}
+      OPEN_CHARGE_MAP_KEY: ${{ secrets.OPEN_CHARGE_MAP_KEY }}
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       HAS_PLAY_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
       PLAY_TRACK: ${{ inputs.track || 'none' }}

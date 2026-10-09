@@ -2,11 +2,31 @@ import { useState } from 'react'
 import { ScrollView, View, Text, StyleSheet } from 'react-native'
 import { formatPrice, type EvTariff } from '@portugal-hoje/core'
 import { useCheapestEvTariffs, useEvTariffs } from '../../hooks/useEv'
-import { Badge, Card, ChipRow, EmptyText, ErrorView, LoadingView, Notice, ScreenHeader, SectionTitle, uiStyles } from '../../components/ui'
+import { EvChargers } from '../../components/EvChargers'
+import {
+  Badge,
+  Card,
+  ChipRow,
+  EmptyText,
+  ErrorView,
+  LoadingView,
+  Notice,
+  ScreenHeader,
+  SectionTitle,
+  SegmentedTabs,
+  uiStyles,
+} from '../../components/ui'
 
 const COLOR = '#f59e0b'
 const KWH_OPTIONS = ['10', '20', '30', '50'] as const
 type KwhOption = (typeof KWH_OPTIONS)[number]
+
+// Postos perto de mim (Open Charge Map, WEB-040) e tarifas CEME (API Aberta, MOB-008).
+type EvTab = 'chargers' | 'tariffs'
+const TABS: { value: EvTab; label: string }[] = [
+  { value: 'chargers', label: 'Postos perto de mim' },
+  { value: 'tariffs', label: 'Tarifas CEME' },
+]
 
 const PERIOD_LABELS: Record<string, string> = {
   vazio: 'Bi-horária',
@@ -18,6 +38,7 @@ const formatEur = (value: number) =>
   new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
 
 export default function EV() {
+  const [tab, setTab] = useState<EvTab>('chargers')
   const [kwh, setKwh] = useState<KwhOption>('30')
   const tariffs = useEvTariffs()
   const cheapest = useCheapestEvTariffs(Number(kwh))
@@ -35,11 +56,17 @@ export default function EV() {
     <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content}>
       <ScreenHeader
         title="⚡ Carregamento EV"
-        subtitle="Tarifas dos comercializadores (CEME)"
-        onRefresh={refresh}
-        refreshing={tariffs.isFetching || cheapest.isFetching}
+        subtitle={tab === 'chargers' ? 'Postos de carregamento · Open Charge Map' : 'Tarifas dos comercializadores (CEME)'}
+        onRefresh={tab === 'tariffs' ? refresh : undefined}
+        refreshing={tab === 'tariffs' && (tariffs.isFetching || cheapest.isFetching)}
       />
 
+      <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
+
+      {tab === 'chargers' && <EvChargers />}
+
+      {tab === 'tariffs' && (
+      <>
       <Card>
         <SectionTitle>Simulador de carregamento</SectionTitle>
         <Text style={[uiStyles.small, styles.hint]}>
@@ -88,6 +115,8 @@ export default function EV() {
           <Text style={styles.groupTitle}>Tarifas indexadas (OMIE)</Text>
           {indexed.map(t => <TariffCard key={t.ceme} tariff={t} />)}
         </>
+      )}
+      </>
       )}
     </ScrollView>
   )
