@@ -11,6 +11,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Necessário para ler o secret VITE_APIABERTA_KEY do ambiente github-pages.
+    environment: github-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -34,6 +36,9 @@ jobs:
 
       - name: Build
         run: pnpm --filter web build
+        env:
+          # Fica embutida no bundle público do Pages.
+          VITE_APIABERTA_KEY: ${{ secrets.VITE_APIABERTA_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
