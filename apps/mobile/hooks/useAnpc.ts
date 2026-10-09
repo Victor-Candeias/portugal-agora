@@ -20,6 +20,15 @@ export function useAnpcSummary() {
   })
 }
 
+// Comunicados da ANPC (WEB-026), do mais recente para o mais antigo.
+export function useAnpcWarnings() {
+  return useQuery({
+    queryKey: ['anpc', 'warnings'],
+    queryFn: () => anpcClient.getWarnings(),
+    staleTime: 15 * 60 * 1000,
+  })
+}
+
 // Risco de incêndio rural (RCM do IPMA, open-data, sem chave) agregado por distrito (MOB-008).
 export function useFireRisk(day: 0 | 1 = 0) {
   return useQuery({

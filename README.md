@@ -127,7 +127,7 @@ Os ecrãs abaixo existem no web e no mobile, exceto EV e Economia, que no web ai
 | ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
 | 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tarifas de carregamento dos CEME + simulador do custo por carregamento |
-| 🔥 Proteção Civil | Ocorrências ANPC + risco de incêndio por distrito (RCM IPMA) |
+| 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
 | 🏥 Hospitais | Urgências SNS, ordenadas por distância |

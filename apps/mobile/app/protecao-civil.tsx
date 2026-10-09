@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { FIRE_RISK_COLORS, FIRE_RISK_LABELS, formatDate, type AnpcIncident } from '@portugal-hoje/core'
-import { useAnpcIncidents, useAnpcSummary, useFireRisk } from '../hooks/useAnpc'
+import {
+  FIRE_RISK_COLORS,
+  FIRE_RISK_LABELS,
+  formatAnpcWarningDate,
+  formatDate,
+  type AnpcIncident,
+} from '@portugal-hoje/core'
+import { useAnpcIncidents, useAnpcSummary, useAnpcWarnings, useFireRisk } from '../hooks/useAnpc'
 import { PointsMap, SinglePointMap, type MapPoint } from '../components/PointsMap'
 import {
   Badge,
@@ -19,6 +25,7 @@ import {
 } from '../components/ui'
 
 const PAGE_SIZE = 20
+const WARNINGS_STEP = 5
 
 const TYPE_EMOJI: Record<string, string> = {
   'Mato': '🔥',
@@ -51,6 +58,7 @@ export default function ProtecaoCivil() {
   const incidents = useAnpcIncidents()
   const summary = useAnpcSummary()
   const fireRisk = useFireRisk()
+  const warnings = useAnpcWarnings()
 
   const [district, setDistrict] = useState<string | null>(null)
   const [type, setType] = useState<string | null>(null)
@@ -108,6 +116,7 @@ export default function ProtecaoCivil() {
           void incidents.refetch()
           void summary.refetch()
           void fireRisk.refetch()
+          void warnings.refetch()
         }}
         refreshing={incidents.isFetching}
       />
@@ -147,6 +156,8 @@ export default function ProtecaoCivil() {
       )}
 
       <FireRiskCard query={fireRisk} />
+
+      <WarningsCard query={warnings} />
 
       {(summary.data?.by_district?.length ?? 0) > 0 && (
         <Card>
@@ -239,6 +250,28 @@ function FireRiskCard({ query }: { query: ReturnType<typeof useFireRisk> }) {
   )
 }
 
+// Comunicados da ANPC via API Aberta (WEB-026), do mais recente para o mais antigo.
+function WarningsCard({ query }: { query: ReturnType<typeof useAnpcWarnings> }) {
+  const [shown, setShown] = useState(WARNINGS_STEP)
+  const items = query.data?.data ?? []
+  return (
+    <Card>
+      <SectionTitle>📢 Comunicados da Proteção Civil</SectionTitle>
+      {query.isLoading && <LoadingView color="#ea580c" />}
+      {query.isError && <ErrorView error={query.error} onRetry={() => void query.refetch()} />}
+      {query.isSuccess && items.length === 0 && <EmptyText>Sem comunicados.</EmptyText>}
+      {items.slice(0, shown).map(w => (
+        <View key={w.id} style={styles.warning}>
+          <Text style={uiStyles.small}>🕒 {formatAnpcWarningDate(w)}</Text>
+          <Text style={styles.warningText}>{w.text}</Text>
+        </View>
+      ))}
+      <ShowMore shown={shown} total={items.length} onPress={() => setShown(s => s + WARNINGS_STEP)} />
+      <Text style={[uiStyles.small, styles.warningSource]}>Fonte: ANEPC via fogos.pt (API Aberta)</Text>
+    </Card>
+  )
+}
+
 function IncidentRow({ incident: inc }: { incident: AnpcIncident }) {
   const [showMap, setShowMap] = useState(false)
   const colors = statusColors(inc.status)
@@ -291,6 +324,9 @@ const styles = StyleSheet.create({
   riskDot: { width: 10, height: 10, borderRadius: 5 },
   riskDistrict: { flex: 1, fontSize: 12, color: '#334155' },
   riskLevel: { fontSize: 11, fontWeight: '700' },
+  warning: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  warningText: { fontSize: 13, color: '#334155', marginTop: 4, lineHeight: 18 },
+  warningSource: { marginTop: 8, color: '#94a3b8' },
   incident: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   incidentRow: { flexDirection: 'row', gap: 10 },
   incidentEmoji: { fontSize: 22 },

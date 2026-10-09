@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import { formatAnpcWarningDate } from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
-import { LoadingBox, ErrorBox } from '@/components/Feedback'
+import { LoadingBox, ErrorBox, Spinner } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
 import { SinglePointMap } from '@/components/SinglePointMap'
-import { useAnpcIncidents, useAnpcSummary } from '@/hooks/useANPC'
+import { useAnpcIncidents, useAnpcSummary, useAnpcWarnings } from '@/hooks/useANPC'
 
 const PAGE_SIZE = 20
+const WARNINGS_STEP = 5
 
 const TYPE_EMOJI: Record<string, string> = {
   'Mato':                   '🔥',
@@ -43,6 +45,7 @@ function formatTime(iso: string) {
 export function ProtecaoCivil() {
   const { data: incidents, isLoading: incLoading, isError: incError, error: incErr, refetch } = useAnpcIncidents()
   const { data: summary, isLoading: sumLoading } = useAnpcSummary()
+  const warnings = useAnpcWarnings()
 
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -78,7 +81,7 @@ export function ProtecaoCivil() {
           </p>
         </div>
         <button
-          onClick={() => refetch()}
+          onClick={() => { void refetch(); void warnings.refetch() }}
           className="text-sm bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 transition-colors"
         >
           Atualizar
@@ -115,6 +118,8 @@ export function ProtecaoCivil() {
           </div>
         </Card>
       )}
+
+      <AnpcWarningsCard query={warnings} />
 
       {/* Summary by district */}
       {(summary?.by_district?.length ?? 0) > 0 && (
@@ -259,5 +264,46 @@ export function ProtecaoCivil() {
         </Card>
       )}
     </div>
+  )
+}
+
+// Comunicados da ANPC via API Aberta (WEB-026), do mais recente para o mais antigo.
+function AnpcWarningsCard({ query }: { query: ReturnType<typeof useAnpcWarnings> }) {
+  const [shown, setShown] = useState(WARNINGS_STEP)
+  const items = query.data?.data ?? []
+
+  return (
+    <Card>
+      <CardTitle>📢 Comunicados da Proteção Civil</CardTitle>
+      {query.isLoading && (
+        <div className="flex justify-center py-4">
+          <Spinner />
+        </div>
+      )}
+      {query.isError && <p className="text-sm text-red-600">Não foi possível carregar os comunicados da ANPC.</p>}
+      {query.isSuccess && items.length === 0 && <p className="text-sm text-slate-500">Sem comunicados.</p>}
+      {items.length > 0 && (
+        <ul className="divide-y divide-slate-100">
+          {items.slice(0, shown).map(w => (
+            <li key={w.id} className="py-3">
+              <p className="text-xs text-slate-500 mb-1">🕒 {formatAnpcWarningDate(w)}</p>
+              <p className="text-sm text-slate-700 whitespace-pre-line break-words">{w.text}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-center justify-between mt-3">
+        <p className="text-xs text-slate-400">Fonte: ANEPC via fogos.pt (API Aberta)</p>
+        {shown < items.length && (
+          <button
+            type="button"
+            onClick={() => setShown(s => s + WARNINGS_STEP)}
+            className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+          >
+            Ver mais ({items.length - shown})
+          </button>
+        )}
+      </div>
+    </Card>
   )
 }
