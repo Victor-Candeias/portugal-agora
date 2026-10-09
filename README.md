@@ -132,7 +132,7 @@ Os ecrãs abaixo existem no web e no mobile.
 
 | Ecrã | Dados |
 |---|---|
-| ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
+| ⛽ Combustível | Preços DGEG por distrito/município e tipo. Com localização: seletor Preço/Distância, raio de 10/25/50 km/Todos e distância a cada posto |
 | 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tarifas de carregamento dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |

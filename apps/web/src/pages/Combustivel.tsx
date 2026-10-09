@@ -11,6 +11,15 @@ import { formatPrice, FUEL_LABELS, FUEL_COLORS, type FuelType } from '@portugal-
 const FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel', 'diesel_plus', 'lpg']
 const PAGE_SIZE = 20
 
+// Igual ao mobile (MOB-010): seletor Preço/Distância e raio 10/25/50 km/Todos, 25 km por omissão.
+type SortBy = 'price' | 'distance'
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: 'price', label: '💶 Preço' },
+  { value: 'distance', label: '🧭 Distância' },
+]
+const RADIUS_OPTIONS = [10, 25, 50]
+const DEFAULT_RADIUS_KM = 25
+
 type UserLocation = {
   latitude: number
   longitude: number
@@ -28,6 +37,10 @@ function distanceKm(from: UserLocation, to: { Latitude: number; Longitude: numbe
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+function hasCoords(s: { Latitude: number; Longitude: number }) {
+  return Number.isFinite(s.Latitude) && Number.isFinite(s.Longitude) && !(s.Latitude === 0 && s.Longitude === 0)
+}
+
 export function Combustivel() {
   const [fuelType, setFuelType] = useState<FuelType>('gasoline_95')
   const [districtId, setDistrictId] = useState<number | undefined>(11) // Lisboa por defeito
@@ -42,12 +55,30 @@ export function Combustivel() {
   const { data: municipalities } = useMunicipalities(districtId)
   const { data: stations = [], isLoading, isError, error } = useFuelPrices(fuelType, districtId, municipalityId)
 
+  const [sortBy, setSortBy] = useState<SortBy>('price')
+  const [radiusKm, setRadiusKm] = useState<number | null>(DEFAULT_RADIUS_KM)
+
+  const effectiveSort: SortBy = userLocation ? sortBy : 'price'
+  const radiusActive = Boolean(userLocation) && radiusKm !== null
+
   const sortedStations = useMemo(() => {
-    if (!userLocation) return stations
-    return [...stations].sort(
-      (a, b) => distanceKm(userLocation, a) - distanceKm(userLocation, b),
+    const withDist = stations.map(s => ({
+      ...s,
+      distKm: userLocation && hasCoords(s) ? distanceKm(userLocation, s) : null,
+    }))
+    // O raio é aplicado no cliente para não paginar os postos do país inteiro.
+    const inRadius = userLocation && radiusKm !== null
+      ? withDist.filter(s => s.distKm !== null && s.distKm <= radiusKm)
+      : withDist
+    const byDistance = (a: typeof withDist[number], b: typeof withDist[number]) =>
+      (a.distKm ?? Infinity) - (b.distKm ?? Infinity)
+    const byPrice = (a: typeof withDist[number], b: typeof withDist[number]) => a.price_eur - b.price_eur
+    return inRadius.sort(
+      effectiveSort === 'distance'
+        ? (a, b) => byDistance(a, b) || byPrice(a, b)
+        : (a, b) => byPrice(a, b) || byDistance(a, b),
     )
-  }, [stations, userLocation])
+  }, [stations, userLocation, radiusKm, effectiveSort])
 
   const minPrice = sortedStations.length ? Math.min(...sortedStations.map(s => s.price_eur)) : undefined
   const maxPrice = sortedStations.length ? Math.max(...sortedStations.map(s => s.price_eur)) : undefined
@@ -76,6 +107,8 @@ export function Combustivel() {
           longitude: position.coords.longitude,
         })
         setLocationStatus('granted')
+        setSortBy('distance')
+        setPage(1)
         setDistrictId(undefined)
         setDistrictName('perto de si')
         setMunicipalityId(undefined)
@@ -177,6 +210,44 @@ export function Combustivel() {
             )}
           </div>
         </div>
+        {userLocation && (
+          <div className="flex flex-wrap gap-6 mt-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Ordenar por</label>
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+                {SORT_OPTIONS.map(o => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { setSortBy(o.value); setPage(1) }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      sortBy === o.value ? 'bg-white text-slate-900 shadow' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Raio</label>
+              <div className="flex flex-wrap gap-2">
+                {[null, ...RADIUS_OPTIONS].map(r => (
+                  <button
+                    key={r ?? 'all'}
+                    type="button"
+                    onClick={() => { setRadiusKm(r); setPage(1) }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      radiusKm === r ? 'bg-green-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {r === null ? 'Todos' : `${r} km`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Summary stats */}
@@ -200,8 +271,9 @@ export function Combustivel() {
       {/* List */}
       <Card>
         <CardTitle>
-          Postos ordenados por preço — {FUEL_LABELS[fuelType]}
+          Postos ordenados por {effectiveSort === 'distance' ? 'distância' : 'preço'} — {FUEL_LABELS[fuelType]}
           {districtName ? ` · ${districtName}` : ''}
+          {radiusActive ? ` · até ${radiusKm} km` : ''}
           {sortedStations.length > 0 ? ` (${sortedStations.length})` : ''}
         </CardTitle>
         {isLoading && <LoadingBox />}
@@ -210,17 +282,26 @@ export function Combustivel() {
           <>
             <div className="divide-y divide-slate-100">
               {sortedStations.length === 0 && (
-                <p className="text-slate-500 text-sm py-6 text-center">Nenhum resultado encontrado.</p>
+                <p className="text-slate-500 text-sm py-6 text-center">
+                  {radiusActive && stations.length > 0
+                    ? `Nenhum posto a menos de ${radiusKm} km. Aumente o raio.`
+                    : 'Nenhum resultado encontrado.'}
+                </p>
               )}
               {pageStations.map((s, i) => {
                 const globalIndex = (page - 1) * PAGE_SIZE + i
                 const showMap = mapStationId === s.Id
+                const isCheapest = minPrice !== undefined && s.price_eur === minPrice
+                // Em Distância, a posição fica a azul e o mais barato é assinalado pelo preço a verde.
+                const rankColor = effectiveSort === 'distance'
+                  ? (globalIndex === 0 ? '#2563eb' : globalIndex < 3 ? '#60a5fa' : '#94a3b8')
+                  : (globalIndex === 0 ? '#16a34a' : globalIndex < 3 ? '#65a30d' : '#94a3b8')
                 return (
                 <div key={s.Id} className="py-3">
                   <div className="flex items-center gap-3">
                     <span
                       className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                      style={{ backgroundColor: globalIndex === 0 ? '#16a34a' : globalIndex === 1 ? '#65a30d' : '#94a3b8' }}
+                      style={{ backgroundColor: rankColor }}
                     >
                       {globalIndex + 1}
                     </span>
@@ -231,20 +312,23 @@ export function Combustivel() {
                         <MapPin size={11} />
                         {s.Morada} · {s.Municipio}, {s.Distrito}
                       </p>
-                      {userLocation && (
-                        <p className="text-xs text-green-700 font-medium mt-0.5">
-                          {distanceKm(userLocation, s).toFixed(1)} km de distância
+                      {s.distKm !== null && (
+                        <p className="text-xs text-blue-600 font-medium mt-0.5">
+                          🧭 {s.distKm.toFixed(1)} km de distância
                         </p>
                       )}
                     </div>
                     <div className="text-right flex-shrink-0 min-w-[90px]">
                       <p
                         className="text-lg font-bold tabular-nums"
-                        style={{ color: globalIndex === 0 ? '#16a34a' : '#0f172a' }}
+                        style={{ color: isCheapest ? '#16a34a' : '#0f172a' }}
                       >
                         {formatPrice(s.price_eur)}
                       </p>
-                      {minPrice && globalIndex > 0 && (
+                      {isCheapest && effectiveSort === 'distance' && (
+                        <p className="text-xs text-green-700 font-semibold">mais barato</p>
+                      )}
+                      {minPrice !== undefined && s.price_eur > minPrice && (
                         <p className="text-xs text-red-500 tabular-nums">
                           +{formatPrice(s.price_eur - minPrice)}
                         </p>
