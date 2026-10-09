@@ -16,6 +16,9 @@ class MainMenuScreen(carContext: CarContext) : Screen(carContext) {
             .addItem(menuRow("🏥 Hospitais SNS") { screenManager.push(HospitaisScreen(carContext)) })
             .addItem(menuRow("🌤️ Tempo") { screenManager.push(TempoScreen(carContext)) })
             .addItem(menuRow("🚆 Transportes CP") { screenManager.push(TransportesScreen(carContext)) })
+            .addItem(menuRow("⚡ Carregamento EV") { screenManager.push(EvScreen(carContext)) })
+            .addItem(menuRow("🏖️ Turismo") { screenManager.push(TurismoScreen(carContext)) })
+            .addItem(menuRow("👮 Serviços Públicos") { screenManager.push(ServicosPublicosScreen(carContext)) })
             .build()
 
         return ListTemplate.Builder()

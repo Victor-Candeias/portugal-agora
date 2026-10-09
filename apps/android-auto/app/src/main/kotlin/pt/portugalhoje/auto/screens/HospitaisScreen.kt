@@ -18,10 +18,9 @@ import kotlinx.coroutines.withContext
 import pt.portugalhoje.auto.api.SnsApi
 import pt.portugalhoje.auto.api.SnsHospitalRecord
 import pt.portugalhoje.auto.utils.LocationHelper
-import java.util.Locale
+import pt.portugalhoje.auto.utils.distanceText
 
 class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
-    private val locale = Locale("pt", "PT")
     private var requested = false
     private var loading = true
     private var hospitals: List<HospitalWithDistance> = emptyList()
@@ -60,9 +59,23 @@ class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
                 addItem(
                     Row.Builder()
                         .setTitle(h.hospital.nome_do_servico_de_urgencia)
-                        .addText("${formatDistance(h.distanceKm)} · ${h.hospital.tipo_de_urgencia}")
+                        .addText(distanceText(h.distanceKm, h.hospital.tipo_de_urgencia))
                         .addText(h.hospital.localidade)
                         .setMetadata(Metadata.Builder().setPlace(place).build())
+                        .setOnClickListener {
+                            screenManager.push(
+                                PlaceDetailScreen(
+                                    carContext,
+                                    title = "Hospitais SNS",
+                                    name = h.hospital.nome_do_servico_de_urgencia,
+                                    latitude = lat,
+                                    longitude = lon,
+                                    distanceKm = h.distanceKm,
+                                    detail = h.hospital.tipo_de_urgencia,
+                                    extraText = h.hospital.localidade,
+                                ),
+                            )
+                        }
                         .build(),
                 )
             }
@@ -71,7 +84,7 @@ class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
         return PlaceListMapTemplate.Builder()
             .setTitle("Hospitais SNS")
             .setHeaderAction(Action.BACK)
-            .setCurrentLocationEnabled(true)
+            .setCurrentLocationEnabled(LocationHelper.hasPermission(carContext))
             .setItemList(itemList)
             .build()
     }
@@ -110,8 +123,6 @@ class HospitaisScreen(carContext: CarContext) : Screen(carContext) {
             invalidate()
         }
     }
-
-    private fun formatDistance(km: Double) = String.format(locale, "%.1f km", km)
 
     private data class HospitalWithDistance(val hospital: SnsHospitalRecord, val distanceKm: Double)
 

@@ -22,6 +22,8 @@ App nativa Kotlin para Android Auto que expõe as principais secções do Portug
 - 🌤️ Tempo — previsão para a cidade IPMA mais próxima
 - 🚆 Transportes — comboios CP com atrasos
 
+> Secções acrescentadas depois: ⚡ Carregamento EV, 🏖️ Turismo e 👮 Serviços Públicos — ver [mob-013-spec](mob-013-spec.md).
+
 **Stack:** Kotlin · Car App Library 1.4+ · OkHttp · Gson · Coroutines · Fused Location Provider
 
 ## Implementation
@@ -50,7 +52,7 @@ App nativa Kotlin para Android Auto que expõe as principais secções do Portug
 
 ### Fase 5 — APIs
 - `AnpcApi` — https://api.apiaberta.pt/v1/anpc/incidents
-- `DgegApi` — https://precoscombustiveis.dgeg.gov.pt/api/PrecoComb/ListarPostos
+- `DgegApi` — https://precoscombustiveis.dgeg.gov.pt/api/PrecoComb/PesquisarPostos (o antigo `ListarPostos` deixou de existir; ver MOB-012)
 - `SnsApi` — transparencia.sns.gov.pt
 - `IpmaApi` — https://api.ipma.pt
 - `ComboiosApi` — https://comboios.live/api/vehicles

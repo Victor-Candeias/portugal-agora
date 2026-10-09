@@ -28,6 +28,9 @@ status: active
 | MOB-009 | Mobile: novo ícone e splash (Portugal_Agora.png) + APK de release com nome e versão | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | MOB-010 | Combustível (mobile): ordenar postos pela localização do utilizador, com seletor Preço/Distância | done | 2026-10-09 | developer | high | 2026-10-09 |  |  |  |
 | MOB-011 | Tempo (mobile): cidade IPMA mais próxima e tempo atual pela localização do utilizador | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
+| MOB-012 | Android Auto: corrigir crashes no DHU (MAP_TEMPLATES, DistanceSpan, localização, endpoint DGEG) | done | 2026-10-09 | developer | high | 2026-10-09 |  |  |  |
+| MOB-013 | Android Auto: secções EV, Turismo e Serviços Públicos | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [MOB-013](../specs/mobile/mob-013-spec.md) |
+| MOB-014 | Android Auto: detalhe do local no mapa + navegar até ao destino | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [MOB-014](../specs/mobile/mob-014-spec.md) |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |
 | WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |

@@ -18,10 +18,9 @@ import kotlinx.coroutines.withContext
 import pt.portugalhoje.auto.api.DgegApi
 import pt.portugalhoje.auto.api.DgegStation
 import pt.portugalhoje.auto.utils.LocationHelper
-import java.util.Locale
+import pt.portugalhoje.auto.utils.distanceText
 
 class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
-    private val locale = Locale("pt", "PT")
     private var requested = false
     private var loading = true
     private var stations: List<StationWithDistance> = emptyList()
@@ -60,9 +59,23 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
                 addItem(
                     Row.Builder()
                         .setTitle(s.station.Nome.ifBlank { s.station.Marca })
-                        .addText("${formatDistance(s.distanceKm)} · ${s.station.Preco}")
+                        .addText(distanceText(s.distanceKm, s.station.Preco))
                         .addText("${s.station.Municipio}, ${s.station.Distrito}")
                         .setMetadata(Metadata.Builder().setPlace(place).build())
+                        .setOnClickListener {
+                            screenManager.push(
+                                PlaceDetailScreen(
+                                    carContext,
+                                    title = "Combustível",
+                                    name = s.station.Nome.ifBlank { s.station.Marca },
+                                    latitude = s.station.Latitude,
+                                    longitude = s.station.Longitude,
+                                    distanceKm = s.distanceKm,
+                                    detail = s.station.Preco,
+                                    extraText = "${s.station.Municipio}, ${s.station.Distrito}",
+                                ),
+                            )
+                        }
                         .build(),
                 )
             }
@@ -71,7 +84,7 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
         return PlaceListMapTemplate.Builder()
             .setTitle("Combustível")
             .setHeaderAction(Action.BACK)
-            .setCurrentLocationEnabled(true)
+            .setCurrentLocationEnabled(LocationHelper.hasPermission(carContext))
             .setItemList(itemList)
             .build()
     }
@@ -108,8 +121,6 @@ class CombustivelScreen(carContext: CarContext) : Screen(carContext) {
             invalidate()
         }
     }
-
-    private fun formatDistance(km: Double) = String.format(locale, "%.1f km", km)
 
     private data class StationWithDistance(val station: DgegStation, val distanceKm: Double)
 

@@ -18,17 +18,14 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 object LocationHelper {
-    suspend fun getLocation(context: Context): Location? {
-        val fineGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
+    fun hasPermission(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
-        if (!fineGranted && !coarseGranted) {
+    suspend fun getLocation(context: Context): Location? {
+        if (!hasPermission(context)) {
             return null
         }
 

@@ -50,12 +50,20 @@ O build de release é assinado apenas se estas variáveis estiverem definidas
    adb forward tcp:5277 tcp:5277
    $ANDROID_HOME/extras/google/auto/desktop-head-unit
    ```
-5. Valide as 5 secções:
+5. Valide as 8 secções:
    - Proteção Civil
    - Combustível
    - Hospitais SNS
    - Tempo
    - Transportes CP
+   - Carregamento EV (tarifas por CEME para 10/20/30/50 kWh)
+   - Turismo (SIGTUR, ICNF e UNESCO a 25 km, por categoria)
+   - Serviços Públicos (esquadras/postos de polícia mais próximos; o `.sqlite` é descarregado na 1.ª vez)
+
+   Nos ecrãs com mapa (Combustível, Hospitais, Turismo, Serviços Públicos), tocar num item abre o
+   detalhe com o mapa centrado nesse local; **Navegar** entrega o destino à app de navegação
+   (Google Maps/Waze), que calcula a rota a partir da posição atual. Apps POI não podem desenhar rotas.
+   Para voltar do Maps à app, toque no ícone da app na barra: o ecrã de detalhe mantém-se.
 
 ## Publicação no Google Play
 

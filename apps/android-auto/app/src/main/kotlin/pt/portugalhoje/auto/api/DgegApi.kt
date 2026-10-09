@@ -1,20 +1,22 @@
 package pt.portugalhoje.auto.api
 
+import java.io.IOException
+
 object DgegApi {
-    private const val URL = "https://precoscombustiveis.dgeg.gov.pt/api/PrecoComb/ListarPostos?idsTiposComb=3201&qtdPorPagina=50&pagina=1"
+    private const val URL = "https://precoscombustiveis.dgeg.gov.pt/api/PrecoComb/PesquisarPostos?idsTiposComb=3201&qtdPorPagina=9999&pagina=1"
 
     suspend fun getStations(): List<DgegStation> {
         val json = ApiClient.get(URL)
-        return ApiClient.gson.fromJson(json, DgegResponse::class.java).resultado?.items.orEmpty()
+        val response = ApiClient.gson.fromJson(json, DgegResponse::class.java)
+        if (!response.status) throw IOException(response.mensagem ?: "Erro na API da DGEG")
+        return response.resultado.orEmpty()
     }
 }
 
 data class DgegResponse(
-    val resultado: DgegResult? = null,
-)
-
-data class DgegResult(
-    val items: List<DgegStation>? = emptyList(),
+    val status: Boolean = false,
+    val mensagem: String? = null,
+    val resultado: List<DgegStation>? = emptyList(),
 )
 
 data class DgegStation(
