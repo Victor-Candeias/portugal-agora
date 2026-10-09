@@ -1,9 +1,14 @@
-import { ScrollView, View, Text, StyleSheet } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { router } from 'expo-router'
 import { useFuelPrices } from '../../hooks/useApi'
 import { useWeatherForecast } from '../../hooks/useApi'
-import { useCivilProtectionAlerts } from '../../hooks/useApi'
 import { useInterestRates } from '../../hooks/useApi'
+import { useAnpcSummary } from '../../hooks/useAnpc'
+import { SECTIONS } from '../../lib/sections'
 import { formatPrice } from '@portugal-hoje/core'
+
+// Os hrefs vêm de lib/sections.ts e coincidem com ficheiros em app/; as rotas tipadas não estão ativas.
+const go = (href: string) => router.push(href as never)
 
 function SummaryCard({
   emoji,
@@ -11,42 +16,51 @@ function SummaryCard({
   value,
   subtitle,
   color = '#16a34a',
+  href,
 }: {
   emoji: string
   title: string
   value: string
   subtitle?: string
   color?: string
+  href?: string
 }) {
   return (
-    <View style={[styles.card, { borderLeftColor: color, borderLeftWidth: 4 }]}>
+    <TouchableOpacity
+      activeOpacity={href ? 0.7 : 1}
+      disabled={!href}
+      onPress={href ? () => go(href) : undefined}
+      style={[styles.card, { borderLeftColor: color, borderLeftWidth: 4 }]}
+    >
       <Text style={styles.cardEmoji}>{emoji}</Text>
       <Text style={styles.cardTitle}>{title}</Text>
       <Text style={[styles.cardValue, { color }]}>{value}</Text>
       {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
-    </View>
+    </TouchableOpacity>
   )
 }
 
 export default function Dashboard() {
   const { data: fuelData } = useFuelPrices('gasoline_95')
   const { data: weatherData } = useWeatherForecast('1110600')
-  const { data: alertsData } = useCivilProtectionAlerts()
+  const { data: anpcData } = useAnpcSummary()
   const { data: ratesData } = useInterestRates()
 
   const cheapest = fuelData?.[0]
   const today = weatherData?.data[0]
-  const alerts = alertsData?.data ?? []
+  const activeIncidents = anpcData?.total_active ?? 0
+  const topDistrict = anpcData?.by_district?.[0]
   const euribor = ratesData?.data.find(r => r.type.includes('3m') || r.type.includes('3M'))
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {alerts.some(a => a.severity === 'high' || a.severity === 'extreme') && (
-        <View style={styles.alertBanner}>
+      {activeIncidents > 0 && (
+        <TouchableOpacity style={styles.alertBanner} activeOpacity={0.8} onPress={() => go('/protecao-civil')}>
           <Text style={styles.alertText}>
-            ⚠️ {alerts[0].title} — {alerts[0].district}
+            ⚠️ {activeIncidents} {activeIncidents === 1 ? 'ocorrência ativa' : 'ocorrências ativas'}
+            {topDistrict ? ` — mais em ${topDistrict.district} (${topDistrict.count})` : ''} ›
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       <Text style={styles.greeting}>Bom dia, Portugal 🇵🇹</Text>
@@ -76,10 +90,25 @@ export default function Dashboard() {
         />
         <SummaryCard
           emoji="🔥"
-          title="Alertas ANPC"
-          value={alerts.length > 0 ? `${alerts.length} alertas` : 'Sem alertas'}
-          color={alerts.length > 0 ? '#ef4444' : '#16a34a'}
+          title="Ocorrências ANPC"
+          value={!anpcData ? '—' : activeIncidents > 0 ? `${activeIncidents} ativas` : 'Sem ocorrências'}
+          subtitle="Proteção Civil"
+          color={activeIncidents > 0 ? '#ef4444' : '#16a34a'}
+          href="/protecao-civil"
         />
+      </View>
+
+      <Text style={styles.sectionTitle}>Todas as secções</Text>
+      <View style={styles.sections}>
+        {SECTIONS.map(s => (
+          <TouchableOpacity key={s.href} style={styles.section} activeOpacity={0.7} onPress={() => go(s.href)}>
+            <View style={[styles.sectionIcon, { backgroundColor: `${s.color}1a` }]}>
+              <Text style={styles.sectionEmoji}>{s.emoji}</Text>
+            </View>
+            <Text style={styles.sectionName} numberOfLines={1}>{s.title}</Text>
+            <Text style={styles.sectionDesc} numberOfLines={1}>{s.description}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.statusCard}>
@@ -87,7 +116,7 @@ export default function Dashboard() {
         {[
           { label: 'Combustível', ok: !!fuelData },
           { label: 'Meteorologia', ok: !!weatherData },
-          { label: 'ANPC', ok: !!alertsData },
+          { label: 'ANPC', ok: !!anpcData },
           { label: 'Banco de Portugal', ok: !!ratesData },
         ].map(({ label, ok }) => (
           <View key={label} style={styles.statusRow}>
@@ -127,6 +156,23 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 11, color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   cardValue: { fontSize: 20, fontWeight: '700', marginTop: 4 },
   cardSubtitle: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 10 },
+  sections: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  section: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 10,
+    width: '31%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  sectionEmoji: { fontSize: 20 },
+  sectionName: { fontSize: 12, fontWeight: '600', color: '#1e293b', textAlign: 'center' },
+  sectionDesc: { fontSize: 10, color: '#94a3b8', textAlign: 'center', marginTop: 1 },
   statusCard: {
     backgroundColor: 'white',
     borderRadius: 12,

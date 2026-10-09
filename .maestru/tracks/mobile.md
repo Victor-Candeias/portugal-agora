@@ -21,7 +21,7 @@ status: active
 | MOB-002 | Mobile: mover lógica partilhável do web para packages/core | done | 2026-10-08 | developer | high | 2026-10-08 |  |  | [MOB-002](../specs/mobile/mob-002-spec.md) |
 | MOB-003 | Mobile: camada SQLite nativa (expo-sqlite) + download/cache dos .sqlite | done | 2026-10-08 | developer | high | 2026-10-08 |  | MOB-001 | [MOB-003](../specs/mobile/mob-003-spec.md) |
 | MOB-004 | Mobile: componente de mapa nativo (react-native-maps) | done | 2026-10-08 | developer | medium | 2026-10-09 |  | MOB-001 | [MOB-004](../specs/mobile/mob-004-spec.md) |
-| MOB-005 | Mobile: ecrãs em falta (Proteção Civil, Hospitais, Transportes, Metro Porto, Serviços Públicos, Código Postal) | backlog | 2026-10-08 | developer | high |  |  | MOB-002, MOB-003, MOB-004 |  |
+| MOB-005 | Mobile: ecrãs em falta (Proteção Civil, Hospitais, Transportes, Metro Porto, Serviços Públicos, Código Postal) | done | 2026-10-08 | developer | high | 2026-10-09 |  | MOB-002, MOB-003, MOB-004 | [MOB-005](../specs/mobile/mob-005-spec.md) |
 | MOB-006 | Android Auto: corrigir manifest, HostValidator, signing e targetSdk | done | 2026-10-08 | developer | high | 2026-10-08 |  |  | [MOB-006](../specs/mobile/mob-006-spec.md) |
 | MOB-007 | Mobile: CI de build Android + publicação em teste interno no Google Play | done | 2026-10-08 | developer | medium | 2026-10-09 |  | MOB-001 | [MOB-007](../specs/mobile/mob-007-spec.md) |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |

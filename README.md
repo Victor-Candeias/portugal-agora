@@ -92,15 +92,32 @@ marcador mostra o nome e "🧭 Direções", que abre o Google Maps nativo (ou o 
 universal de direções (`apps/mobile/lib/maps.ts`). Como é um módulo nativo, depois de o instalar é
 preciso refazer o development build (`pnpm android`).
 
+### Navegação no mobile
+
+A raiz (`apps/mobile/app/_layout.tsx`) é um `Stack`. As tabs (Início, Combustível, Tempo, EV, Economia,
+Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Hospitais, Transportes (CP,
+Carris, TML), Metro do Porto, Serviços Públicos e Código Postal — são rotas da stack (`app/*.tsx`) e abrem
+a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
+risco de incêndio da Proteção Civil exige `EXPO_PUBLIC_APIABERTA_KEY`; sem chave, o ecrã mostra-o como
+indisponível e as ocorrências ANPC continuam a funcionar.
+
 ## Funcionalidades
+
+Os ecrãs abaixo existem no web e no mobile.
 
 | Ecrã | Dados |
 |---|---|
 | ⛽ Combustível | Preços DGEG — ordenados por custo, filtro por distrito/tipo |
 | 🌤️ Tempo | Previsão 5 dias IPMA + observação em tempo real |
 | ⚡ EV | Postos MOBI.E com estado livre/ocupado em tempo real |
-| 🔥 Proteção Civil | Alertas ANPC + mapa de risco de incêndio por distrito |
+| 🔥 Proteção Civil | Ocorrências ANPC + risco de incêndio por distrito |
 | 📊 Economia | Indicadores INE + taxas BdP (Euribor, BCE) |
+| 🏖️ Turismo | Pontos de interesse perto de ti |
+| 🏥 Hospitais | Urgências SNS, ordenadas por distância |
+| 🚆 Transportes | Comboios CP, Carris (veículos, linhas, paragens, alertas) e alertas TML |
+| 🚇 Metro do Porto | Estações, linhas e próximas partidas |
+| 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
+| 📮 Código Postal | Distrito/concelho/localidade, artérias e mapa (geoapi.pt) |
 
 ## Build para produção
 

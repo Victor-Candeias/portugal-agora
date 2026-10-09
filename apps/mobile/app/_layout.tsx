@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Tabs } from 'expo-router'
+import { Stack } from 'expo-router'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { Text } from 'react-native'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -9,62 +8,28 @@ const queryClient = new QueryClient({
   },
 })
 
+// Stack raiz: as 6 tabs ficam no grupo `(tabs)` e as restantes secções abrem por cima, com botão
+// Voltar (12 secções não cabem numa barra de tabs). A grelha "Todas as secções" do Início liga a todas.
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <Tabs
+        <Stack
           screenOptions={{
-            tabBarActiveTintColor: '#16a34a',
-            tabBarStyle: { borderTopColor: '#e2e8f0' },
             headerStyle: { backgroundColor: '#ffffff' },
             headerTintColor: '#16a34a',
+            headerTitleStyle: { color: '#0f172a' },
+            contentStyle: { backgroundColor: '#f8fafc' },
           }}
         >
-          <Tabs.Screen
-            name="(tabs)/index"
-            options={{
-              title: 'Início',
-              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏠</Text>,
-              headerTitle: '🇵🇹 Portugal Hoje',
-            }}
-          />
-          <Tabs.Screen
-            name="(tabs)/combustivel"
-            options={{
-              title: 'Combustível',
-              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⛽</Text>,
-            }}
-          />
-          <Tabs.Screen
-            name="(tabs)/tempo"
-            options={{
-              title: 'Tempo',
-              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🌤️</Text>,
-            }}
-          />
-          <Tabs.Screen
-            name="(tabs)/ev"
-            options={{
-              title: 'EV',
-              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⚡</Text>,
-            }}
-          />
-          <Tabs.Screen
-            name="(tabs)/economia"
-            options={{
-              title: 'Economia',
-              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📊</Text>,
-            }}
-          />
-          <Tabs.Screen
-            name="(tabs)/turismo"
-            options={{
-              title: 'Turismo',
-              tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏖️</Text>,
-            }}
-          />
-        </Tabs>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="protecao-civil" options={{ title: 'Proteção Civil' }} />
+          <Stack.Screen name="hospitais" options={{ title: 'Hospitais' }} />
+          <Stack.Screen name="transportes" options={{ title: 'Transportes' }} />
+          <Stack.Screen name="metro-porto" options={{ title: 'Metro do Porto' }} />
+          <Stack.Screen name="servicos-publicos" options={{ title: 'Serviços Públicos' }} />
+          <Stack.Screen name="codigo-postal" options={{ title: 'Código Postal' }} />
+        </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>
   )
