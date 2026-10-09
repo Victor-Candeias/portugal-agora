@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Image } from 'react-native'
 import * as Location from 'expo-location'
 import { useTourismPoints, useWikidataEnrichment } from '../../hooks/useApi'
+import { PointsMap, SinglePointMap, type MapPoint } from '../../components/PointsMap'
+import { openDirections } from '../../lib/maps'
 
 const CATEGORY_LABEL: Record<string, string> = {
   'health-wellness': 'Saúde e Bem-Estar',
@@ -44,6 +46,16 @@ export default function Turismo() {
   }, [])
 
   const { data: points = [], isLoading, refetch } = useTourismPoints(coords?.latitude, coords?.longitude)
+  const mapPoints = useMemo<MapPoint[]>(
+    () => points.map(p => ({
+      id: p.id,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      label: p.name,
+      description: CATEGORY_LABEL[p.category] ?? p.category,
+    })),
+    [points],
+  )
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -69,6 +81,8 @@ export default function Turismo() {
         <Text style={styles.empty}>Sem pontos de interesse encontrados na zona.</Text>
       )}
 
+      {mapPoints.length > 0 && <PointsMap points={mapPoints} height={260} style={styles.overviewMap} />}
+
       {points.map(point => (
         <TourismPointCard key={point.id} point={point} />
       ))}
@@ -91,6 +105,7 @@ type TourismPoint = {
 
 function TourismPointCard({ point }: { point: TourismPoint }) {
   const [showInfo, setShowInfo] = useState(false)
+  const [showMap, setShowMap] = useState(false)
   const { data: enrichment, isLoading: isLoadingInfo, isError: isInfoError } = useWikidataEnrichment(point.name, showInfo)
 
   return (
@@ -121,12 +136,22 @@ function TourismPointCard({ point }: { point: TourismPoint }) {
         <TouchableOpacity onPress={() => setShowInfo(!showInfo)}>
           <Text style={styles.actionText}>{showInfo ? '📖 Ocultar info' : '📖 Saber mais'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}`)}
-        >
+        <TouchableOpacity onPress={() => setShowMap(!showMap)}>
+          <Text style={styles.actionText}>{showMap ? '🗺️ Ocultar mapa' : '🗺️ Mapa'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => openDirections(point.latitude, point.longitude)}>
           <Text style={styles.actionText}>🧭 Direções</Text>
         </TouchableOpacity>
       </View>
+
+      {showMap && (
+        <SinglePointMap
+          latitude={point.latitude}
+          longitude={point.longitude}
+          label={point.name}
+          style={styles.cardMap}
+        />
+      )}
 
       {showInfo && (
         <View style={styles.infoBox}>
@@ -180,6 +205,8 @@ const styles = StyleSheet.create({
   address: { fontSize: 12, color: '#64748b', marginBottom: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   actionText: { fontSize: 12, color: '#2563eb', fontWeight: '600' },
+  overviewMap: { marginBottom: 12 },
+  cardMap: { marginTop: 10 },
   infoBox: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   infoMuted: { fontSize: 12, color: '#94a3b8' },
   infoRow: { flexDirection: 'row', gap: 10 },

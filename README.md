@@ -83,6 +83,15 @@ segundo plano, no máximo a cada 6 h, verifica o ETag do ficheiro publicado; uma
 A origem pode ser alterada com `EXPO_PUBLIC_STATIC_DATA_URL` (por omissão
 `https://victor-candeias.github.io/portugal-agora/data/`).
 
+### Mapas no mobile
+
+`apps/mobile/components/PointsMap.tsx` (`PointsMap` para uma lista de pontos, `SinglePointMap` para um
+só) usa o MapLibre (`@maplibre/maplibre-react-native`) com os mosaicos do OpenStreetMap — os mesmos do
+Leaflet no web — pelo que **não é precisa chave Google Maps** nem conta Google Cloud. Tocar num
+marcador mostra o nome e "🧭 Direções", que abre o Google Maps nativo (ou o browser) com o URL
+universal de direções (`apps/mobile/lib/maps.ts`). Como é um módulo nativo, depois de o instalar é
+preciso refazer o development build (`pnpm android`).
+
 ## Funcionalidades
 
 | Ecrã | Dados |

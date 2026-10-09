@@ -10,6 +10,7 @@
     "plugins": [
       "expo-router",
       "./plugins/withReleaseSigning",
+      "@maplibre/maplibre-react-native",
       [
         "expo-location",
         {

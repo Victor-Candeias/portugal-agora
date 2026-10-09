@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@maplibre/maplibre-react-native": "11.5.0",
     "@portugal-hoje/core": "workspace:*",
     "@tanstack/react-query": "^5.101.2",
     "expo": "~57.0.4",
