@@ -9,7 +9,7 @@ const queryClient = new QueryClient({
 })
 
 // Stack raiz: as 6 tabs ficam no grupo `(tabs)` e as restantes secções abrem por cima, com botão
-// Voltar (12 secções não cabem numa barra de tabs). A grelha "Todas as secções" do Início liga a todas.
+// Voltar (13 secções não cabem numa barra de tabs). A grelha "Todas as secções" do Início liga a todas.
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -29,6 +29,8 @@ export default function RootLayout() {
           <Stack.Screen name="metro-porto" options={{ title: 'Metro do Porto' }} />
           <Stack.Screen name="servicos-publicos" options={{ title: 'Serviços Públicos' }} />
           <Stack.Screen name="codigo-postal" options={{ title: 'Código Postal' }} />
+          <Stack.Screen name="contratos/index" options={{ title: 'Contratos Públicos' }} />
+          <Stack.Screen name="contratos/[id]" options={{ title: 'Contrato' }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

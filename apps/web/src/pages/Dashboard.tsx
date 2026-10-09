@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Fuel, CloudSun, Zap, BarChart3 } from 'lucide-react'
+import { Fuel, CloudSun, Zap, BarChart3, FileText } from 'lucide-react'
 import { Card } from '@/components/Card'
 import { LoadingBox } from '@/components/Feedback'
 import { useFuelPrices } from '@/hooks/useFuel'
@@ -7,8 +7,10 @@ import { useIpmaForecast, useIpmaWarnings } from '@/hooks/useIPMA'
 import { useAnpcSummary } from '@/hooks/useANPC'
 import { useBdpRates } from '@/hooks/useEconomia'
 import { useCheapestEvTariffs } from '@/hooks/useEv'
+import { useBaseContracts } from '@/hooks/useContratos'
 import {
-  formatBdpPeriod, formatPrice, formatRate, FUEL_LABELS, maxWarningLevel, WARNING_LEVEL_LABELS, type FuelType, type WarningLevel,
+  formatBaseDate, formatBdpPeriod, formatContractValue, formatPrice, formatRate, FUEL_LABELS, maxWarningLevel, parseBaseParty,
+  WARNING_LEVEL_LABELS, type FuelType, type WarningLevel,
 } from '@portugal-hoje/core'
 
 const LIVE_FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel']
@@ -32,6 +34,8 @@ export function Dashboard() {
   const { data: warnings } = useIpmaWarnings()
   const { data: rates } = useBdpRates()
   const { data: evCost } = useCheapestEvTariffs(EV_CARD_KWH)
+  // Mesma query da 1.ª página de /contratos (fica em cache ao abrir a secção).
+  const { data: contracts } = useBaseContracts(null, 1)
 
   const fuelMap: Partial<Record<FuelType, typeof fuel95>> = {
     gasoline_95: fuel95,
@@ -45,6 +49,7 @@ export function Dashboard() {
   const ecbDeposit = rates?.data.find(r => r.key === 'ecb_deposit')
   const estr = rates?.data.find(r => r.key === 'estr')
   const cheapestEv = evCost?.data[0]
+  const latestContract = contracts?.data[0]
 
   return (
     <div className="space-y-6">
@@ -170,6 +175,35 @@ export function Dashboard() {
                 </p>
               </div>
               <p className="text-xs text-slate-400 mt-2">Fonte: ERSE/OMIE · sem tarifas OPC/EGME</p>
+            </Card>
+          </Link>
+        )}
+
+        {/* Contratos Públicos (WEB-031) */}
+        {contracts && latestContract && (
+          <Link to="/contratos" className="block mb-4">
+            <Card className="hover:shadow-md transition-shadow bg-slate-50 border-slate-300">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-slate-200">
+                    <FileText size={20} className="text-slate-700" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contratos Públicos · BASE</p>
+                    <p className="text-2xl font-bold text-slate-800 tabular-nums">
+                      {contracts.total.toLocaleString('pt-PT')} <span className="text-sm font-medium text-slate-500">contratos</span>
+                    </p>
+                    <p className="text-sm text-slate-600 truncate">
+                      Mais recente: {latestContract.description || parseBaseParty(latestContract.awarded)?.name || latestContract.id}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 font-medium text-right shrink-0">
+                  {formatContractValue(latestContract.value)}
+                  <br />
+                  <span className="text-slate-400">{formatBaseDate(latestContract.date)}</span>
+                </p>
+              </div>
             </Card>
           </Link>
         )}

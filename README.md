@@ -70,6 +70,7 @@ nenhum valor `demo`).
 | Taxas BCE/€STR/TBA e crédito/depósitos | API Aberta — `/bdp/rates`, `/bdp/lending-rates` | sim |
 | Indicadores de Portugal | API Aberta — `/ine/latest`, `/ine/indicators`, `/ine/stats` (Eurostat; sem `from` a série só começa em 2000) | sim |
 | Focos de calor por satélite (VIIRS/MODIS, Portugal continental, até 7 dias) | API Aberta — `/nasafirms/hotspots` (NASA FIRMS) | sim |
+| Contratos públicos (BASE.gov.pt, ~2,2 M contratos, sincronizados diariamente) | API Aberta — `/base/contracts`, `/base/contracts/search?q=` (`q` obrigatório; sem `pages` na resposta), `/base/contracts/lookup/:id` (id inexistente → 200 com `{ error }`); `limit` ≤ 100 | sim |
 | Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
@@ -116,7 +117,8 @@ preciso refazer o development build (`pnpm android`).
 
 A raiz (`apps/mobile/app/_layout.tsx`) é um `Stack`. As tabs (Início, Combustível, Tempo, EV, Economia,
 Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Hospitais, Transportes (CP,
-Carris, TML), Metro do Porto, Serviços Públicos e Código Postal — são rotas da stack (`app/*.tsx`) e abrem
+Carris, TML), Metro do Porto, Serviços Públicos, Código Postal e Contratos Públicos (`app/contratos/index.tsx`
+e o detalhe `app/contratos/[id].tsx`) — são rotas da stack e abrem
 a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
 risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave).
 
@@ -137,6 +139,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
 | 📮 Código Postal | Distrito/concelho/localidade, artérias (moradas.dev) e mapa aproximado da localidade (Open-Meteo geocoding) |
+| 📑 Contratos Públicos | Contratos do BASE.gov.pt: mais recentes, pesquisa por texto/entidade/NIF e detalhe (preço, data, procedimento, entidade adjudicante e adjudicatário, link para o portal BASE) (resumo no Início, no web) |
 
 ## Build para produção
 

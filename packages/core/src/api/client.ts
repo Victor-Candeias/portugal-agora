@@ -7,6 +7,7 @@ import {
   type NasaFirmsHotspotsResponse,
   type NasaFirmsMeta,
 } from './nasaFirms.js'
+import { BASE_CONTRACTS_MAX_LIMIT, type BaseContract, type BaseContractsPage } from './base.js'
 
 // Limite por página usado nos focos da NASA FIRMS (a API aceita valores acima de 100, o valor por omissão).
 const FIRMS_PAGE_LIMIT = 1000
@@ -273,6 +274,40 @@ export class ApiAbertaClient {
 
   async getNasaFirmsMeta(): Promise<NasaFirmsMeta> {
     return this.get('/nasafirms/meta')
+  }
+
+  // ── BASE (contratos públicos, WEB-031) ────────────────────────────────────
+  /** Contratos mais recentes (por data de celebração). */
+  async getBaseContracts(params?: { page?: number; limit?: number }): Promise<BaseContractsPage> {
+    const limit = Math.min(params?.limit ?? 25, BASE_CONTRACTS_MAX_LIMIT)
+    const res = await this.get<BaseContractsPage>('/base/contracts', { page: params?.page, limit })
+    return { ...res, pages: res.pages ?? Math.ceil(res.total / res.limit) }
+  }
+
+  /** Pesquisa de texto na descrição, na entidade adjudicante e no adjudicatário (inclui NIF). */
+  async searchBaseContracts(params: { q: string; page?: number; limit?: number }): Promise<BaseContractsPage> {
+    const limit = Math.min(params.limit ?? 25, BASE_CONTRACTS_MAX_LIMIT)
+    const res = await this.get<Omit<BaseContractsPage, 'pages'> & { pages?: number }>('/base/contracts/search', {
+      q: params.q,
+      page: params.page,
+      limit,
+    })
+    return { ...res, pages: res.pages ?? Math.ceil(res.total / res.limit) }
+  }
+
+  // Um id inexistente devolve 200 com `{ error }`; aqui passa a 404.
+  async getBaseContract(id: string): Promise<BaseContract> {
+    const res = await this.get<BaseContract & { error?: string }>(`/base/contracts/lookup/${encodeURIComponent(id)}`)
+    if (res.error) throw new ApiError(404, 'Contrato não encontrado')
+    return {
+      id: res.id,
+      description: res.description,
+      contractingEntity: res.contractingEntity,
+      awarded: res.awarded,
+      value: res.value,
+      date: res.date,
+      type: res.type,
+    }
   }
 
   // ── Geo ───────────────────────────────────────────────────────────────────

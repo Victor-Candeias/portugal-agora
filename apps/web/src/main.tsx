@@ -15,6 +15,8 @@ import { CodigoPostal } from '@/pages/CodigoPostal'
 import { Turismo } from '@/pages/Turismo'
 import { MetroPorto } from '@/pages/MetroPorto'
 import { ServicosPublicos } from '@/pages/ServicosPublicos'
+import { Contratos } from '@/pages/Contratos'
+import { ContratoDetalhe } from '@/pages/ContratoDetalhe'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -44,6 +46,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="turismo" element={<Turismo />} />
             <Route path="metro-porto" element={<MetroPorto />} />
             <Route path="servicos-publicos" element={<ServicosPublicos />} />
+            <Route path="contratos" element={<Contratos />} />
+            <Route path="contratos/:id" element={<ContratoDetalhe />} />
           </Route>
         </Routes>
       </HashRouter>
