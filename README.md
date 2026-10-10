@@ -8,7 +8,7 @@ Aplicação web e mobile que agrega dados públicos portugueses via [API Aberta]
 portugal-hoje/
 ├── apps/
 │   ├── web/      # React + Vite + Tailwind (browser / PWA)
-│   └── mobile/   # React Native + Expo (iOS / Android)
+│   └── mobile/   # React Native + Expo (iOS / Android, inclui Android Auto em modules/car-app)
 ├── packages/
 │   └── core/     # Lógica partilhada: API client, tipos, utils
 └── pnpm-workspace.yaml
@@ -128,6 +128,25 @@ risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave)
 Fora do Início, todos os headers têm à direita o botão "🏠 Início"
 (`apps/mobile/components/HomeHeaderButton.tsx`). No web, o header (`apps/web/src/components/Layout.tsx`)
 tem o mesmo botão e o logótipo também leva ao Início.
+
+### Android Auto no mobile
+
+A app mobile (`pt.portugalhoje.app`) também funciona no Android Auto (categoria POI). O Android Auto
+não mostra UI React Native, só templates da Car App Library, por isso o ecrã do carro é nativo (Kotlin)
+no módulo Expo local `apps/mobile/modules/car-app`, incluído por autolinking (sem editar o `android/`
+gerado). O manifest do módulo declara o `CarAppService`, a meta-data `com.google.android.gms.car.application`
+e a permissão `MAP_TEMPLATES`, que o Gradle funde no manifest da app.
+
+- Secções: Proteção Civil, Combustível, Hospitais SNS, Tempo, Transportes CP, Carregamento EV, Turismo e
+  Serviços Públicos; nos ecrãs com mapa, tocar num item abre o detalhe e **Navegar** entrega o destino
+  ao Google Maps/Waze.
+- Chave da API Aberta: a mesma `EXPO_PUBLIC_APIABERTA_KEY` do bundle (do ambiente ou de `apps/mobile/.env`),
+  injetada em `BuildConfig.APIABERTA_KEY` do módulo.
+- `HostValidator`: aceita qualquer host se a app for debuggable; em release só os hosts oficiais da Google.
+- Testar (instalação local, sem Play Store): instalar o APK, abrir a app uma vez para dar a permissão de
+  localização; no Android Auto ativar o modo programador (tocar 10× em **Versão**), **Fontes desconhecidas**
+  e **Iniciar servidor da unidade principal**; no PC
+  `adb forward tcp:5277 tcp:5277` e `%ANDROID_HOME%\extras\google\auto\desktop-head-unit.exe`.
 
 ## Funcionalidades
 

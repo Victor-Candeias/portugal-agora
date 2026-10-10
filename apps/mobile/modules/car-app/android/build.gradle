@@ -1,0 +1,44 @@
+// Android Auto (MOB-015): ecrãs do carro em Kotlin (Car App Library), ligados à app mobile por
+// autolinking do Expo (pasta `modules/`). O Android Auto não mostra UI React Native, só templates.
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'pt.portugalhoje'
+version = '1.0.0'
+
+// Mesma chave da API Aberta do bundle JS (EXPO_PUBLIC_APIABERTA_KEY): vem do ambiente (CI) ou,
+// em builds locais, do apps/mobile/.env.
+def readApiAbertaKey() {
+  def fromEnv = System.getenv('EXPO_PUBLIC_APIABERTA_KEY')
+  if (fromEnv) return fromEnv
+  def envFile = new File(projectDir, '../../../.env')
+  if (!envFile.exists()) return ''
+  def line = envFile.readLines().find { it.trim().startsWith('EXPO_PUBLIC_APIABERTA_KEY=') }
+  return line ? line.trim().substring('EXPO_PUBLIC_APIABERTA_KEY='.length()).trim().replaceAll(/^["']|["']$/, '') : ''
+}
+
+android {
+  namespace "pt.portugalhoje.car"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+    consumerProguardFiles("proguard-rules.pro")
+    buildConfigField "String", "APIABERTA_KEY", "\"${readApiAbertaKey()}\""
+  }
+  buildFeatures {
+    buildConfig true
+  }
+}
+
+dependencies {
+  implementation 'androidx.car.app:app:1.4.0'
+  implementation 'androidx.car.app:app-projected:1.4.0'
+  implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+  implementation 'com.google.code.gson:gson:2.10.1'
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+  implementation 'com.google.android.gms:play-services-location:21.2.0'
+  implementation 'androidx.lifecycle:lifecycle-service:2.7.0'
+  implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+}
