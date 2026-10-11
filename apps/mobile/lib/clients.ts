@@ -11,6 +11,7 @@ import {
   createPublicServicesClient,
   createSnsClient,
   createTmlClient,
+  createViesClient,
   type PostalCodeGeoMap,
 } from '@portugal-hoje/core'
 import Constants from 'expo-constants'
@@ -36,6 +37,9 @@ export const tmlClient = createTmlClient()
 export const codigoPostalClient = createCodigoPostalClient()
 
 export const anpcClient = createAnpcClient({ apiKey: process.env.EXPO_PUBLIC_APIABERTA_KEY ?? '' })
+
+// VIES (WEB-041): fetch direto, o nativo não tem restrições de CORS.
+export const viesClient = createViesClient()
 
 // Postos de carregamento EV (WEB-040). A chave vem do OPEN_CHARGE_MAP_KEY via app.config.js.
 export const openChargeMapClient = createOpenChargeMapClient({

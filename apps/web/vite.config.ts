@@ -26,6 +26,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/carris/, ''),
       },
+      // VIES sem cabeçalhos CORS (WEB-041).
+      '/api/vies': {
+        target: 'https://ec.europa.eu',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/vies/, '/taxation_customs/vies/rest-api'),
+      },
     },
   },
 })

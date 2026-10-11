@@ -12,6 +12,7 @@ import {
   createPublicServicesClient,
   createSnsClient,
   createTmlClient,
+  createViesClient,
   type PostalCodeGeoMap,
 } from '@portugal-hoje/core'
 import { queryAll as carrisQueryAll } from '@/lib/staticDb'
@@ -47,3 +48,7 @@ export const openChargeMapClient = createOpenChargeMapClient({ apiKey: import.me
 
 // Sem chave, o cliente falha cada pedido com uma mensagem clara (MOB-008).
 export const apiClient = new ApiAbertaClient({ apiKey: import.meta.env.VITE_APIABERTA_KEY ?? '' })
+
+// VIES sem cabeçalhos CORS (WEB-041). Dev: proxy do Vite (/api/vies). Prod (GitHub Pages): sem proxy,
+// por isso `null` e a página NIF mostra um link para o formulário do VIES.
+export const viesClient = import.meta.env.DEV ? createViesClient({ baseUrl: '/api/vies' }) : null

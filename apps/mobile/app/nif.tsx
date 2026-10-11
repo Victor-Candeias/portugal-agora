@@ -1,19 +1,22 @@
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { validateNif } from '@portugal-hoje/core'
-import { Card, COLORS, ScreenHeader, uiStyles } from '../components/ui'
+import { isCompanyNif, validateNif } from '@portugal-hoje/core'
+import { Card, COLORS, ErrorView, LoadingView, ScreenHeader, SectionTitle, uiStyles } from '../components/ui'
+import { useViesLookup } from '../hooks/useVies'
 
-// Validação local (MOD 11), sem pedidos de rede (WEB-033).
+// Validação local (MOD 11), sem pedidos de rede (WEB-033). Para empresas, nome e morada no VIES (WEB-041).
 export default function Nif() {
   const [input, setInput] = useState('')
   const result = input.length === 9 ? validateNif(input) : null
   const missing = 9 - input.length
+  const companyNif = result?.valid === true && isCompanyNif(result.nif) ? result.nif : null
+  const vies = useViesLookup(companyNif)
 
   return (
     <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content} keyboardShouldPersistTaps="handled">
       <ScreenHeader
         title="🪪 Validar NIF"
-        subtitle="Formato, prefixo e dígito de controlo · Validação local, sem envio de dados"
+        subtitle="Formato, prefixo e dígito de controlo · Empresas: nome e morada no VIES"
       />
 
       <Card>
@@ -60,8 +63,36 @@ export default function Nif() {
         )}
       </Card>
 
+      {companyNif && (
+        <Card>
+          <SectionTitle>🏢 Empresa (VIES)</SectionTitle>
+          {vies.isLoading && <LoadingView />}
+          {vies.isError && <ErrorView error={vies.error} onRetry={() => void vies.refetch()} />}
+          {vies.data?.status === 'registered' && (
+            <View>
+              <Text style={styles.companyName}>{vies.data.name || 'Nome não disponível'}</Text>
+              {vies.data.address.map((line, i) => (
+                <Text key={i} style={styles.companyAddress}>{line}</Text>
+              ))}
+            </View>
+          )}
+          {vies.data?.status === 'not-registered' && (
+            <Text style={styles.companyAddress}>
+              Não está registado no VIES (sem IVA intracomunitário). O NIF pode estar correto na mesma.
+            </Text>
+          )}
+          {vies.data && (
+            <Text style={styles.source}>
+              Fonte: VIES, Comissão Europeia · consultado a {new Date(vies.data.checkedAt).toLocaleString('pt-PT')}
+            </Text>
+          )}
+        </Card>
+      )}
+
       <Text style={styles.note}>
         Um NIF válido significa só que o número está bem formado. Não confirma que está atribuído nem a quem.
+        Só os NIFs de empresas e outras entidades são consultados no VIES. Os de pessoas singulares não saem do
+        telemóvel.
       </Text>
     </ScrollView>
   )
@@ -92,5 +123,8 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: 15, fontWeight: '700' },
   resultText: { fontSize: 13, marginTop: 2 },
   hint: { fontSize: 12, color: COLORS.faint, marginTop: 10 },
+  companyName: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  companyAddress: { fontSize: 13, color: COLORS.muted },
+  source: { fontSize: 11, color: COLORS.faint, marginTop: 10 },
   note: { fontSize: 11, color: COLORS.faint, marginTop: 4 },
 })

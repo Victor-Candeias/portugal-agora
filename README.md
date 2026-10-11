@@ -75,6 +75,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Focos de calor por satélite (VIIRS/MODIS, Portugal continental, até 7 dias) | API Aberta — `/nasafirms/hotspots` (NASA FIRMS) | sim |
 | Contratos públicos (BASE.gov.pt, ~2,2 M contratos, sincronizados diariamente) | API Aberta — `/base/contracts`, `/base/contracts/search?q=` (`q` obrigatório; sem `pages` na resposta), `/base/contracts/lookup/:id` (id inexistente → 200 com `{ error }`); `limit` ≤ 100 | sim |
 | Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
+| Nome e morada de empresas pelo NIF | VIES (Comissão Europeia) — `ec.europa.eu/taxation_customs/vies/rest-api/ms/PT/vat/{nif}`; só NIFs de empresas/entidades; sem CORS (mobile direto, web via proxy do Vite só em dev) | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -165,7 +166,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
 | 📮 Código Postal | Distrito/concelho/localidade, artérias (moradas.dev) e mapa aproximado da localidade (Open-Meteo geocoding) |
-| 🪪 Validar NIF | Validação local (`validateNif` no core): 9 dígitos, prefixo atribuído pela AT e dígito de controlo MOD 11, com o tipo de entidade. Sem pedidos de rede |
+| 🪪 Validar NIF | Validação local (`validateNif` no core): 9 dígitos, prefixo atribuído pela AT e dígito de controlo MOD 11, com o tipo de entidade. Para empresas e outras entidades, mostra o nome e a morada do VIES (no web, só em dev, por causa do proxy). Os NIFs de pessoas singulares não são enviados |
 | 📑 Contratos Públicos | Contratos do BASE.gov.pt: mais recentes, pesquisa por texto/entidade/NIF e detalhe (preço, data, procedimento, entidade adjudicante e adjudicatário, link para o portal BASE) (resumo no Início, no web) |
 | 🇪🇺 Fundos PRR / PT2030 | Resumo do PRR (período, 9 componentes, 61 investimentos), investimentos agrupados por componente com filtro e pesquisa sem acentos (no cliente), e resumo do PT2030 (período e orçamento). Fonte: transparencia.gov.pt via API Aberta |
 
