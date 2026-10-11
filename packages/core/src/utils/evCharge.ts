@@ -1,6 +1,7 @@
 // Energia de um carregamento de bateria (de X% a Y%) para o custo por posto (WEB-043) e tempo
-// previsto em cada tipo de tomada do posto (WEB-044). O custo vem do simulador CEME da API Aberta
+// previsto em cada tipo de tomada do posto, em AC e DC em separado e com o cálculo (WEB-044, WEB-046). O custo vem do simulador CEME da API Aberta
 // (`/ev/tariffs/cheapest?kwh=`).
+import type { EvChargeCost } from '../api/client.js'
 import type { EvConnector } from '../api/openChargeMap.js'
 
 /** Bateria útil média dos EV vendidos em Portugal (~60 kWh). */
@@ -80,24 +81,74 @@ const DC_TAPER_FACTOR = 0.4
 
 const DC_CONNECTOR_TYPES = new Set(['CCS1', 'CCS2', 'CHAdeMO', 'Tesla Supercharger'])
 
+/** Uma parcela do cálculo: horas = `kwh / (kw × factor)`. */
+export interface EvChargeStep {
+  kwh: number
+  kw: number
+  factor: number
+}
+
 export interface EvChargeTime {
-  connector: EvConnector
+  /** `null`: estimativa sem tomada deste tipo no posto, com a potência máxima do carro. */
+  connector: EvConnector | null
   current: 'AC' | 'DC'
   /** Potência usada no cálculo: a menor entre a da tomada e a do carro (kW). */
   effectiveKw: number
   limitedByCar: boolean
   minutes: number
+  steps: EvChargeStep[]
+}
+
+/** Tempos de um tipo de corrente (WEB-046: AC e DC em separado). */
+export interface EvChargeTimeGroup {
+  current: 'AC' | 'DC'
+  carMaxKw: number
+  /** Tomadas do posto com potência conhecida, da mais rápida para a mais lenta. */
+  times: EvChargeTime[]
+  /** Quando o posto não tem tomadas deste tipo com potência conhecida: estimativa com o máximo do carro. */
+  carOnly: EvChargeTime | null
+  /** Tomadas deste tipo sem potência indicada. */
+  unknownPower: number
 }
 
 export type EvChargeTimes =
-  | { ok: true; times: EvChargeTime[]; unknownPower: number }
+  | { ok: true; ac: EvChargeTimeGroup; dc: EvChargeTimeGroup }
   | { ok: false; error: string }
 
 function connectorCurrent(c: EvConnector): 'AC' | 'DC' {
   return c.current ?? (DC_CONNECTOR_TYPES.has(c.type) ? 'DC' : 'AC')
 }
 
-/** Tempo previsto em cada tipo de tomada, do mais rápido para o mais lento. */
+function chargeSteps(
+  estimate: Extract<EvChargeEstimate, { ok: true }>,
+  current: 'AC' | 'DC',
+  kw: number,
+): EvChargeStep[] {
+  if (current === 'AC') return [{ kwh: estimate.energyKwh, kw, factor: AC_EFFICIENCY }]
+  const { batteryKwh, fromPct, toPct } = estimate
+  const kwhBetween = (a: number, b: number) => Math.max(0, b - a) * batteryKwh / 100
+  const fastKwh = kwhBetween(fromPct, Math.min(toPct, DC_TAPER_FROM_PCT))
+  const slowKwh = kwhBetween(Math.max(fromPct, DC_TAPER_FROM_PCT), toPct)
+  const steps: EvChargeStep[] = []
+  if (fastKwh > 0) steps.push({ kwh: fastKwh, kw, factor: DC_AVERAGE_FACTOR })
+  if (slowKwh > 0) steps.push({ kwh: slowKwh, kw, factor: DC_TAPER_FACTOR })
+  return steps
+}
+
+function chargeTime(
+  estimate: Extract<EvChargeEstimate, { ok: true }>,
+  current: 'AC' | 'DC',
+  connector: EvConnector | null,
+  carMaxKw: number,
+): EvChargeTime {
+  const powerKw = connector?.powerKw ?? carMaxKw
+  const effectiveKw = Math.min(powerKw, carMaxKw)
+  const steps = chargeSteps(estimate, current, effectiveKw)
+  const hours = steps.reduce((sum, s) => sum + s.kwh / (s.kw * s.factor), 0)
+  return { connector, current, effectiveKw, limitedByCar: carMaxKw < powerKw, minutes: hours * 60, steps }
+}
+
+/** Tempo previsto em AC e em DC, em cada tipo de tomada do posto. */
 export function estimateEvChargeTimes(
   estimate: Extract<EvChargeEstimate, { ok: true }>,
   connectors: EvConnector[],
@@ -112,30 +163,50 @@ export function estimateEvChargeTimes(
     return { ok: false, error: `A potência DC do carro tem de estar entre 1 e ${MAX_EV_CAR_DC_KW} kW.` }
   }
 
-  const { batteryKwh, fromPct, toPct } = estimate
-  const kwhBetween = (a: number, b: number) => Math.max(0, b - a) * batteryKwh / 100
-  const times: EvChargeTime[] = []
-  let unknownPower = 0
-  for (const connector of connectors) {
-    if (connector.powerKw == null) {
-      unknownPower += 1
-      continue
+  const group = (current: 'AC' | 'DC', carMaxKw: number): EvChargeTimeGroup => {
+    const own = connectors.filter(c => connectorCurrent(c) === current)
+    const times = own
+      .filter(c => c.powerKw != null)
+      .map(c => chargeTime(estimate, current, c, carMaxKw))
+      .sort((a, b) => a.minutes - b.minutes)
+    return {
+      current,
+      carMaxKw,
+      times,
+      carOnly: times.length === 0 ? chargeTime(estimate, current, null, carMaxKw) : null,
+      unknownPower: own.length - times.length,
     }
-    const current = connectorCurrent(connector)
-    const carMax = current === 'DC' ? dcMax : acMax
-    const effectiveKw = Math.min(connector.powerKw, carMax)
-    let hours: number
-    if (current === 'AC') {
-      hours = estimate.energyKwh / (effectiveKw * AC_EFFICIENCY)
-    } else {
-      const fastKwh = kwhBetween(fromPct, Math.min(toPct, DC_TAPER_FROM_PCT))
-      const slowKwh = kwhBetween(Math.max(fromPct, DC_TAPER_FROM_PCT), toPct)
-      hours = fastKwh / (effectiveKw * DC_AVERAGE_FACTOR) + slowKwh / (effectiveKw * DC_TAPER_FACTOR)
-    }
-    times.push({ connector, current, effectiveKw, limitedByCar: carMax < connector.powerKw, minutes: hours * 60 })
   }
-  times.sort((a, b) => a.minutes - b.minutes)
-  return { ok: true, times, unknownPower }
+  return { ok: true, ac: group('AC', acMax), dc: group('DC', dcMax) }
+}
+
+const formatCalcNumber = (value: number, digits = 1) =>
+  new Intl.NumberFormat('pt-PT', { maximumFractionDigits: digits }).format(value)
+
+/** `20 kWh ÷ (22 kW × 90%) = 61 min` (o cálculo por trás do tempo previsto). */
+export function formatChargeTimeCalc(time: Pick<EvChargeTime, 'steps' | 'minutes'>): string {
+  const parts = time.steps.map(
+    s => `${formatCalcNumber(s.kwh)} kWh ÷ (${formatCalcNumber(s.kw)} kW × ${Math.round(s.factor * 100)}%)`,
+  )
+  return `${parts.join(' + ')} = ${formatCalcNumber(time.minutes, 0)} min`
+}
+
+/** `20 kWh × 0,149 €/kWh = 2,98 € + 0,15 € ativação = 3,13 €` (o cálculo por trás do custo). */
+export function formatEvCostCalc(
+  kwh: number,
+  cost: Pick<EvChargeCost, 'price_per_kwh_eur' | 'energy_cost_eur' | 'activation_fee_eur' | 'total_cost_eur'>,
+): string {
+  const eur = (v: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+  const price = new Intl.NumberFormat('pt-PT', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(cost.price_per_kwh_eur)
+  const energy = `${formatCalcNumber(kwh)} kWh × ${price}/kWh = ${eur(cost.energy_cost_eur)}`
+  return cost.activation_fee_eur > 0
+    ? `${energy} + ${eur(cost.activation_fee_eur)} ativação = ${eur(cost.total_cost_eur)}`
+    : energy
 }
 
 /** `~45 min`, `~1h 20min`, `~5h` (arredondado a 5 minutos). */

@@ -7,17 +7,22 @@ import {
   estimateEvCharge,
   estimateEvChargeTimes,
   formatChargeDuration,
+  formatChargeTimeCalc,
   formatEvConnector,
+  formatEvCostCalc,
   formatPowerKw,
   formatPrice,
   parseDecimal,
   type EvChargeSettings,
+  type EvChargeTime,
+  type EvChargeTimeGroup,
   type EvConnector,
 } from '@portugal-hoje/core'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
 import { useCheapestEvTariffs } from '@/hooks/useEv'
 
-// Custo (WEB-043) e tempo previsto (WEB-044) de carregar a bateria de X% a Y% num posto.
+// Custo (WEB-043) e tempo previsto (WEB-044) de carregar a bateria de X% a Y% num posto, com o tempo em AC e DC
+// em separado e o cálculo de cada valor (WEB-046).
 const TOP_N = 5
 
 const PERIOD_LABELS: Record<string, string> = {
@@ -103,28 +108,11 @@ export function EvChargeCost({ settings, onChange, connectors }: Props) {
           <NumberField label="DC" unit="kW" value={settings.dcMaxKw} max={MAX_EV_CAR_DC_KW} onChange={v => onChange({ dcMaxKw: v })} />
         </div>
         {times && 'error' in times && <p className="text-xs text-red-600 mt-2">{times.error}</p>}
-        {times?.ok && times.times.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {times.times.map(t => (
-              <li key={formatEvConnector(t.connector)} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-slate-600 min-w-0 truncate">
-                  {formatEvConnector(t.connector)}
-                  {t.limitedByCar && (
-                    <span className="text-slate-400"> · carro limita a {formatPowerKw(t.effectiveKw)}</span>
-                  )}
-                </span>
-                <span className="font-bold text-slate-900 tabular-nums whitespace-nowrap">{formatChargeDuration(t.minutes)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {times?.ok && times.times.length === 0 && (
-          <p className="text-xs text-slate-500 mt-2">Este posto não indica a potência das tomadas.</p>
-        )}
-        {times?.ok && times.times.length > 0 && times.unknownPower > 0 && (
-          <p className="text-[11px] text-slate-400 mt-1">
-            {times.unknownPower} tipo{times.unknownPower !== 1 ? 's' : ''} de tomada sem potência indicada.
-          </p>
+        {times?.ok && (
+          <div className="mt-2 space-y-2">
+            <TimeGroup group={times.ac} />
+            <TimeGroup group={times.dc} />
+          </div>
         )}
       </div>
 
@@ -140,9 +128,10 @@ export function EvChargeCost({ settings, onChange, connectors }: Props) {
                 <span className="w-4 text-center text-xs font-bold text-slate-400">{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-900 truncate">{c.ceme}</p>
-                  <p className="text-[11px] text-slate-500">
-                    {formatPrice(c.price_per_kwh_eur)}/kWh
-                    {c.activation_fee_eur > 0 ? ` + ativação ${formatEur(c.activation_fee_eur)}` : ''}
+                  <p className="text-[11px] text-slate-500 tabular-nums">
+                    {cheapest.data
+                      ? formatEvCostCalc(cheapest.data.meta.kwh_requested, c)
+                      : `${formatPrice(c.price_per_kwh_eur)}/kWh`}
                   </p>
                 </div>
                 <p className={`text-sm font-bold tabular-nums ${i === 0 ? 'text-green-600' : 'text-slate-900'}`}>
@@ -167,8 +156,60 @@ export function EvChargeCost({ settings, onChange, connectors }: Props) {
         Tempo estimado com a menor potência entre a tomada e o carro (AC com ~10% de perdas; DC mais lento acima de 80%).
         Pode variar com a temperatura, a partilha de potência e o carro. Custo: energia ao preço de cada CEME
         {period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}, sem a tarifa do operador do posto (OPC), a tarifa de
-        acesso às redes (EGME) nem as perdas no carregamento.
+        acesso às redes (EGME) nem as perdas no carregamento. O preço CEME por kWh é o mesmo em AC e em DC.
       </p>
+    </div>
+  )
+}
+
+function TimeGroup({ group }: { group: EvChargeTimeGroup }) {
+  const missing = group.unknownPower > 0
+    ? `Tomadas ${group.current} sem potência indicada.`
+    : `Este posto não tem tomadas ${group.current}.`
+  return (
+    <div className="rounded-md bg-white/70 border border-amber-100 px-2 py-1.5">
+      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+        {group.current === 'AC' ? '🔌 AC (corrente alternada)' : '⚡ DC (carregamento rápido)'}
+      </p>
+      {group.carOnly ? (
+        <>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            {missing} Com o máximo do carro ({formatPowerKw(group.carMaxKw)}):
+          </p>
+          <TimeRow time={group.carOnly} label={`Carregador ${group.current} · ${formatPowerKw(group.carMaxKw)}`} />
+        </>
+      ) : (
+        <ul className="divide-y divide-amber-50">
+          {group.times.map(t => {
+            const label = t.connector ? formatEvConnector(t.connector) : group.current
+            return (
+              <li key={label}>
+                <TimeRow time={t} label={label} />
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {!group.carOnly && group.unknownPower > 0 && (
+        <p className="text-[11px] text-slate-400 mt-0.5">
+          {group.unknownPower} tipo{group.unknownPower !== 1 ? 's' : ''} de tomada {group.current} sem potência indicada.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function TimeRow({ time, label }: { time: EvChargeTime; label: string }) {
+  return (
+    <div className="py-1">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="text-slate-600 min-w-0 truncate">
+          {label}
+          {time.limitedByCar && <span className="text-slate-400"> · carro limita a {formatPowerKw(time.effectiveKw)}</span>}
+        </span>
+        <span className="font-bold text-slate-900 tabular-nums whitespace-nowrap">{formatChargeDuration(time.minutes)}</span>
+      </div>
+      <p className="text-[11px] text-slate-400 tabular-nums">{formatChargeTimeCalc(time)}</p>
     </div>
   )
 }

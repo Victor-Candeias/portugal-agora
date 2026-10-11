@@ -5,17 +5,22 @@ import {
   estimateEvCharge,
   estimateEvChargeTimes,
   formatChargeDuration,
+  formatChargeTimeCalc,
   formatEvConnector,
+  formatEvCostCalc,
   formatPowerKw,
   formatPrice,
   parseDecimal,
   type EvChargeSettings,
+  type EvChargeTime,
+  type EvChargeTimeGroup,
   type EvConnector,
 } from '@portugal-hoje/core'
 import { useCheapestEvTariffs } from '../hooks/useEv'
 import { ChipRow, COLORS, ErrorView, LinkText, LoadingView, uiStyles } from './ui'
 
-// Custo (WEB-043) e tempo previsto (WEB-044) de carregar a bateria de X% a Y% num posto.
+// Custo (WEB-043) e tempo previsto (WEB-044) de carregar a bateria de X% a Y% num posto, com o tempo em AC e DC
+// em separado e o cálculo de cada valor (WEB-046).
 const COLOR = '#f59e0b'
 const TOP_N = 5
 
@@ -91,22 +96,11 @@ export function EvChargeCost({ settings, onChange, connectors }: Props) {
           <NumberField label="DC" unit="kW" value={settings.dcMaxKw} onChange={v => onChange({ dcMaxKw: v })} />
         </View>
         {times && 'error' in times && <Text style={styles.error}>{times.error}</Text>}
-        {times?.ok && times.times.map(t => (
-          <View key={formatEvConnector(t.connector)} style={styles.timeRow}>
-            <View style={styles.flex}>
-              <Text style={styles.connector} numberOfLines={1}>{formatEvConnector(t.connector)}</Text>
-              {t.limitedByCar && <Text style={styles.price}>carro limita a {formatPowerKw(t.effectiveKw)}</Text>}
-            </View>
-            <Text style={styles.duration}>{formatChargeDuration(t.minutes)}</Text>
-          </View>
-        ))}
-        {times?.ok && times.times.length === 0 && (
-          <Text style={[uiStyles.small, styles.summary]}>Este posto não indica a potência das tomadas.</Text>
-        )}
-        {times?.ok && times.times.length > 0 && times.unknownPower > 0 && (
-          <Text style={styles.note}>
-            {times.unknownPower} tipo{times.unknownPower !== 1 ? 's' : ''} de tomada sem potência indicada.
-          </Text>
+        {times?.ok && (
+          <>
+            <TimeGroup group={times.ac} />
+            <TimeGroup group={times.dc} />
+          </>
         )}
       </View>
 
@@ -121,8 +115,9 @@ export function EvChargeCost({ settings, onChange, connectors }: Props) {
             <View style={styles.flex}>
               <Text style={styles.ceme} numberOfLines={1}>{c.ceme}</Text>
               <Text style={styles.price}>
-                {formatPrice(c.price_per_kwh_eur)}/kWh
-                {c.activation_fee_eur > 0 ? ` + ativação ${formatEur(c.activation_fee_eur)}` : ''}
+                {cheapest.data
+                  ? formatEvCostCalc(cheapest.data.meta.kwh_requested, c)
+                  : `${formatPrice(c.price_per_kwh_eur)}/kWh`}
               </Text>
             </View>
             <Text style={[styles.total, i === 0 && styles.cheapest]}>{formatEur(c.total_cost_eur)}</Text>
@@ -140,8 +135,50 @@ export function EvChargeCost({ settings, onChange, connectors }: Props) {
         Tempo estimado com a menor potência entre a tomada e o carro (AC com ~10% de perdas; DC mais lento acima de
         80%). Pode variar com a temperatura, a partilha de potência e o carro. Custo: energia ao preço de cada CEME
         {period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}, sem a tarifa do operador do posto (OPC), a tarifa
-        de acesso às redes (EGME) nem as perdas no carregamento.
+        de acesso às redes (EGME) nem as perdas no carregamento. O preço CEME por kWh é o mesmo em AC e em DC.
       </Text>
+    </View>
+  )
+}
+
+function TimeGroup({ group }: { group: EvChargeTimeGroup }) {
+  const missing = group.unknownPower > 0
+    ? `Tomadas ${group.current} sem potência indicada.`
+    : `Este posto não tem tomadas ${group.current}.`
+  return (
+    <View style={styles.group}>
+      <Text style={styles.groupTitle}>
+        {group.current === 'AC' ? '🔌 AC (corrente alternada)' : '⚡ DC (carregamento rápido)'}
+      </Text>
+      {group.carOnly ? (
+        <>
+          <Text style={styles.calc}>{missing} Com o máximo do carro ({formatPowerKw(group.carMaxKw)}):</Text>
+          <TimeRow time={group.carOnly} label={`Carregador ${group.current} · ${formatPowerKw(group.carMaxKw)}`} />
+        </>
+      ) : (
+        group.times.map(t => {
+          const label = t.connector ? formatEvConnector(t.connector) : group.current
+          return <TimeRow key={label} time={t} label={label} />
+        })
+      )}
+      {!group.carOnly && group.unknownPower > 0 && (
+        <Text style={styles.calc}>
+          {group.unknownPower} tipo{group.unknownPower !== 1 ? 's' : ''} de tomada {group.current} sem potência indicada.
+        </Text>
+      )}
+    </View>
+  )
+}
+
+function TimeRow({ time, label }: { time: EvChargeTime; label: string }) {
+  return (
+    <View style={styles.timeRow}>
+      <View style={styles.flex}>
+        <Text style={styles.connector} numberOfLines={1}>{label}</Text>
+        {time.limitedByCar && <Text style={styles.price}>carro limita a {formatPowerKw(time.effectiveKw)}</Text>}
+        <Text style={styles.calc}>{formatChargeTimeCalc(time)}</Text>
+      </View>
+      <Text style={styles.duration}>{formatChargeDuration(time.minutes)}</Text>
     </View>
   )
 }
@@ -202,7 +239,18 @@ const styles = StyleSheet.create({
   error: { fontSize: 12, color: '#dc2626', marginTop: 8 },
   summary: { marginTop: 8, marginBottom: 4 },
   energy: { fontWeight: '700', color: COLORS.text },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, marginTop: 4 },
+  group: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  groupTitle: { fontSize: 11, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase' },
+  calc: { fontSize: 11, color: COLORS.faint, marginTop: 2 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   connector: { fontSize: 12, color: '#334155' },
   duration: { fontSize: 14, fontWeight: '700', color: COLORS.text },
   costRow: {
