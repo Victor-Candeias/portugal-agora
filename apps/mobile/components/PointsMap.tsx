@@ -6,6 +6,8 @@ import { OSM_STYLE, openDirections, viewForPoints, type DirectionsOptions, type 
 export type { MapPoint } from '../lib/maps'
 
 const PADDING = { top: 40, right: 40, bottom: 40, left: 40 }
+// Com um balão aberto desde o início, deixa espaço no topo para não tapar os marcadores.
+const PADDING_WITH_CALLOUT = { ...PADDING, top: 110 }
 
 type PointsMapProps = {
   points: MapPoint[]
@@ -25,10 +27,11 @@ export function PointsMap({ points, height = 224, initialSelectedId, color = '#e
   const [selectedId, setSelectedId] = useState<string | undefined>(
     initialSelectedId ?? (points.length === 1 ? points[0].id : undefined),
   )
+  const [padding] = useState(() => (initialSelectedId ? PADDING_WITH_CALLOUT : PADDING))
   const view = useMemo(() => (bounds ? { bounds } : viewForPoints(points)), [bounds, points])
   const stop = useMemo(
-    () => (view && 'bounds' in view ? { bounds: view.bounds, padding: PADDING } : view ?? undefined),
-    [view],
+    () => (view && 'bounds' in view ? { bounds: view.bounds, padding } : view ?? undefined),
+    [view, padding],
   )
   const selected = points.find(p => p.id === selectedId)
 

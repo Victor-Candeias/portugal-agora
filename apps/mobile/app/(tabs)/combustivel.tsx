@@ -69,12 +69,13 @@ function StationItem({
       latitude: s.Latitude,
       longitude: s.Longitude,
       label: s.Nome,
+      color: '#ea580c',
       description: [formatPrice(s.price_eur), s.distKm !== null ? formatDistance(s.distKm) : null]
         .filter(Boolean)
         .join(' · '),
     }]
     if (origin) {
-      points.push({ id: ME_POINT_ID, ...origin, label: 'Estou aqui', color: '#16a34a', noDirections: true })
+      points.push({ id: ME_POINT_ID, ...origin, label: '📍 Estou aqui', color: '#2563eb', noDirections: true })
     }
     return points
   }, [stationId, s.Latitude, s.Longitude, s.Nome, s.price_eur, s.distKm, origin])
@@ -126,7 +127,6 @@ function StationItem({
                   initialSelectedId={stationId}
                   directions={directions}
                   height={260}
-                  color="#16a34a"
                   style={uiStyles.cardMap}
                 />
               )}
