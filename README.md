@@ -158,7 +158,7 @@ Os ecrãs abaixo existem no web e no mobile.
 |---|---|
 | ⛽ Combustível | Preços DGEG por distrito/município e tipo. Com localização: seletor Preço/Distância, raio de 10/25/50 km/Todos e distância a cada posto |
 | 🌤️ Tempo | Previsão IPMA a 5 dias por cidade + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
-| ⚡ EV | Tab "Postos perto de mim": postos de carregamento (Open Charge Map) ordenados por distância, com raio, potência mínima, tomadas, estado, mapa e direções (fallback Lisboa sem localização). Tab "Tarifas CEME": tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
+| ⚡ EV | Tab "Postos perto de mim": postos de carregamento (Open Charge Map) ordenados por distância, com raio, potência mínima, tomadas, estado, mapa e direções (fallback Lisboa sem localização). Em cada posto, "Custo" calcula o preço de carregar a bateria de X% a Y% (por omissão 60 kWh, 10% → 90%, editáveis e guardados no dispositivo) por CEME. Tab "Tarifas CEME": tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) | tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat, cada um com gráfico da série histórica e seletor de intervalo de anos (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |

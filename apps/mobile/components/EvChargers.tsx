@@ -9,9 +9,11 @@ import {
   formatPowerKw,
   type EvCharger,
   type EvChargerStatus,
+  type EvChargeSettings,
 } from '@portugal-hoje/core'
-import { useEvChargers } from '../hooks/useEv'
+import { useEvChargeSettings, useEvChargers } from '../hooks/useEv'
 import { LISBON_COORDS, useUserLocation } from '../hooks/useUserLocation'
+import { EvChargeCost } from './EvChargeCost'
 import { PointsMap, SinglePointMap, type MapPoint } from './PointsMap'
 import { openDirections } from '../lib/maps'
 import {
@@ -51,6 +53,7 @@ export function EvChargers() {
   const [minPower, setMinPower] = useState<string | null>(null)
   const [shown, setShown] = useState(PAGE_SIZE)
   const [showOverview, setShowOverview] = useState(false)
+  const [chargeSettings, updateChargeSettings] = useEvChargeSettings()
 
   const coords = location.status === 'loading' ? null : location.coords
   const params = coords
@@ -140,7 +143,12 @@ export function EvChargers() {
           )}
           {showOverview && <PointsMap points={mapPoints} height={300} color={COLOR} style={uiStyles.map} />}
           {chargers.slice(0, shown).map(c => (
-            <ChargerCard key={c.id} charger={c} />
+            <ChargerCard
+              key={c.id}
+              charger={c}
+              chargeSettings={chargeSettings}
+              onChargeSettingsChange={updateChargeSettings}
+            />
           ))}
           {chargers.length === 0 && (
             <EmptyText>Nenhum posto encontrado. Experimente aumentar o raio ou baixar a potência mínima.</EmptyText>
@@ -156,8 +164,17 @@ export function EvChargers() {
   )
 }
 
-function ChargerCard({ charger: c }: { charger: EvCharger }) {
+function ChargerCard({
+  charger: c,
+  chargeSettings,
+  onChargeSettingsChange,
+}: {
+  charger: EvCharger
+  chargeSettings: EvChargeSettings
+  onChargeSettingsChange: (patch: Partial<EvChargeSettings>) => void
+}) {
   const [showMap, setShowMap] = useState(false)
+  const [showCost, setShowCost] = useState(false)
   return (
     <Card>
       <View style={styles.header}>
@@ -196,10 +213,12 @@ function ChargerCard({ charger: c }: { charger: EvCharger }) {
       {c.lastVerified ? <Text style={styles.verified}>Verificado em {formatDate(c.lastVerified)}</Text> : null}
 
       <View style={uiStyles.actions}>
+        <LinkText label={showCost ? '💶 Ocultar custo' : '💶 Custo'} onPress={() => setShowCost(v => !v)} />
         <LinkText label={showMap ? '🗺️ Ocultar mapa' : '🗺️ Mapa'} onPress={() => setShowMap(v => !v)} />
         <LinkText label="🧭 Direções" onPress={() => openDirections(c.latitude, c.longitude)} />
         <LinkText label="🔗 Open Charge Map" onPress={() => void Linking.openURL(c.url)} />
       </View>
+      {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} />}
       {showMap && <SinglePointMap latitude={c.latitude} longitude={c.longitude} label={c.name} style={uiStyles.cardMap} />}
     </Card>
   )

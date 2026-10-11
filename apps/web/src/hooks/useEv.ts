@@ -1,6 +1,36 @@
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { shouldRetryOpenChargeMap, type NearbyEvChargersParams } from '@portugal-hoje/core'
+import {
+  DEFAULT_EV_CHARGE_SETTINGS,
+  EV_CHARGE_STORAGE_KEY,
+  parseEvChargeSettings,
+  shouldRetryOpenChargeMap,
+  type EvChargeSettings,
+  type NearbyEvChargersParams,
+} from '@portugal-hoje/core'
 import { apiClient, openChargeMapClient } from '@/lib/clients'
+
+// Bateria e percentagens do cálculo de custo por posto (WEB-043), guardadas no localStorage.
+function readChargeSettings(): EvChargeSettings {
+  try {
+    return parseEvChargeSettings(window.localStorage.getItem(EV_CHARGE_STORAGE_KEY))
+  } catch {
+    return DEFAULT_EV_CHARGE_SETTINGS
+  }
+}
+
+export function useEvChargeSettings() {
+  const [settings, setSettings] = useState<EvChargeSettings>(readChargeSettings)
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(EV_CHARGE_STORAGE_KEY, JSON.stringify(settings))
+    } catch {
+      // Sem localStorage (modo privado): fica só em memória.
+    }
+  }, [settings])
+  const update = (patch: Partial<EvChargeSettings>) => setSettings(prev => ({ ...prev, ...patch }))
+  return [settings, update] as const
+}
 
 // Tarifas de carregamento dos CEME (API Aberta /ev).
 export function useEvTariffs() {

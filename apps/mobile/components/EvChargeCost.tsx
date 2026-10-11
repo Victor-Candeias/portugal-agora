@@ -1,0 +1,178 @@
+import { useEffect, useState } from 'react'
+import { StyleSheet, Text, TextInput, View } from 'react-native'
+import {
+  EV_BATTERY_PRESETS_KWH,
+  estimateEvCharge,
+  formatPrice,
+  parseDecimal,
+  type EvChargeSettings,
+} from '@portugal-hoje/core'
+import { useCheapestEvTariffs } from '../hooks/useEv'
+import { ChipRow, COLORS, ErrorView, LinkText, LoadingView, uiStyles } from './ui'
+
+// Custo de carregar a bateria de X% a Y% num posto, por CEME (WEB-043).
+const COLOR = '#f59e0b'
+const TOP_N = 5
+
+const PERIOD_LABELS: Record<string, string> = {
+  vazio: 'vazio',
+  fora_vazio: 'fora de vazio',
+  simples: 'simples',
+}
+
+const BATTERY_OPTIONS = EV_BATTERY_PRESETS_KWH.map(v => ({ value: String(v), label: `${v} kWh` }))
+
+const formatEur = (value: number) =>
+  new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
+
+const formatNumber = (value: number) => new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 1 }).format(value)
+
+interface Props {
+  settings: EvChargeSettings
+  onChange: (patch: Partial<EvChargeSettings>) => void
+}
+
+export function EvChargeCost({ settings, onChange }: Props) {
+  const estimate = estimateEvCharge(settings)
+  const [kwh, setKwh] = useState(estimate.ok ? estimate.energyKwh : 0)
+  const [showAll, setShowAll] = useState(false)
+
+  // Espera que o utilizador pare de escrever antes de pedir o custo à API.
+  const energy = estimate.ok ? estimate.energyKwh : null
+  useEffect(() => {
+    if (energy === null) return
+    const timer = setTimeout(() => setKwh(energy), 400)
+    return () => clearTimeout(timer)
+  }, [energy])
+
+  const cheapest = useCheapestEvTariffs(kwh)
+  const costs = cheapest.data?.data ?? []
+  const shown = showAll ? costs : costs.slice(0, TOP_N)
+  const period = cheapest.data?.meta.current_period
+  const battery = parseDecimal(settings.batteryKwh)
+  const selectedBattery = BATTERY_OPTIONS.find(o => Number(o.value) === battery)?.value ?? null
+
+  return (
+    <View style={styles.panel}>
+      <Text style={styles.title}>Custo do carregamento</Text>
+      <ChipRow
+        options={BATTERY_OPTIONS}
+        value={selectedBattery}
+        onChange={v => v && onChange({ batteryKwh: v })}
+        allLabel={null}
+        color={COLOR}
+      />
+      <View style={styles.fields}>
+        <NumberField label="Bateria" unit="kWh" value={settings.batteryKwh} onChange={v => onChange({ batteryKwh: v })} />
+        <NumberField label="De" unit="%" value={settings.fromPct} onChange={v => onChange({ fromPct: v })} />
+        <NumberField label="Até" unit="%" value={settings.toPct} onChange={v => onChange({ toPct: v })} />
+      </View>
+
+      {'error' in estimate && <Text style={styles.error}>{estimate.error}</Text>}
+      {estimate.ok && (
+        <Text style={[uiStyles.small, styles.summary]}>
+          A carregar <Text style={styles.energy}>{formatNumber(estimate.energyKwh)} kWh</Text> (
+          {formatNumber(estimate.fromPct)}% → {formatNumber(estimate.toPct)}% de {formatNumber(estimate.batteryKwh)} kWh)
+        </Text>
+      )}
+
+      {cheapest.isLoading && <LoadingView color={COLOR} />}
+      {cheapest.isError && <ErrorView error={cheapest.error} onRetry={() => void cheapest.refetch()} />}
+      {cheapest.data && costs.length === 0 && <Text style={uiStyles.small}>Sem tarifas disponíveis.</Text>}
+      {shown.map((c, i) => (
+        <View key={c.ceme} style={styles.costRow}>
+          <Text style={styles.rank}>{i + 1}</Text>
+          <View style={styles.flex}>
+            <Text style={styles.ceme} numberOfLines={1}>{c.ceme}</Text>
+            <Text style={styles.price}>
+              {formatPrice(c.price_per_kwh_eur)}/kWh
+              {c.activation_fee_eur > 0 ? ` + ativação ${formatEur(c.activation_fee_eur)}` : ''}
+            </Text>
+          </View>
+          <Text style={[styles.total, i === 0 && styles.cheapest]}>{formatEur(c.total_cost_eur)}</Text>
+        </View>
+      ))}
+      {costs.length > TOP_N && (
+        <LinkText
+          label={showAll ? 'Ver menos' : `Ver todos os CEME (${costs.length})`}
+          onPress={() => setShowAll(v => !v)}
+        />
+      )}
+
+      <Text style={styles.note}>
+        Energia ao preço de cada CEME{period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}. Não inclui a tarifa
+        do operador do posto (OPC), a tarifa de acesso às redes (EGME) nem as perdas no carregamento.
+      </Text>
+    </View>
+  )
+}
+
+function NumberField({
+  label,
+  unit,
+  value,
+  onChange,
+}: {
+  label: string
+  unit: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <View style={uiStyles.row}>
+      <Text style={uiStyles.small}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        keyboardType="decimal-pad"
+        maxLength={5}
+        style={styles.input}
+        accessibilityLabel={`${label} (${unit})`}
+      />
+      <Text style={uiStyles.small}>{unit}</Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  panel: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    backgroundColor: '#fffbeb',
+  },
+  title: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 8 },
+  fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  input: {
+    minWidth: 52,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 13,
+    color: '#0f172a',
+    backgroundColor: 'white',
+    textAlign: 'center',
+  },
+  error: { fontSize: 12, color: '#dc2626', marginTop: 8 },
+  summary: { marginTop: 8, marginBottom: 4 },
+  energy: { fontWeight: '700', color: COLORS.text },
+  costRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#fef3c7',
+  },
+  rank: { width: 16, fontSize: 12, fontWeight: '700', color: '#94a3b8', textAlign: 'center' },
+  flex: { flex: 1 },
+  ceme: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  price: { fontSize: 11, color: COLORS.muted },
+  total: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  cheapest: { color: '#16a34a' },
+  note: { fontSize: 11, color: COLORS.faint, marginTop: 8 },
+})

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MapPin, Navigation, Zap, ExternalLink, RefreshCw } from 'lucide-react'
+import { MapPin, Navigation, Zap, ExternalLink, RefreshCw, Euro } from 'lucide-react'
 import {
   EV_CHARGER_MIN_POWER_OPTIONS,
   EV_CHARGER_RADII_KM,
@@ -9,12 +9,14 @@ import {
   formatPowerKw,
   type EvCharger,
   type EvChargerStatus,
+  type EvChargeSettings,
 } from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
+import { EvChargeCost } from '@/components/EvChargeCost'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
 import { SinglePointMap } from '@/components/SinglePointMap'
-import { useEvChargers } from '@/hooks/useEv'
+import { useEvChargeSettings, useEvChargers } from '@/hooks/useEv'
 
 // Postos de carregamento perto do utilizador via Open Charge Map (WEB-040).
 const PAGE_SIZE = 20
@@ -46,6 +48,8 @@ export function EvChargers() {
   const [minPower, setMinPower] = useState<string>('')
   const [page, setPage] = useState(1)
   const [mapId, setMapId] = useState<number | null>(null)
+  const [costId, setCostId] = useState<number | null>(null)
+  const [chargeSettings, updateChargeSettings] = useEvChargeSettings()
 
   useEffect(() => { requestLocation() }, [])
 
@@ -73,6 +77,7 @@ export function EvChargers() {
   function resetPage() {
     setPage(1)
     setMapId(null)
+    setCostId(null)
   }
 
   const totalPages = Math.ceil(chargers.length / PAGE_SIZE)
@@ -156,6 +161,10 @@ export function EvChargers() {
                   charger={c}
                   showMap={mapId === c.id}
                   onToggleMap={() => setMapId(mapId === c.id ? null : c.id)}
+                  showCost={costId === c.id}
+                  onToggleCost={() => setCostId(costId === c.id ? null : c.id)}
+                  chargeSettings={chargeSettings}
+                  onChargeSettingsChange={updateChargeSettings}
                 />
               ))}
               {chargers.length === 0 && (
@@ -165,7 +174,7 @@ export function EvChargers() {
               )}
             </div>
 
-            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapId(null) }} />
+            <Pagination page={page} totalPages={totalPages} onPage={p => { setPage(p); setMapId(null); setCostId(null) }} />
           </>
         )}
       </Card>
@@ -178,7 +187,25 @@ export function EvChargers() {
   )
 }
 
-function ChargerCard({ charger: c, showMap, onToggleMap }: { charger: EvCharger; showMap: boolean; onToggleMap: () => void }) {
+interface ChargerCardProps {
+  charger: EvCharger
+  showMap: boolean
+  onToggleMap: () => void
+  showCost: boolean
+  onToggleCost: () => void
+  chargeSettings: EvChargeSettings
+  onChargeSettingsChange: (patch: Partial<EvChargeSettings>) => void
+}
+
+function ChargerCard({
+  charger: c,
+  showMap,
+  onToggleMap,
+  showCost,
+  onToggleCost,
+  chargeSettings,
+  onChargeSettingsChange,
+}: ChargerCardProps) {
   return (
     <div className="border border-slate-100 rounded-lg p-4 hover:border-slate-300 transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -239,12 +266,21 @@ function ChargerCard({ charger: c, showMap, onToggleMap }: { charger: EvCharger;
         </a>
         <button
           type="button"
+          onClick={onToggleCost}
+          className="ml-auto flex items-center gap-1 text-amber-700 hover:text-amber-800 font-medium flex-shrink-0"
+        >
+          <Euro size={11} /> {showCost ? 'Ocultar custo' : 'Custo'}
+        </button>
+        <button
+          type="button"
           onClick={onToggleMap}
-          className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium flex-shrink-0"
+          className="flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium flex-shrink-0"
         >
           <MapPin size={11} /> {showMap ? 'Ocultar mapa' : 'Mapa'}
         </button>
       </div>
+
+      {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} />}
 
       {showMap && (
         <SinglePointMap
