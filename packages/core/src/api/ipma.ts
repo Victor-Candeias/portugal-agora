@@ -1,6 +1,8 @@
-// IPMA open-data (sem chave) — risco de incêndio rural (RCM) por concelho, agregado por distrito (MOB-008).
+// IPMA open-data (sem chave): risco de incêndio rural (RCM) por concelho, agregado por distrito (MOB-008),
+// avisos meteorológicos (WEB-025) e previsão diária a 5 dias por cidade (MOB-019).
 // A API Aberta não tem rota de risco de incêndio.
 import type { FIRE_RISK_LABELS } from '../utils/index.js'
+import type { IpmaDailyForecast } from './client.js'
 
 export const IPMA_OPEN_DATA_URL = 'https://api.ipma.pt/open-data'
 
@@ -202,8 +204,129 @@ export interface FireRiskByDistrict {
   data: DistrictFireRisk[]
 }
 
+// ── Previsão diária por cidade, 5 dias (MOB-019) ─────────────────────────────
+// A rota /ipma/forecasts da API Aberta só tem 3 dias; o open-data do IPMA tem 5 (sem chave, com CORS).
+
+/** `idWeatherType` → descrição PT (open-data/weather-type-classe.json). */
+export const IPMA_WEATHER_TYPES: Record<number, string> = {
+  0: 'Sem informação',
+  1: 'Céu limpo',
+  2: 'Céu pouco nublado',
+  3: 'Céu parcialmente nublado',
+  4: 'Céu muito nublado ou encoberto',
+  5: 'Céu nublado por nuvens altas',
+  6: 'Aguaceiros/chuva',
+  7: 'Aguaceiros/chuva fracos',
+  8: 'Aguaceiros/chuva fortes',
+  9: 'Chuva/aguaceiros',
+  10: 'Chuva fraca ou chuvisco',
+  11: 'Chuva/aguaceiros forte',
+  12: 'Períodos de chuva',
+  13: 'Períodos de chuva fraca',
+  14: 'Períodos de chuva forte',
+  15: 'Chuvisco',
+  16: 'Neblina',
+  17: 'Nevoeiro ou nuvens baixas',
+  18: 'Neve',
+  19: 'Trovoada',
+  20: 'Aguaceiros e possibilidade de trovoada',
+  21: 'Granizo',
+  22: 'Geada',
+  23: 'Chuva e possibilidade de trovoada',
+  24: 'Nebulosidade convectiva',
+  25: 'Céu com períodos de muito nublado',
+  26: 'Nevoeiro',
+  27: 'Céu nublado',
+  28: 'Aguaceiros de neve',
+  29: 'Chuva e neve',
+  30: 'Chuva e neve',
+}
+
+export function ipmaWeatherTypeDescription(id: number | string): string {
+  return IPMA_WEATHER_TYPES[Number(id)] ?? 'Sem informação'
+}
+
+/** Local de previsão do IPMA (capitais de distrito, outras cidades e ilhas). */
+export interface IpmaLocation {
+  cityId: number
+  cityName: string
+  district?: string
+  latitude: number
+  longitude: number
+}
+
+interface RawIpmaLocation {
+  globalIdLocal: number
+  local: string
+  latitude: string | number
+  longitude: string | number
+}
+
+export function parseIpmaLocations(raw: { data?: RawIpmaLocation[] }): IpmaLocation[] {
+  return (raw.data ?? []).map(l => ({
+    cityId: Number(l.globalIdLocal),
+    cityName: l.local,
+    district: districtFromIpmaCityId(l.globalIdLocal),
+    latitude: Number(l.latitude),
+    longitude: Number(l.longitude),
+  }))
+}
+
+interface RawIpmaDailyForecast {
+  forecastDate: string
+  tMin: string | number
+  tMax: string | number
+  precipitaProb: string | number
+  idWeatherType: number
+  predWindDir: string
+  classWindSpeed: number | string
+}
+
+export interface IpmaCityDailyForecast {
+  cityId: number
+  /** Hora da última atualização do IPMA, ex.: `2026-10-11T19:31:03`. */
+  updated?: string
+  forecasts: IpmaDailyForecast[]
+}
+
+const toInt = (v: string | number) => Math.round(Number(v))
+
+export function parseIpmaDailyForecast(raw: {
+  globalIdLocal?: number
+  dataUpdate?: string
+  data?: RawIpmaDailyForecast[]
+}, cityId: number | string): IpmaCityDailyForecast {
+  return {
+    cityId: Number(raw.globalIdLocal ?? cityId),
+    updated: raw.dataUpdate,
+    forecasts: (raw.data ?? []).map(d => ({
+      date: d.forecastDate,
+      tMin: toInt(d.tMin),
+      tMax: toInt(d.tMax),
+      description: ipmaWeatherTypeDescription(d.idWeatherType),
+      precipProb: toInt(d.precipitaProb),
+      windDir: d.predWindDir,
+      windSpeed: String(d.classWindSpeed),
+    })),
+  }
+}
+
 export function createIpmaClient(baseUrl: string = IPMA_OPEN_DATA_URL) {
   return {
+    /** Locais com previsão diária (35: capitais de distrito, outras cidades e ilhas). */
+    async getLocations(): Promise<IpmaLocation[]> {
+      const res = await fetch(`${baseUrl}/distrits-islands.json`)
+      if (!res.ok) throw new Error(`IPMA locais: ${res.status}`)
+      return parseIpmaLocations((await res.json()) as { data?: RawIpmaLocation[] })
+    },
+
+    /** Previsão diária a 5 dias (hoje + 4) de um local (`globalIdLocal`). */
+    async getCityForecast(cityId: number | string): Promise<IpmaCityDailyForecast> {
+      const res = await fetch(`${baseUrl}/forecast/meteorology/cities/daily/${cityId}.json`)
+      if (!res.ok) throw new Error(`IPMA previsão: ${res.status}`)
+      return parseIpmaDailyForecast(await res.json(), cityId)
+    },
+
     /** day 0 = hoje, 1 = amanhã. Nível do distrito = máximo dos seus concelhos. */
     async getFireRiskByDistrict(day: 0 | 1 = 0): Promise<FireRiskByDistrict> {
       const res = await fetch(`${baseUrl}/forecast/meteorology/rcm/rcm-d${day}.json`)

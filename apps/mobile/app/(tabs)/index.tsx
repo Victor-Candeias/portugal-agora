@@ -1,7 +1,7 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import { useFuelPrices } from '../../hooks/useApi'
-import { DEFAULT_CITY_ID, useIpmaForecasts, useIpmaWarnings } from '../../hooks/useTempo'
+import { DEFAULT_CITY_ID, useIpmaCityForecast, useIpmaWarnings } from '../../hooks/useTempo'
 import { useBdpRates } from '../../hooks/useEconomia'
 import { useAnpcSummary } from '../../hooks/useAnpc'
 import { SECTIONS } from '../../lib/sections'
@@ -42,13 +42,13 @@ function SummaryCard({
 
 export default function Dashboard() {
   const { data: fuelData } = useFuelPrices('gasoline_95')
-  const { data: weatherData } = useIpmaForecasts()
+  const { data: weatherData } = useIpmaCityForecast(DEFAULT_CITY_ID)
   const { data: anpcData } = useAnpcSummary()
   const { data: ratesData } = useBdpRates()
   const { data: warnings } = useIpmaWarnings()
 
   const cheapest = fuelData?.[0]
-  const today = weatherData?.find(c => c.cityId === DEFAULT_CITY_ID)?.forecasts[0]
+  const today = weatherData?.forecasts[0]
   const activeIncidents = anpcData?.total_active ?? 0
   const topDistrict = anpcData?.by_district?.[0]
   const ecbDeposit = ratesData?.data.find(r => r.key === 'ecb_deposit')

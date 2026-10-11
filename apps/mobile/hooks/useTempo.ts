@@ -1,21 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
 import { ipmaClient, openMeteoClient } from '@portugal-hoje/core'
-import { apiClient } from '../lib/api'
 
 export const DEFAULT_CITY_ID = 1110600 // Lisboa
 
-// Previsão IPMA (~3 dias) para as capitais de distrito e ilhas, via API Aberta — um só pedido.
-export function useIpmaForecasts() {
+// Locais de previsão do IPMA (capitais de distrito, outras cidades e ilhas), open-data sem chave (MOB-019).
+export function useIpmaLocations() {
   return useQuery({
-    queryKey: ['ipma', 'forecasts'],
-    queryFn: () => apiClient.getIpmaForecasts(),
+    queryKey: ['ipma', 'locations'],
+    queryFn: () => ipmaClient.getLocations(),
+    staleTime: 24 * 60 * 60 * 1000,
+  })
+}
+
+// Previsão a 5 dias de um local, open-data do IPMA: a API Aberta só tem 3 dias (MOB-019).
+export function useIpmaCityForecast(cityId: number | string) {
+  return useQuery({
+    queryKey: ['ipma', 'forecast', String(cityId)],
+    queryFn: () => ipmaClient.getCityForecast(cityId),
     staleTime: 60 * 60 * 1000,
-    select: (res) =>
-      res.data.map(city => ({
-        ...city,
-        latitude: Number(city.latitude),
-        longitude: Number(city.longitude),
-      })),
   })
 }
 

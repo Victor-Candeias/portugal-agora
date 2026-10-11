@@ -11,7 +11,13 @@ import {
   type IpmaDailyForecast,
   type IpmaWarning,
 } from '@portugal-hoje/core'
-import { DEFAULT_CITY_ID, useCurrentWeather, useIpmaForecasts, useIpmaWarnings } from '../../hooks/useTempo'
+import {
+  DEFAULT_CITY_ID,
+  useCurrentWeather,
+  useIpmaCityForecast,
+  useIpmaLocations,
+  useIpmaWarnings,
+} from '../../hooks/useTempo'
 import { useUserLocation } from '../../hooks/useUserLocation'
 import {
   Badge,
@@ -47,14 +53,14 @@ export function ipmaEmoji(description: string): string {
 }
 
 export default function Tempo() {
-  const forecasts = useIpmaForecasts()
+  const locations = useIpmaLocations()
   const location = useUserLocation()
   const coords = location.status === 'granted' ? location.coords : null
   // null = automático: cidade IPMA mais próxima com localização, Lisboa sem ela.
   const [manualCityId, setManualCityId] = useState<string | null>(null)
 
   const cities = useMemo(() => {
-    const list = forecasts.data ?? []
+    const list = locations.data ?? []
     if (!coords) return list.map(c => ({ ...c, distKm: null as number | null }))
     return list
       .map(c => ({
@@ -65,12 +71,14 @@ export default function Tempo() {
             : null,
       }))
       .sort((a, b) => (a.distKm ?? Infinity) - (b.distKm ?? Infinity))
-  }, [forecasts.data, coords])
+  }, [locations.data, coords])
 
   const nearest = coords ? cities.find(c => c.distKm !== null) : undefined
   const autoCityId = nearest ? String(nearest.cityId) : String(DEFAULT_CITY_ID)
   const cityId = manualCityId ?? autoCityId
   const city = cities.find(c => String(c.cityId) === cityId)
+  const forecast = useIpmaCityForecast(cityId)
+  const days = forecast.data?.forecasts ?? []
   // Sem cidade escolhida à mão, o "Agora" usa as coordenadas exatas do utilizador.
   const atUserLocation = coords !== null && manualCityId === null
   const place = atUserLocation
@@ -84,7 +92,8 @@ export default function Tempo() {
   const districtWarnings = filterWarningsByDistrict(warnings.data ?? [], district)
 
   const refresh = () => {
-    void forecasts.refetch()
+    void locations.refetch()
+    void forecast.refetch()
     void current.refetch()
     void warnings.refetch()
   }
@@ -93,9 +102,9 @@ export default function Tempo() {
     <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content}>
       <ScreenHeader
         title="🌤️ Meteorologia"
-        subtitle={`Previsão IPMA · ${city?.cityName ?? LISBOA.name}${atUserLocation && city ? ' (mais próxima)' : ''}`}
+        subtitle={`Previsão IPMA a 5 dias · ${city?.cityName ?? LISBOA.name}${atUserLocation && city ? ' (mais próxima)' : ''}`}
         onRefresh={refresh}
-        refreshing={forecasts.isFetching || current.isFetching || warnings.isFetching}
+        refreshing={locations.isFetching || forecast.isFetching || current.isFetching || warnings.isFetching}
       />
 
       {cities.length > 0 && (
@@ -157,13 +166,14 @@ export default function Tempo() {
         isError={warnings.isError}
       />
 
-      {forecasts.isLoading && <LoadingView color="#0ea5e9" />}
-      {forecasts.isError && <ErrorView error={forecasts.error} onRetry={() => void forecasts.refetch()} />}
+      {locations.isError && <ErrorView error={locations.error} onRetry={() => void locations.refetch()} />}
+      {forecast.isLoading && <LoadingView color="#0ea5e9" />}
+      {forecast.isError && <ErrorView error={forecast.error} onRetry={() => void forecast.refetch()} />}
 
-      {city && city.forecasts.length > 0 && (
+      {days.length > 0 && (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daysRow}>
-            {city.forecasts.map(f => (
+            {days.map(f => (
               <View key={f.date} style={styles.dayCard}>
                 <Text style={styles.dayDate}>{formatDate(f.date)}</Text>
                 <Text style={styles.dayEmoji}>{ipmaEmoji(f.description)}</Text>
@@ -175,8 +185,8 @@ export default function Tempo() {
           </ScrollView>
 
           <Card>
-            <SectionTitle>Previsão</SectionTitle>
-            {city.forecasts.map(f => (
+            <SectionTitle>Previsão a {days.length} dias</SectionTitle>
+            {days.map(f => (
               <ForecastRow key={f.date} forecast={f} />
             ))}
           </Card>

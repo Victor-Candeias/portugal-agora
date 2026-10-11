@@ -64,7 +64,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Dados | Fonte | Chave |
 |---|---|---|
 | Combustível, distritos/concelhos, ANPC | API Aberta — `/fuel/*`, `/geo/*`, `/anpc/*` | sim |
-| Previsão do tempo (capitais de distrito, ~3 dias) | API Aberta — `/ipma/forecasts` | sim |
+| Previsão do tempo (35 locais: capitais de distrito, outras cidades e ilhas; 5 dias) | IPMA open-data — `cities/daily/{globalIdLocal}.json` (um pedido por cidade) e `distrits-islands.json` (locais); a rota `/ipma/forecasts` da API Aberta só tem 3 dias | não |
 | Tempo atual | Open-Meteo (`api.open-meteo.com`) | não |
 | Risco de incêndio rural | IPMA open-data — RCM por concelho (`rcm-d0.json`), agregado por distrito | não |
 | Avisos meteorológicos (amarelo/laranja/vermelho) | IPMA open-data — `warnings_www.json` (a rota `/ipma/warnings` da API Aberta não traz o nível nem todas as regiões) | não |
@@ -155,7 +155,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | Ecrã | Dados |
 |---|---|
 | ⛽ Combustível | Preços DGEG por distrito/município e tipo. Com localização: seletor Preço/Distância, raio de 10/25/50 km/Todos e distância a cada posto |
-| 🌤️ Tempo | Previsão IPMA por capital de distrito + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
+| 🌤️ Tempo | Previsão IPMA a 5 dias por cidade + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tab "Postos perto de mim": postos de carregamento (Open Charge Map) ordenados por distância, com raio, potência mínima, tomadas, estado, mapa e direções (fallback Lisboa sem localização). Tab "Tarifas CEME": tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat, cada um com gráfico da série histórica e seletor de intervalo de anos (resumo "Taxa BCE" no Início) |
