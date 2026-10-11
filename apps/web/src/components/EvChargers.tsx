@@ -269,7 +269,7 @@ function ChargerCard({
           onClick={onToggleCost}
           className="ml-auto flex items-center gap-1 text-amber-700 hover:text-amber-800 font-medium flex-shrink-0"
         >
-          <Euro size={11} /> {showCost ? 'Ocultar custo' : 'Custo'}
+          <Euro size={11} /> {showCost ? 'Ocultar custo e tempo' : 'Custo e tempo'}
         </button>
         <button
           type="button"
@@ -280,7 +280,7 @@ function ChargerCard({
         </button>
       </div>
 
-      {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} />}
+      {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} connectors={c.connectors} />}
 
       {showMap && (
         <SinglePointMap

@@ -4,9 +4,19 @@ import { Card, CardTitle } from '@/components/Card'
 import { LoadingBox, ErrorBox } from '@/components/Feedback'
 import { Pagination } from '@/components/Pagination'
 import { SinglePointMap } from '@/components/SinglePointMap'
-import { useFuelPrices } from '@/hooks/useFuel'
+import { useFuelPrices, useFuelTankLitres } from '@/hooks/useFuel'
 import { useDistricts, useMunicipalities } from '@/hooks/useGeo'
-import { formatPrice, FUEL_LABELS, FUEL_COLORS, type FuelType } from '@portugal-hoje/core'
+import {
+  formatPrice,
+  formatEuros,
+  formatLitres,
+  fuelTankCost,
+  parseTankLitres,
+  FUEL_LABELS,
+  FUEL_COLORS,
+  MAX_FUEL_TANK_LITRES,
+  type FuelType,
+} from '@portugal-hoje/core'
 
 const FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel', 'diesel_plus', 'lpg']
 const PAGE_SIZE = 20
@@ -57,6 +67,9 @@ export function Combustivel() {
 
   const [sortBy, setSortBy] = useState<SortBy>('price')
   const [radiusKm, setRadiusKm] = useState<number | null>(DEFAULT_RADIUS_KM)
+  // Custo de atestar o depósito (WEB-045).
+  const [tankText, setTankText] = useFuelTankLitres()
+  const tankLitres = parseTankLitres(tankText)
 
   const effectiveSort: SortBy = userLocation ? sortBy : 'price'
   const radiusActive = Boolean(userLocation) && radiusKm !== null
@@ -208,8 +221,29 @@ export function Combustivel() {
                 </select>
               </div>
             )}
+            <div>
+              <label htmlFor="fuel-tank-litres" className="block text-xs font-medium text-slate-500 mb-1">Depósito</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="fuel-tank-litres"
+                  type="number"
+                  min={1}
+                  max={MAX_FUEL_TANK_LITRES}
+                  step={1}
+                  value={tankText}
+                  onChange={e => setTankText(e.target.value)}
+                  className={`w-20 border rounded-lg px-3 py-1.5 text-sm bg-white tabular-nums ${
+                    tankLitres === null ? 'border-red-300' : 'border-slate-200'
+                  }`}
+                />
+                <span className="text-sm text-slate-500">L</span>
+              </div>
+            </div>
           </div>
         </div>
+        {tankLitres === null && (
+          <p className="text-xs text-red-600 mt-2">Indique um depósito entre 1 e {MAX_FUEL_TANK_LITRES} litros.</p>
+        )}
         {userLocation && (
           <div className="flex flex-wrap gap-6 mt-4">
             <div>
@@ -256,14 +290,17 @@ export function Combustivel() {
           <Card className="text-center">
             <p className="text-xs text-slate-500 mb-1">Mais barato</p>
             <p className="text-xl font-bold text-green-700">{formatPrice(minPrice!)}</p>
+            <TankCost price={minPrice!} litres={tankLitres} />
           </Card>
           <Card className="text-center">
             <p className="text-xs text-slate-500 mb-1">Média</p>
             <p className="text-xl font-bold text-slate-700">{formatPrice(avgPrice)}</p>
+            <TankCost price={avgPrice} litres={tankLitres} />
           </Card>
           <Card className="text-center">
             <p className="text-xs text-slate-500 mb-1">Mais caro</p>
             <p className="text-xl font-bold text-red-600">{formatPrice(maxPrice!)}</p>
+            <TankCost price={maxPrice!} litres={tankLitres} />
           </Card>
         </div>
       )}
@@ -333,6 +370,11 @@ export function Combustivel() {
                           +{formatPrice(s.price_eur - minPrice)}
                         </p>
                       )}
+                      {tankLitres !== null && (
+                        <p className="text-xs text-slate-500 tabular-nums whitespace-nowrap" title="Custo de atestar o depósito">
+                          ⛽ {formatLitres(tankLitres)}: <strong className="text-slate-700">{formatEuros(fuelTankCost(s.price_eur, tankLitres))}</strong>
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -362,5 +404,14 @@ export function Combustivel() {
         )}
       </Card>
     </div>
+  )
+}
+
+function TankCost({ price, litres }: { price: number; litres: number | null }) {
+  if (litres === null) return null
+  return (
+    <p className="text-xs text-slate-500 mt-1 tabular-nums">
+      Atestar {formatLitres(litres)}: <strong className="text-slate-700">{formatEuros(fuelTankCost(price, litres))}</strong>
+    </p>
   )
 }

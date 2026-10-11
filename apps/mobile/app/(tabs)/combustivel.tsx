@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Modal, FlatList, SafeAreaView,
 } from 'react-native'
 import { useFuelPrices, useDistricts, useMunicipalities } from '../../hooks/useApi'
+import { useFuelTankLitres } from '../../hooks/useFuelTank'
 import { useUserLocation, type Coords } from '../../hooks/useUserLocation'
 import { ChipRow, LinkText, SegmentedTabs, formatDistance, uiStyles } from '../../components/ui'
 import { PointsMap, type MapPoint } from '../../components/PointsMap'
 import { openDirections } from '../../lib/maps'
 import {
-  formatPrice, haversineDistance, FUEL_LABELS, FUEL_COLORS, type DgegStation, type FuelType,
+  formatPrice, formatEuros, formatLitres, fuelTankCost, haversineDistance, parseTankLitres,
+  FUEL_LABELS, FUEL_COLORS, MAX_FUEL_TANK_LITRES, type DgegStation, type FuelType,
 } from '@portugal-hoje/core'
 
 const FUEL_TYPES: FuelType[] = ['gasoline_95', 'gasoline_98', 'diesel', 'diesel_plus', 'lpg']
@@ -43,6 +45,7 @@ function StationItem({
   rank,
   sortBy,
   minPrice,
+  tankLitres,
   origin,
   expanded,
   onToggle,
@@ -51,6 +54,7 @@ function StationItem({
   rank: number
   sortBy: SortBy
   minPrice: number | undefined
+  tankLitres: number | null
   origin: Coords | null
   expanded: boolean
   onToggle: () => void
@@ -104,6 +108,11 @@ function StationItem({
           )}
           {minPrice !== undefined && s.price_eur > minPrice && (
             <Text style={styles.priceDiff}>+{formatPrice(s.price_eur - minPrice)}</Text>
+          )}
+          {tankLitres !== null && (
+            <Text style={styles.tankCost}>
+              ⛽ {formatLitres(tankLitres)}: <Text style={styles.tankCostValue}>{formatEuros(fuelTankCost(s.price_eur, tankLitres))}</Text>
+            </Text>
           )}
         </View>
       </TouchableOpacity>
@@ -199,6 +208,9 @@ export default function Combustivel() {
   const [sortBy, setSortBy] = useState<SortBy>('price')
   const [radiusKm, setRadiusKm] = useState<number | null>(DEFAULT_RADIUS_KM)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  // Custo de atestar o depósito (WEB-045).
+  const [tankText, setTankText] = useFuelTankLitres()
+  const tankLitres = parseTankLitres(tankText)
 
   // Por omissão: Distância com localização, Preço sem ela.
   useEffect(() => {
@@ -319,6 +331,25 @@ export default function Combustivel() {
             </Text>
           </TouchableOpacity>
         )}
+
+        <View style={[styles.filterBtn, styles.tankRow]}>
+          <View style={styles.flex}>
+            <Text style={styles.filterLabel}>Depósito</Text>
+            <Text style={styles.tankHint}>Custo de atestar em cada posto</Text>
+          </View>
+          <TextInput
+            value={tankText}
+            onChangeText={setTankText}
+            keyboardType="decimal-pad"
+            maxLength={5}
+            style={[styles.tankInput, tankLitres === null && styles.tankInputInvalid]}
+            accessibilityLabel="Depósito (litros)"
+          />
+          <Text style={styles.tankUnit}>L</Text>
+        </View>
+        {tankLitres === null && (
+          <Text style={styles.tankError}>Indique um depósito entre 1 e {MAX_FUEL_TANK_LITRES} litros.</Text>
+        )}
       </View>
 
       {rows.length > 0 && (
@@ -328,6 +359,9 @@ export default function Combustivel() {
             <Text style={[styles.statValue, { color: '#16a34a' }]}>
               {minPrice !== undefined ? formatPrice(minPrice) : '—'}
             </Text>
+            {minPrice !== undefined && tankLitres !== null && (
+              <Text style={styles.statSub}>{formatLitres(tankLitres)}: {formatEuros(fuelTankCost(minPrice, tankLitres))}</Text>
+            )}
           </View>
           {nearestKm !== null && (
             <View style={styles.statCard}>
@@ -374,6 +408,7 @@ export default function Combustivel() {
             rank={i}
             sortBy={effectiveSort}
             minPrice={minPrice}
+            tankLitres={tankLitres}
             origin={coords}
             expanded={expandedKey === key}
             onToggle={() => setExpandedKey(k => (k === key ? null : key))}
@@ -496,6 +531,26 @@ const styles = StyleSheet.create({
   cheapestTag: { fontSize: 10, color: '#16a34a', fontWeight: '700', marginTop: 1 },
   price: { fontSize: 17, fontWeight: '700', color: '#0f172a' },
   priceDiff: { fontSize: 11, color: '#ef4444', marginTop: 1 },
+  tankCost: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  tankCostValue: { fontWeight: '700', color: '#334155' },
+  flex: { flex: 1 },
+  tankRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tankHint: { fontSize: 12, color: '#64748b' },
+  tankInput: {
+    minWidth: 60,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 15,
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  tankInputInvalid: { borderColor: '#fca5a5' },
+  tankUnit: { fontSize: 15, color: '#64748b', fontWeight: '600' },
+  tankError: { fontSize: 12, color: '#dc2626', marginTop: -4 },
+  statSub: { fontSize: 11, color: '#64748b', marginTop: 2 },
 })
 
 const modalStyles = StyleSheet.create({

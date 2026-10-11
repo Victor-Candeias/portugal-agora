@@ -79,4 +79,6 @@ status: active
 | WEB-041 | NIF (web e mobile): nome e morada de empresas via VIES | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [WEB-041](../specs/mobile/web-041-spec.md) |
 | WEB-042 | Concelhos (web e mobile): ficha do concelho via API Aberta /geo | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [WEB-042](../specs/mobile/web-042-spec.md) |
 | WEB-043 | EV (web e mobile): custo de carregamento da bateria ao abrir um posto | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
+| WEB-044 | EV (web e mobile): tempo previsto de carregamento por posto e carga por omissão de 10% a 80% | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
+| WEB-045 | Combustível (web e mobile): custo de atestar o depósito (50 L por omissão, editável) | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
 <!-- /maestru:work-items-list -->

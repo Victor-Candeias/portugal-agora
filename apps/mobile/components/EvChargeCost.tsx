@@ -3,14 +3,19 @@ import { StyleSheet, Text, TextInput, View } from 'react-native'
 import {
   EV_BATTERY_PRESETS_KWH,
   estimateEvCharge,
+  estimateEvChargeTimes,
+  formatChargeDuration,
+  formatEvConnector,
+  formatPowerKw,
   formatPrice,
   parseDecimal,
   type EvChargeSettings,
+  type EvConnector,
 } from '@portugal-hoje/core'
 import { useCheapestEvTariffs } from '../hooks/useEv'
 import { ChipRow, COLORS, ErrorView, LinkText, LoadingView, uiStyles } from './ui'
 
-// Custo de carregar a bateria de X% a Y% num posto, por CEME (WEB-043).
+// Custo (WEB-043) e tempo previsto (WEB-044) de carregar a bateria de X% a Y% num posto.
 const COLOR = '#f59e0b'
 const TOP_N = 5
 
@@ -30,9 +35,10 @@ const formatNumber = (value: number) => new Intl.NumberFormat('pt-PT', { maximum
 interface Props {
   settings: EvChargeSettings
   onChange: (patch: Partial<EvChargeSettings>) => void
+  connectors: EvConnector[]
 }
 
-export function EvChargeCost({ settings, onChange }: Props) {
+export function EvChargeCost({ settings, onChange, connectors }: Props) {
   const estimate = estimateEvCharge(settings)
   const [kwh, setKwh] = useState(estimate.ok ? estimate.energyKwh : 0)
   const [showAll, setShowAll] = useState(false)
@@ -51,10 +57,11 @@ export function EvChargeCost({ settings, onChange }: Props) {
   const period = cheapest.data?.meta.current_period
   const battery = parseDecimal(settings.batteryKwh)
   const selectedBattery = BATTERY_OPTIONS.find(o => Number(o.value) === battery)?.value ?? null
+  const times = estimate.ok ? estimateEvChargeTimes(estimate, connectors, settings) : null
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.title}>Custo do carregamento</Text>
+      <Text style={styles.title}>Custo e tempo do carregamento</Text>
       <ChipRow
         options={BATTERY_OPTIONS}
         value={selectedBattery}
@@ -76,32 +83,64 @@ export function EvChargeCost({ settings, onChange }: Props) {
         </Text>
       )}
 
-      {cheapest.isLoading && <LoadingView color={COLOR} />}
-      {cheapest.isError && <ErrorView error={cheapest.error} onRetry={() => void cheapest.refetch()} />}
-      {cheapest.data && costs.length === 0 && <Text style={uiStyles.small}>Sem tarifas disponíveis.</Text>}
-      {shown.map((c, i) => (
-        <View key={c.ceme} style={styles.costRow}>
-          <Text style={styles.rank}>{i + 1}</Text>
-          <View style={styles.flex}>
-            <Text style={styles.ceme} numberOfLines={1}>{c.ceme}</Text>
-            <Text style={styles.price}>
-              {formatPrice(c.price_per_kwh_eur)}/kWh
-              {c.activation_fee_eur > 0 ? ` + ativação ${formatEur(c.activation_fee_eur)}` : ''}
-            </Text>
-          </View>
-          <Text style={[styles.total, i === 0 && styles.cheapest]}>{formatEur(c.total_cost_eur)}</Text>
+      <View style={styles.section}>
+        <Text style={styles.subtitle}>⏱️ Tempo previsto</Text>
+        <Text style={[uiStyles.small, styles.carHint]}>O carro aceita até:</Text>
+        <View style={styles.fields}>
+          <NumberField label="AC" unit="kW" value={settings.acMaxKw} onChange={v => onChange({ acMaxKw: v })} />
+          <NumberField label="DC" unit="kW" value={settings.dcMaxKw} onChange={v => onChange({ dcMaxKw: v })} />
         </View>
-      ))}
-      {costs.length > TOP_N && (
-        <LinkText
-          label={showAll ? 'Ver menos' : `Ver todos os CEME (${costs.length})`}
-          onPress={() => setShowAll(v => !v)}
-        />
-      )}
+        {times && 'error' in times && <Text style={styles.error}>{times.error}</Text>}
+        {times?.ok && times.times.map(t => (
+          <View key={formatEvConnector(t.connector)} style={styles.timeRow}>
+            <View style={styles.flex}>
+              <Text style={styles.connector} numberOfLines={1}>{formatEvConnector(t.connector)}</Text>
+              {t.limitedByCar && <Text style={styles.price}>carro limita a {formatPowerKw(t.effectiveKw)}</Text>}
+            </View>
+            <Text style={styles.duration}>{formatChargeDuration(t.minutes)}</Text>
+          </View>
+        ))}
+        {times?.ok && times.times.length === 0 && (
+          <Text style={[uiStyles.small, styles.summary]}>Este posto não indica a potência das tomadas.</Text>
+        )}
+        {times?.ok && times.times.length > 0 && times.unknownPower > 0 && (
+          <Text style={styles.note}>
+            {times.unknownPower} tipo{times.unknownPower !== 1 ? 's' : ''} de tomada sem potência indicada.
+          </Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.subtitle}>💶 Custo por CEME</Text>
+        {cheapest.isLoading && <LoadingView color={COLOR} />}
+        {cheapest.isError && <ErrorView error={cheapest.error} onRetry={() => void cheapest.refetch()} />}
+        {cheapest.data && costs.length === 0 && <Text style={uiStyles.small}>Sem tarifas disponíveis.</Text>}
+        {shown.map((c, i) => (
+          <View key={c.ceme} style={styles.costRow}>
+            <Text style={styles.rank}>{i + 1}</Text>
+            <View style={styles.flex}>
+              <Text style={styles.ceme} numberOfLines={1}>{c.ceme}</Text>
+              <Text style={styles.price}>
+                {formatPrice(c.price_per_kwh_eur)}/kWh
+                {c.activation_fee_eur > 0 ? ` + ativação ${formatEur(c.activation_fee_eur)}` : ''}
+              </Text>
+            </View>
+            <Text style={[styles.total, i === 0 && styles.cheapest]}>{formatEur(c.total_cost_eur)}</Text>
+          </View>
+        ))}
+        {costs.length > TOP_N && (
+          <LinkText
+            label={showAll ? 'Ver menos' : `Ver todos os CEME (${costs.length})`}
+            onPress={() => setShowAll(v => !v)}
+          />
+        )}
+      </View>
 
       <Text style={styles.note}>
-        Energia ao preço de cada CEME{period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}. Não inclui a tarifa
-        do operador do posto (OPC), a tarifa de acesso às redes (EGME) nem as perdas no carregamento.
+        Tempo estimado com a menor potência entre a tomada e o carro (AC com ~10% de perdas; DC mais lento acima de
+        80%). Pode variar com a temperatura, a partilha de potência e o carro. Custo: energia ao preço de cada CEME
+        {period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}, sem a tarifa do operador do posto (OPC), a tarifa
+        de acesso às redes (EGME) nem as perdas no carregamento.
       </Text>
     </View>
   )
@@ -144,6 +183,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fffbeb',
   },
   title: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 8 },
+  subtitle: { fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 },
+  section: { marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#fef3c7' },
+  carHint: { marginBottom: 6 },
   fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   input: {
     minWidth: 52,
@@ -160,6 +202,9 @@ const styles = StyleSheet.create({
   error: { fontSize: 12, color: '#dc2626', marginTop: 8 },
   summary: { marginTop: 8, marginBottom: 4 },
   energy: { fontWeight: '700', color: COLORS.text },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, marginTop: 4 },
+  connector: { fontSize: 12, color: '#334155' },
+  duration: { fontSize: 14, fontWeight: '700', color: COLORS.text },
   costRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -213,12 +213,12 @@ function ChargerCard({
       {c.lastVerified ? <Text style={styles.verified}>Verificado em {formatDate(c.lastVerified)}</Text> : null}
 
       <View style={uiStyles.actions}>
-        <LinkText label={showCost ? '💶 Ocultar custo' : '💶 Custo'} onPress={() => setShowCost(v => !v)} />
+        <LinkText label={showCost ? '💶 Ocultar custo e tempo' : '💶 Custo e tempo'} onPress={() => setShowCost(v => !v)} />
         <LinkText label={showMap ? '🗺️ Ocultar mapa' : '🗺️ Mapa'} onPress={() => setShowMap(v => !v)} />
         <LinkText label="🧭 Direções" onPress={() => openDirections(c.latitude, c.longitude)} />
         <LinkText label="🔗 Open Charge Map" onPress={() => void Linking.openURL(c.url)} />
       </View>
-      {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} />}
+      {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} connectors={c.connectors} />}
       {showMap && <SinglePointMap latitude={c.latitude} longitude={c.longitude} label={c.name} style={uiStyles.cardMap} />}
     </Card>
   )

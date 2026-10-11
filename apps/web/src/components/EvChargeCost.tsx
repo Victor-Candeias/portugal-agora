@@ -2,15 +2,22 @@ import { useEffect, useState } from 'react'
 import {
   EV_BATTERY_PRESETS_KWH,
   MAX_EV_BATTERY_KWH,
+  MAX_EV_CAR_AC_KW,
+  MAX_EV_CAR_DC_KW,
   estimateEvCharge,
+  estimateEvChargeTimes,
+  formatChargeDuration,
+  formatEvConnector,
+  formatPowerKw,
   formatPrice,
   parseDecimal,
   type EvChargeSettings,
+  type EvConnector,
 } from '@portugal-hoje/core'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
 import { useCheapestEvTariffs } from '@/hooks/useEv'
 
-// Custo de carregar a bateria de X% a Y% num posto, por CEME (WEB-043).
+// Custo (WEB-043) e tempo previsto (WEB-044) de carregar a bateria de X% a Y% num posto.
 const TOP_N = 5
 
 const PERIOD_LABELS: Record<string, string> = {
@@ -27,9 +34,10 @@ const formatNumber = (value: number) => new Intl.NumberFormat('pt-PT', { maximum
 interface Props {
   settings: EvChargeSettings
   onChange: (patch: Partial<EvChargeSettings>) => void
+  connectors: EvConnector[]
 }
 
-export function EvChargeCost({ settings, onChange }: Props) {
+export function EvChargeCost({ settings, onChange, connectors }: Props) {
   const estimate = estimateEvCharge(settings)
   const [kwh, setKwh] = useState(estimate.ok ? estimate.energyKwh : 0)
   const [showAll, setShowAll] = useState(false)
@@ -47,10 +55,11 @@ export function EvChargeCost({ settings, onChange }: Props) {
   const shown = showAll ? costs : costs.slice(0, TOP_N)
   const period = cheapest.data?.meta.current_period
   const battery = parseDecimal(settings.batteryKwh)
+  const times = estimate.ok ? estimateEvChargeTimes(estimate, connectors, settings) : null
 
   return (
     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-      <p className="text-xs font-semibold text-slate-700 mb-2">Custo do carregamento</p>
+      <p className="text-xs font-semibold text-slate-700 mb-2">Custo e tempo do carregamento</p>
 
       <div className="flex flex-wrap gap-1.5 mb-2">
         {EV_BATTERY_PRESETS_KWH.map(v => (
@@ -86,7 +95,41 @@ export function EvChargeCost({ settings, onChange }: Props) {
         </p>
       )}
 
-      <div className="mt-2">
+      <div className="mt-3 border-t border-amber-100 pt-2">
+        <p className="text-xs font-semibold text-slate-700 mb-1.5">⏱️ Tempo previsto</p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
+          <span className="text-slate-500">O carro aceita até:</span>
+          <NumberField label="AC" unit="kW" value={settings.acMaxKw} max={MAX_EV_CAR_AC_KW} onChange={v => onChange({ acMaxKw: v })} />
+          <NumberField label="DC" unit="kW" value={settings.dcMaxKw} max={MAX_EV_CAR_DC_KW} onChange={v => onChange({ dcMaxKw: v })} />
+        </div>
+        {times && 'error' in times && <p className="text-xs text-red-600 mt-2">{times.error}</p>}
+        {times?.ok && times.times.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {times.times.map(t => (
+              <li key={formatEvConnector(t.connector)} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-600 min-w-0 truncate">
+                  {formatEvConnector(t.connector)}
+                  {t.limitedByCar && (
+                    <span className="text-slate-400"> · carro limita a {formatPowerKw(t.effectiveKw)}</span>
+                  )}
+                </span>
+                <span className="font-bold text-slate-900 tabular-nums whitespace-nowrap">{formatChargeDuration(t.minutes)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {times?.ok && times.times.length === 0 && (
+          <p className="text-xs text-slate-500 mt-2">Este posto não indica a potência das tomadas.</p>
+        )}
+        {times?.ok && times.times.length > 0 && times.unknownPower > 0 && (
+          <p className="text-[11px] text-slate-400 mt-1">
+            {times.unknownPower} tipo{times.unknownPower !== 1 ? 's' : ''} de tomada sem potência indicada.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 border-t border-amber-100 pt-2">
+        <p className="text-xs font-semibold text-slate-700 mb-1">💶 Custo por CEME</p>
         {cheapest.isLoading && <LoadingBox />}
         {cheapest.isError && <ErrorBox message={(cheapest.error as Error).message} />}
         {cheapest.data && costs.length === 0 && <p className="text-xs text-slate-500">Sem tarifas disponíveis.</p>}
@@ -121,8 +164,10 @@ export function EvChargeCost({ settings, onChange }: Props) {
       </div>
 
       <p className="text-[11px] text-slate-400 mt-2">
-        Energia ao preço de cada CEME{period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}. Não inclui a tarifa do
-        operador do posto (OPC), a tarifa de acesso às redes (EGME) nem as perdas no carregamento.
+        Tempo estimado com a menor potência entre a tomada e o carro (AC com ~10% de perdas; DC mais lento acima de 80%).
+        Pode variar com a temperatura, a partilha de potência e o carro. Custo: energia ao preço de cada CEME
+        {period ? ` (período ${PERIOD_LABELS[period] ?? period})` : ''}, sem a tarifa do operador do posto (OPC), a tarifa de
+        acesso às redes (EGME) nem as perdas no carregamento.
       </p>
     </div>
   )
