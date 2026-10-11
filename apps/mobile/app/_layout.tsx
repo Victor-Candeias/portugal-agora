@@ -37,6 +37,8 @@ export default function RootLayout() {
           <Stack.Screen name="contratos/index" options={{ title: 'Contratos Públicos' }} />
           <Stack.Screen name="contratos/[id]" options={{ title: 'Contrato' }} />
           <Stack.Screen name="fundos" options={{ title: 'Fundos PRR / PT2030' }} />
+          <Stack.Screen name="concelhos/index" options={{ title: 'Concelhos' }} />
+          <Stack.Screen name="concelhos/[slug]" options={{ title: 'Concelho' }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

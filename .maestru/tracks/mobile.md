@@ -77,4 +77,5 @@ status: active
 | WEB-039 | Deploy Pages: passar VITE_APIABERTA_KEY ao build a partir do secret APIABERTA_KEY | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | WEB-040 | EV (web e mobile): postos de carregamento perto de mim via Open Charge Map | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-040](../specs/mobile/web-040-spec.md) |
 | WEB-041 | NIF (web e mobile): nome e morada de empresas via VIES | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [WEB-041](../specs/mobile/web-041-spec.md) |
+| WEB-042 | Concelhos (web e mobile): ficha do concelho via API Aberta /geo | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [WEB-042](../specs/mobile/web-042-spec.md) |
 <!-- /maestru:work-items-list -->

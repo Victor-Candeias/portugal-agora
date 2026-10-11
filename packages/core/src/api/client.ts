@@ -26,6 +26,24 @@ export interface GeoMunicipality {
   district: string
   codigoine: string
   coords: { lat: number; lng: number } | null
+  area_ha?: number | null
+  email?: string | null
+  phone?: string | null
+  postal_code?: string | null
+  website?: string | null
+}
+
+/** Fronteira (GeoJSON) devolvida no detalhe de `/geo/municipalities/{slug}` (WEB-042). */
+export interface GeoBoundary {
+  type: 'Feature'
+  properties: Record<string, unknown> | null
+  geometry:
+    | { type: 'Polygon'; coordinates: number[][][] }
+    | { type: 'MultiPolygon'; coordinates: number[][][][] }
+}
+
+export interface GeoMunicipalityDetail extends GeoMunicipality {
+  geojson: GeoBoundary | null
 }
 
 export interface ApiClientOptions {
@@ -342,8 +360,13 @@ export class ApiAbertaClient {
     return this.get('/geo/districts')
   }
 
-  async getMunicipalities(): Promise<ListResponse<GeoMunicipality>> {
+  // A API pagina 50 por omissão; 400 cobre os 308 concelhos num só pedido.
+  async getMunicipalities(): Promise<{ total: number; data: GeoMunicipality[] }> {
     return this.get('/geo/municipalities', { limit: 400 })
+  }
+
+  async getMunicipality(slug: string): Promise<GeoMunicipalityDetail> {
+    return this.get(`/geo/municipalities/${encodeURIComponent(slug)}`)
   }
 }
 

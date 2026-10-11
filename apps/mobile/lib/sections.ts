@@ -20,6 +20,7 @@ export const SECTIONS: Section[] = [
   { href: '/metro-porto', title: 'Metro do Porto', emoji: '🚇', color: '#9333ea', description: 'Estações e partidas' },
   { href: '/servicos-publicos', title: 'Serviços Públicos', emoji: '🚓', color: '#1d4ed8', description: 'PSP e GNR' },
   { href: '/codigo-postal', title: 'Código Postal', emoji: '📮', color: '#0d9488', description: 'Pesquisa e mapa' },
+  { href: '/concelhos', title: 'Concelhos', emoji: '🏛️', color: '#15803d', description: 'Câmaras e limites' },
   { href: '/nif', title: 'Validar NIF', emoji: '🪪', color: '#0891b2', description: 'Verificar um NIF' },
   { href: '/contratos', title: 'Contratos Públicos', emoji: '📑', color: '#475569', description: 'Contratos BASE' },
   { href: '/fundos', title: 'Fundos PRR / PT2030', emoji: '🇪🇺', color: '#1e40af', description: 'Investimentos PRR' },

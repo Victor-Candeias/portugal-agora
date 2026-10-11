@@ -63,7 +63,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 
 | Dados | Fonte | Chave |
 |---|---|---|
-| Combustível, distritos/concelhos, ANPC | API Aberta — `/fuel/*`, `/geo/*`, `/anpc/*` | sim |
+| Combustível, ANPC | API Aberta — `/fuel/*`, `/anpc/*` (os seletores de distrito/concelho usam a DGEG) | sim |
 | Previsão do tempo (35 locais: capitais de distrito, outras cidades e ilhas; 5 dias) | IPMA open-data — `cities/daily/{globalIdLocal}.json` (um pedido por cidade) e `distrits-islands.json` (locais); a rota `/ipma/forecasts` da API Aberta só tem 3 dias | não |
 | Tempo atual | Open-Meteo (`api.open-meteo.com`) | não |
 | Risco de incêndio rural | IPMA open-data — RCM por concelho (`rcm-d0.json`), agregado por distrito | não |
@@ -76,6 +76,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Contratos públicos (BASE.gov.pt, ~2,2 M contratos, sincronizados diariamente) | API Aberta — `/base/contracts`, `/base/contracts/search?q=` (`q` obrigatório; sem `pages` na resposta), `/base/contracts/lookup/:id` (id inexistente → 200 com `{ error }`); `limit` ≤ 100 | sim |
 | Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
 | Nome e morada de empresas pelo NIF | VIES (Comissão Europeia) — `ec.europa.eu/taxation_customs/vies/rest-api/ms/PT/vat/{nif}`; só NIFs de empresas/entidades; sem CORS (mobile direto, web via proxy do Vite só em dev) | não |
+| Concelhos (contactos da câmara, área, limites) | API Aberta — `/geo/municipalities?limit=400` (lista em cache persistente 30 dias: `localStorage` no web, `expo-sqlite/kv-store` no mobile) e `/geo/municipalities/{slug}` (fronteira GeoJSON). As ilhas vêm sem distrito: a região sai do código INE | sim |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -121,7 +122,7 @@ preciso refazer o development build (`pnpm android`).
 
 A raiz (`apps/mobile/app/_layout.tsx`) é um `Stack`. As tabs (Início, Combustível, Tempo, EV, Economia,
 Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Hospitais, Transportes (CP,
-Carris, TML), Metro do Porto, Serviços Públicos, Código Postal, Validar NIF (`app/nif.tsx`), Fundos PRR / PT2030 (`app/fundos.tsx`) e Contratos Públicos (`app/contratos/index.tsx`
+Carris, TML), Metro do Porto, Serviços Públicos, Código Postal, Concelhos (`app/concelhos/index.tsx` e a ficha `app/concelhos/[slug].tsx`), Validar NIF (`app/nif.tsx`), Fundos PRR / PT2030 (`app/fundos.tsx`) e Contratos Públicos (`app/contratos/index.tsx`
 e o detalhe `app/contratos/[id].tsx`) — são rotas da stack e abrem
 a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
 risco de incêndio da Proteção Civil vem do RCM do IPMA (open-data, sem chave).
@@ -166,6 +167,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
 | 📮 Código Postal | Distrito/concelho/localidade, artérias (moradas.dev) e mapa aproximado da localidade (Open-Meteo geocoding) |
+| 🏛️ Concelhos | Os 308 concelhos (API Aberta), com pesquisa e filtro por distrito/região. A ficha mostra os contactos da câmara (telefone, email, código postal), a área, o código INE e os limites do concelho no mapa |
 | 🪪 Validar NIF | Validação local (`validateNif` no core): 9 dígitos, prefixo atribuído pela AT e dígito de controlo MOD 11, com o tipo de entidade. Para empresas e outras entidades, mostra o nome e a morada do VIES (no web, só em dev, por causa do proxy). Os NIFs de pessoas singulares não são enviados |
 | 📑 Contratos Públicos | Contratos do BASE.gov.pt: mais recentes, pesquisa por texto/entidade/NIF e detalhe (preço, data, procedimento, entidade adjudicante e adjudicatário, link para o portal BASE) (resumo no Início, no web) |
 | 🇪🇺 Fundos PRR / PT2030 | Resumo do PRR (período, 9 componentes, 61 investimentos), investimentos agrupados por componente com filtro e pesquisa sem acentos (no cliente), e resumo do PT2030 (período e orçamento). Fonte: transparencia.gov.pt via API Aberta |
