@@ -32,6 +32,8 @@ status: active
 | MOB-013 | Android Auto: secções EV, Turismo e Serviços Públicos | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [MOB-013](../specs/mobile/mob-013-spec.md) |
 | MOB-014 | Android Auto: detalhe do local no mapa + navegar até ao destino | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [MOB-014](../specs/mobile/mob-014-spec.md) |
 | MOB-015 | Mobile: Android Auto na app pt.portugalhoje.app (módulo Expo local com CarAppService) | done | 2026-10-10 | developer | high | 2026-10-10 |  |  | [MOB-015](../specs/mobile/mob-015-spec.md) |
+| MOB-016 | Combustível (mobile): mostrar o posto no mapa e direções a partir da minha localização | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [MOB-016](../specs/mobile/mob-016-spec.md) |
+| MOB-017 | EV (mobile): Tarifas CEME com mais quantidades de kWh e valor personalizado | backlog | 2026-10-11 | developer | medium |  |  |  |  |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |
 | WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |

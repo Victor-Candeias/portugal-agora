@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 import { Map, Camera, Marker, type LngLatBounds } from '@maplibre/maplibre-react-native'
-import { OSM_STYLE, openDirections, viewForPoints, type MapPoint } from '../lib/maps'
+import { OSM_STYLE, openDirections, viewForPoints, type DirectionsOptions, type MapPoint } from '../lib/maps'
 
 export type { MapPoint } from '../lib/maps'
 
@@ -15,11 +15,13 @@ type PointsMapProps = {
   color?: string
   // Enquadramento fixo `[oeste, sul, este, norte]` em vez de ajustar aos pontos (mostra o mapa mesmo sem pontos).
   bounds?: LngLatBounds
+  // Opções do "Direções" do balão (ex.: partir da localização do utilizador).
+  directions?: DirectionsOptions
   style?: StyleProp<ViewStyle>
 }
 
 // Mapa nativo (MapLibre + OpenStreetMap) com um ou vários pontos; tocar num marcador mostra o nome e "Direções".
-export function PointsMap({ points, height = 224, initialSelectedId, color = '#ea580c', bounds, style }: PointsMapProps) {
+export function PointsMap({ points, height = 224, initialSelectedId, color = '#ea580c', bounds, directions, style }: PointsMapProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>(
     initialSelectedId ?? (points.length === 1 ? points[0].id : undefined),
   )
@@ -73,9 +75,11 @@ export function PointsMap({ points, height = 224, initialSelectedId, color = '#e
               <Text style={styles.calloutDescription} numberOfLines={2}>{selected.description}</Text>
             )}
           </View>
-          <TouchableOpacity onPress={() => openDirections(selected.latitude, selected.longitude)}>
-            <Text style={styles.calloutAction}>🧭 Direções</Text>
-          </TouchableOpacity>
+          {!selected.noDirections && (
+            <TouchableOpacity onPress={() => openDirections(selected.latitude, selected.longitude, directions)}>
+              <Text style={styles.calloutAction}>🧭 Direções</Text>
+            </TouchableOpacity>
+          )}
           {points.length > 1 && (
             <TouchableOpacity onPress={() => setSelectedId(undefined)} hitSlop={8}>
               <Text style={styles.calloutClose}>✕</Text>

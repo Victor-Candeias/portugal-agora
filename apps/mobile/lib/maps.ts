@@ -24,17 +24,26 @@ export type MapPoint = {
   description?: string
   /** Cor do marcador quando não está selecionado (por omissão azul). */
   color?: string
+  /** Esconde "Direções" no balão deste ponto (ex.: o marcador "Estou aqui"). */
+  noDirections?: boolean
 }
+
+export type Coords = { latitude: number; longitude: number }
+export type DirectionsOptions = { origin?: Coords | null; travelMode?: 'driving' | 'walking' | 'transit' }
 
 export const SINGLE_POINT_ZOOM = 15
 
-export function directionsUrl(latitude: number, longitude: number): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
+// Sem `origin`, o Google Maps usa a localização atual do dispositivo como partida.
+export function directionsUrl(latitude: number, longitude: number, options: DirectionsOptions = {}): string {
+  const { origin, travelMode } = options
+  const from = origin ? `&origin=${origin.latitude},${origin.longitude}` : ''
+  const mode = travelMode ? `&travelmode=${travelMode}` : ''
+  return `https://www.google.com/maps/dir/?api=1${from}&destination=${latitude},${longitude}${mode}`
 }
 
 // No Android o URL universal do Google Maps abre a app nativa (se instalada); senão abre o browser.
-export function openDirections(latitude: number, longitude: number): Promise<void> {
-  return Linking.openURL(directionsUrl(latitude, longitude))
+export function openDirections(latitude: number, longitude: number, options?: DirectionsOptions): Promise<void> {
+  return Linking.openURL(directionsUrl(latitude, longitude, options))
 }
 
 export type MapView =

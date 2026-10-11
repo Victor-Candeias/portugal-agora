@@ -4,8 +4,10 @@ import {
   ActivityIndicator, Modal, FlatList, SafeAreaView,
 } from 'react-native'
 import { useFuelPrices, useDistricts, useMunicipalities } from '../../hooks/useApi'
-import { useUserLocation } from '../../hooks/useUserLocation'
-import { ChipRow, SegmentedTabs, formatDistance } from '../../components/ui'
+import { useUserLocation, type Coords } from '../../hooks/useUserLocation'
+import { ChipRow, LinkText, SegmentedTabs, formatDistance, uiStyles } from '../../components/ui'
+import { PointsMap, type MapPoint } from '../../components/PointsMap'
+import { openDirections } from '../../lib/maps'
 import {
   formatPrice, haversineDistance, FUEL_LABELS, FUEL_COLORS, type DgegStation, type FuelType,
 } from '@portugal-hoje/core'
@@ -32,6 +34,111 @@ const byDistance = (a: StationRow, b: StationRow) => (a.distKm ?? Infinity) - (b
 const byPrice = (a: StationRow, b: StationRow) => a.price_eur - b.price_eur
 
 type PickerItem = { Id: number; Descritivo: string }
+
+const ME_POINT_ID = 'me'
+
+// Linha de um posto; tocar abre as ações "Ver no mapa" e "Como chegar" (MOB-016).
+function StationItem({
+  station: s,
+  rank,
+  sortBy,
+  minPrice,
+  origin,
+  expanded,
+  onToggle,
+}: {
+  station: StationRow
+  rank: number
+  sortBy: SortBy
+  minPrice: number | undefined
+  origin: Coords | null
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const [showMap, setShowMap] = useState(false)
+  const located = hasCoords(s)
+  const isCheapest = minPrice !== undefined && s.price_eur === minPrice
+  const rankColor = sortBy === 'distance'
+    ? (rank === 0 ? '#2563eb' : rank < 3 ? '#60a5fa' : '#94a3b8')
+    : (rank === 0 ? '#16a34a' : rank < 3 ? '#65a30d' : '#94a3b8')
+
+  const stationId = `station-${s.Id}`
+  const mapPoints = useMemo<MapPoint[]>(() => {
+    const points: MapPoint[] = [{
+      id: stationId,
+      latitude: s.Latitude,
+      longitude: s.Longitude,
+      label: s.Nome,
+      description: [formatPrice(s.price_eur), s.distKm !== null ? formatDistance(s.distKm) : null]
+        .filter(Boolean)
+        .join(' · '),
+    }]
+    if (origin) {
+      points.push({ id: ME_POINT_ID, ...origin, label: 'Estou aqui', color: '#16a34a', noDirections: true })
+    }
+    return points
+  }, [stationId, s.Latitude, s.Longitude, s.Nome, s.price_eur, s.distKm, origin])
+
+  const directions = { origin, travelMode: 'driving' as const }
+
+  return (
+    <View style={styles.stationCard}>
+      <TouchableOpacity style={styles.stationRow} onPress={onToggle} activeOpacity={0.7}>
+        <View style={[styles.rank, { backgroundColor: rankColor }]}>
+          <Text style={styles.rankText}>{rank + 1}</Text>
+        </View>
+        <View style={styles.stationInfo}>
+          <Text style={styles.stationName} numberOfLines={expanded ? undefined : 1}>{s.Nome}</Text>
+          <Text style={styles.stationLocation}>📍 {s.Municipio}, {s.Distrito}</Text>
+          {s.distKm !== null && (
+            <Text style={styles.stationDistance}>🧭 {formatDistance(s.distKm)}</Text>
+          )}
+        </View>
+        <View style={styles.priceBox}>
+          <Text style={[styles.price, isCheapest && { color: '#16a34a' }]}>
+            {formatPrice(s.price_eur)}
+          </Text>
+          {isCheapest && sortBy === 'distance' && (
+            <Text style={styles.cheapestTag}>mais barato</Text>
+          )}
+          {minPrice !== undefined && s.price_eur > minPrice && (
+            <Text style={styles.priceDiff}>+{formatPrice(s.price_eur - minPrice)}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.stationDetails}>
+          {located ? (
+            <>
+              <View style={uiStyles.actions}>
+                <LinkText label={showMap ? '🗺️ Ocultar mapa' : '🗺️ Ver no mapa'} onPress={() => setShowMap(v => !v)} />
+                <LinkText label="🧭 Como chegar" onPress={() => void openDirections(s.Latitude, s.Longitude, directions)} />
+              </View>
+              <Text style={styles.directionsHint}>
+                {origin
+                  ? 'Percurso de carro a partir da sua localização (Google Maps).'
+                  : 'Sem a sua localização: o Google Maps usa a posição atual do telemóvel.'}
+              </Text>
+              {showMap && (
+                <PointsMap
+                  points={mapPoints}
+                  initialSelectedId={stationId}
+                  directions={directions}
+                  height={260}
+                  color="#16a34a"
+                  style={uiStyles.cardMap}
+                />
+              )}
+            </>
+          ) : (
+            <Text style={styles.directionsHint}>Este posto não tem coordenadas na DGEG.</Text>
+          )}
+        </View>
+      )}
+    </View>
+  )
+}
 
 function SelectModal({
   visible,
@@ -91,6 +198,7 @@ export default function Combustivel() {
   const coords = location.coords
   const [sortBy, setSortBy] = useState<SortBy>('price')
   const [radiusKm, setRadiusKm] = useState<number | null>(DEFAULT_RADIUS_KM)
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
   // Por omissão: Distância com localização, Preço sem ela.
   useEffect(() => {
@@ -258,34 +366,18 @@ export default function Combustivel() {
       )}
 
       {rows.slice(0, MAX_SHOWN).map((s, i) => {
-        const isCheapest = minPrice !== undefined && s.price_eur === minPrice
-        const rankColor = effectiveSort === 'distance'
-          ? (i === 0 ? '#2563eb' : i < 3 ? '#60a5fa' : '#94a3b8')
-          : (i === 0 ? '#16a34a' : i < 3 ? '#65a30d' : '#94a3b8')
+        const key = `${s.Id}-${i}`
         return (
-          <View key={`${s.Id}-${i}`} style={styles.stationRow}>
-            <View style={[styles.rank, { backgroundColor: rankColor }]}>
-              <Text style={styles.rankText}>{i + 1}</Text>
-            </View>
-            <View style={styles.stationInfo}>
-              <Text style={styles.stationName} numberOfLines={1}>{s.Nome}</Text>
-              <Text style={styles.stationLocation}>📍 {s.Municipio}, {s.Distrito}</Text>
-              {s.distKm !== null && (
-                <Text style={styles.stationDistance}>🧭 {formatDistance(s.distKm)}</Text>
-              )}
-            </View>
-            <View style={styles.priceBox}>
-              <Text style={[styles.price, isCheapest && { color: '#16a34a' }]}>
-                {formatPrice(s.price_eur)}
-              </Text>
-              {isCheapest && effectiveSort === 'distance' && (
-                <Text style={styles.cheapestTag}>mais barato</Text>
-              )}
-              {minPrice !== undefined && s.price_eur > minPrice && (
-                <Text style={styles.priceDiff}>+{formatPrice(s.price_eur - minPrice)}</Text>
-              )}
-            </View>
-          </View>
+          <StationItem
+            key={key}
+            station={s}
+            rank={i}
+            sortBy={effectiveSort}
+            minPrice={minPrice}
+            origin={coords}
+            expanded={expandedKey === key}
+            onToggle={() => setExpandedKey(k => (k === key ? null : key))}
+          />
         )
       })}
 
@@ -369,15 +461,24 @@ const styles = StyleSheet.create({
   errorText: { color: '#dc2626', fontSize: 14 },
   listTitle: { fontSize: 12, color: '#64748b', fontWeight: '600', marginBottom: 8 },
   emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginVertical: 24 },
-  stationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  stationCard: {
     backgroundColor: 'white',
     borderRadius: 10,
-    padding: 12,
     marginBottom: 8,
     elevation: 1,
   },
+  stationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  stationDetails: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  directionsHint: { fontSize: 11, color: '#94a3b8', marginTop: 6 },
   rank: {
     width: 28,
     height: 28,
