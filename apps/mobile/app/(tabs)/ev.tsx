@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ScrollView, View, Text, StyleSheet } from 'react-native'
+import { useEffect, useState } from 'react'
+import { ScrollView, View, Text, TextInput, StyleSheet } from 'react-native'
 import { formatPrice, type EvTariff } from '@portugal-hoje/core'
 import { useCheapestEvTariffs, useEvTariffs } from '../../hooks/useEv'
 import { EvChargers } from '../../components/EvChargers'
@@ -18,8 +18,15 @@ import {
 } from '../../components/ui'
 
 const COLOR = '#f59e0b'
-const KWH_OPTIONS = ['10', '20', '30', '50'] as const
-type KwhOption = (typeof KWH_OPTIONS)[number]
+// Quantidades típicas: carga parcial (5–20), bateria média (30–60) e grande (75–100). "Outro" aceita até MAX_KWH.
+const KWH_PRESETS = ['5', '10', '20', '30', '40', '50', '60', '75', '100'] as const
+const MAX_KWH = 200
+const DEFAULT_KWH = 30
+
+function parseKwh(text: string): number | null {
+  const value = Number(text.trim().replace(',', '.'))
+  return Number.isFinite(value) && value > 0 && value <= MAX_KWH ? value : null
+}
 
 // Postos perto de mim (Open Charge Map, WEB-040) e tarifas CEME (API Aberta, MOB-008).
 type EvTab = 'chargers' | 'tariffs'
@@ -37,11 +44,31 @@ const PERIOD_LABELS: Record<string, string> = {
 const formatEur = (value: number) =>
   new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
 
+const formatKwh = (value: number) =>
+  `${new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 1 }).format(value)} kWh`
+
 export default function EV() {
   const [tab, setTab] = useState<EvTab>('chargers')
-  const [kwh, setKwh] = useState<KwhOption>('30')
+  const [kwhInput, setKwhInput] = useState(String(DEFAULT_KWH))
+  const [kwh, setKwh] = useState(DEFAULT_KWH)
   const tariffs = useEvTariffs()
-  const cheapest = useCheapestEvTariffs(Number(kwh))
+  const cheapest = useCheapestEvTariffs(kwh)
+
+  // Espera que o utilizador pare de escrever antes de pedir o custo à API.
+  useEffect(() => {
+    const value = parseKwh(kwhInput)
+    if (value === null) return
+    const timer = setTimeout(() => setKwh(value), 400)
+    return () => clearTimeout(timer)
+  }, [kwhInput])
+
+  const selectPreset = (value: string) => {
+    setKwhInput(value)
+    setKwh(Number(value))
+  }
+
+  const inputInvalid = kwhInput.trim() !== '' && parseKwh(kwhInput) === null
+  const selectedPreset = (KWH_PRESETS as readonly string[]).includes(kwhInput.trim()) ? kwhInput.trim() : null
 
   const refresh = () => {
     void tariffs.refetch()
@@ -73,12 +100,28 @@ export default function EV() {
           Custo de energia por CEME{period ? `, tarifa atual (${PERIOD_LABELS[period] ?? period})` : ''}.
         </Text>
         <ChipRow
-          options={KWH_OPTIONS.map(v => ({ value: v, label: `${v} kWh` }))}
-          value={kwh}
-          onChange={v => v && setKwh(v)}
+          options={KWH_PRESETS.map(v => ({ value: v as string, label: `${v} kWh` }))}
+          value={selectedPreset}
+          onChange={v => v && selectPreset(v)}
           allLabel={null}
           color={COLOR}
         />
+        <View style={[uiStyles.row, styles.customRow]}>
+          <Text style={uiStyles.small}>Outro:</Text>
+          <TextInput
+            value={kwhInput}
+            onChangeText={setKwhInput}
+            keyboardType="decimal-pad"
+            maxLength={6}
+            placeholder={String(DEFAULT_KWH)}
+            placeholderTextColor="#94a3b8"
+            style={[styles.kwhInput, inputInvalid && styles.kwhInputInvalid]}
+            accessibilityLabel="Energia a carregar (kWh)"
+          />
+          <Text style={uiStyles.small}>kWh</Text>
+        </View>
+        {inputInvalid && <Text style={styles.inputError}>Indique um valor entre 1 e {MAX_KWH} kWh.</Text>}
+        <Text style={[uiStyles.small, styles.hint]}>A simular {formatKwh(kwh)}.</Text>
         {cheapest.isLoading && <LoadingView color={COLOR} />}
         {cheapest.isError && <ErrorView error={cheapest.error} onRetry={() => void cheapest.refetch()} />}
         {cheapest.data?.data.map((c, i) => (
@@ -159,6 +202,20 @@ function Price({ label, value, highlight }: { label: string; value: string; high
 
 const styles = StyleSheet.create({
   hint: { marginBottom: 8 },
+  customRow: { marginTop: 4, marginBottom: 6 },
+  kwhInput: {
+    width: 80,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 14,
+    color: '#0f172a',
+    backgroundColor: 'white',
+  },
+  kwhInputInvalid: { borderColor: '#fca5a5' },
+  inputError: { fontSize: 12, color: '#dc2626', marginBottom: 6 },
   costRow: {
     flexDirection: 'row',
     alignItems: 'center',
