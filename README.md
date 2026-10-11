@@ -214,12 +214,19 @@ com o plugin `expo-splash-screen`). O fundo é `#01163a`.
 
 ```powershell
 $env:JAVA_HOME = "<JDK 17>"
-# ANDROID_KEYSTORE_PATH / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD definidos
 cd apps/mobile
-npx expo prebuild --platform android --no-install   # recriar android/local.properties (cmake.dir) se for apagado
-cd android; .\gradlew.bat assembleRelease
-# app/build/outputs/apk/release/app-release.apk → copiado para "<nome da app>-<versão>.apk" na mesma pasta
+pnpm build:apk            # ou: node scripts/build-apk.mjs   (--no-bump para não mudar a versão)
+# → android/app/build/outputs/apk/release/Portugal-Hoje-<versão>.apk
 ```
+
+O `build:apk` (`apps/mobile/scripts/build-apk.mjs`, MOB-018):
+
+- Incrementa a versão no `app.json` em cada build: patch do `version` (1.0.1 → 1.0.2) e `android.versionCode` +1. Assim o APK instala-se por cima do anterior, sem perder dados. Se o build falhar, o `app.json` é reposto. Fazer commit do `app.json` com a nova versão.
+- Assina com a keystore de release. Usa as variáveis `ANDROID_KEYSTORE_PATH` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` ou, se não estiverem definidas, o ficheiro `KEY=VALOR` em `ANDROID_KEYSTORE_PROPERTIES` (por omissão `~/.keystores/portugal-hoje-release.properties`, fora do repositório). Sem nenhum, assina com a debug keystore e o APK não atualiza uma app instalada com a de release.
+- Corre `expo prebuild`, que apaga e recria o `android/`, e volta a criar o `android/local.properties`. O `cmake.dir` aponta para o CMake mais recente do SDK; com o 3.22 o ninja falha com "build.ninja still dirty". Depois corre `gradlew assembleRelease`. O build completo demora ~20 min.
+- O nome do APK (`<nome da app>-<versão>.apk`) vem do config plugin `plugins/withApkName.js`, por isso também se aplica a um `gradlew assembleRelease` manual.
+
+Instalar no telemóvel ligado por USB: `adb install -r <apk>`.
 
 ### Mobile no CI (GitHub Actions) e Google Play
 

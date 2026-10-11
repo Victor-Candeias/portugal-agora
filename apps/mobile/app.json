@@ -2,7 +2,7 @@
   "expo": {
     "name": "Portugal Hoje",
     "slug": "portugal-hoje",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,6 +10,7 @@
     "plugins": [
       "expo-router",
       "./plugins/withReleaseSigning",
+      "./plugins/withApkName",
       "@maplibre/maplibre-react-native",
       [
         "expo-splash-screen",
@@ -32,6 +33,7 @@
     },
     "android": {
       "package": "pt.portugalhoje.app",
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#01163a",
         "foregroundImage": "./assets/android-icon-foreground.png"

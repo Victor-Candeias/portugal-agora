@@ -120,7 +120,7 @@ jobs:
           name: portugal-hoje-android-${{ github.run_number }}
           path: |
             apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
-            apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+            apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       - name: Publicar no Google Play

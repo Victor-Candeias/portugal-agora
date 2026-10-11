@@ -32,7 +32,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "build:apk": "node scripts/build-apk.mjs"
   },
   "private": true
 }
