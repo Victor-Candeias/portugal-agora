@@ -4,6 +4,7 @@ import {
   EV_CHARGER_MIN_POWER_OPTIONS,
   EV_CHARGER_RADII_KM,
   OPEN_CHARGE_MAP_ATTRIBUTION,
+  OSM_ATTRIBUTION,
   formatDate,
   formatEvConnector,
   formatPowerKw,
@@ -32,9 +33,11 @@ import {
   uiStyles,
 } from './ui'
 
-// Postos de carregamento perto do utilizador via Open Charge Map (WEB-040).
+// Postos de carregamento perto do utilizador via Open Charge Map (WEB-040) e OpenStreetMap (WEB-047).
 const COLOR = '#f59e0b'
 const PAGE_SIZE = 20
+// Os marcadores são views React: com centenas de postos o mapa fica lento.
+const MAP_MAX_POINTS = 200
 
 const RADIUS_OPTIONS = EV_CHARGER_RADII_KM.map(r => ({ value: String(r), label: `${r} km` }))
 
@@ -59,12 +62,12 @@ export function EvChargers() {
   const params = coords
     ? { ...coords, radiusKm: Number(radius), minPowerKw: minPower ? Number(minPower) : undefined }
     : null
-  const { data: chargers = [], isLoading, isError, error, isFetching, refetch } = useEvChargers(params)
+  const { data: chargers = [], isLoading, isError, error, isFetching, refetch, sources, ocmError } = useEvChargers(params)
 
   const mapPoints = useMemo<MapPoint[]>(
     () =>
-      chargers.map(c => ({
-        id: String(c.id),
+      chargers.slice(0, MAP_MAX_POINTS).map(c => ({
+        id: c.id,
         latitude: c.latitude,
         longitude: c.longitude,
         label: c.name,
@@ -77,6 +80,11 @@ export function EvChargers() {
 
   const resetList = () => setShown(PAGE_SIZE)
   const fastCount = chargers.filter(c => c.hasDc).length
+  const osmCount = chargers.filter(c => c.source === 'osm').length
+  const summary = [
+    fastCount > 0 ? `${fastCount} com carregamento rápido (DC)` : null,
+    osmCount > 0 ? `${osmCount} só no OpenStreetMap` : null,
+  ].filter(Boolean).join(' · ')
 
   return (
     <>
@@ -134,14 +142,22 @@ export function EvChargers() {
           >
             {chargers.length} posto{chargers.length !== 1 ? 's' : ''} até {radius} km
           </SectionTitle>
-          {(fastCount > 0 || chargers.length >= 100) && (
-            <Text style={styles.summary}>
-              {fastCount > 0 ? `${fastCount} com carregamento rápido (DC)` : ''}
-              {fastCount > 0 && chargers.length >= 100 ? ' · ' : ''}
-              {chargers.length >= 100 ? 'a mostrar os 100 mais próximos' : ''}
+          {summary ? <Text style={styles.summary}>{summary}</Text> : null}
+          {sources.osm === 'loading' && <Text style={styles.sourceInfo}>A procurar mais postos no OpenStreetMap…</Text>}
+          {sources.osm === 'error' && (
+            <Text style={styles.sourceWarning}>
+              OpenStreetMap indisponível de momento: só postos do Open Charge Map. Toca em Atualizar para tentar outra vez.
+            </Text>
+          )}
+          {sources.ocm === 'error' && (
+            <Text style={styles.sourceWarning}>
+              Open Charge Map indisponível ({(ocmError as Error | null)?.message}): só postos do OpenStreetMap.
             </Text>
           )}
           {showOverview && <PointsMap points={mapPoints} height={300} color={COLOR} style={uiStyles.map} />}
+          {showOverview && chargers.length > MAP_MAX_POINTS && (
+            <Text style={styles.sourceInfo}>Mapa com os {MAP_MAX_POINTS} postos mais próximos.</Text>
+          )}
           {chargers.slice(0, shown).map(c => (
             <ChargerCard
               key={c.id}
@@ -158,7 +174,8 @@ export function EvChargers() {
       )}
 
       <Notice>
-        Dados: {OPEN_CHARGE_MAP_ATTRIBUTION}. O estado de cada posto é o declarado na comunidade, não é em tempo real.
+        Dados: {OPEN_CHARGE_MAP_ATTRIBUTION} e {OSM_ATTRIBUTION}. O estado de cada posto é o declarado na comunidade, não é
+        em tempo real; os postos do OpenStreetMap não indicam estado.
       </Notice>
     </>
   )
@@ -216,7 +233,10 @@ function ChargerCard({
         <LinkText label={showCost ? '💶 Ocultar custo e tempo' : '💶 Custo e tempo'} onPress={() => setShowCost(v => !v)} />
         <LinkText label={showMap ? '🗺️ Ocultar mapa' : '🗺️ Mapa'} onPress={() => setShowMap(v => !v)} />
         <LinkText label="🧭 Direções" onPress={() => openDirections(c.latitude, c.longitude)} />
-        <LinkText label="🔗 Open Charge Map" onPress={() => void Linking.openURL(c.url)} />
+        <LinkText
+          label={c.source === 'osm' ? '🔗 OpenStreetMap' : '🔗 Open Charge Map'}
+          onPress={() => void Linking.openURL(c.url)}
+        />
       </View>
       {showCost && <EvChargeCost settings={chargeSettings} onChange={onChargeSettingsChange} connectors={c.connectors} />}
       {showMap && <SinglePointMap latitude={c.latitude} longitude={c.longitude} label={c.name} style={uiStyles.cardMap} />}
@@ -231,6 +251,8 @@ const styles = StyleSheet.create({
   distance: { fontSize: 12, fontWeight: '600', color: '#ea580c' },
   located: { fontSize: 12, color: '#15803d', fontWeight: '600' },
   summary: { fontSize: 12, color: COLORS.faint, marginTop: -6, marginBottom: 10 },
+  sourceInfo: { fontSize: 12, color: COLORS.faint, marginBottom: 10 },
+  sourceWarning: { fontSize: 12, color: '#b45309', marginBottom: 10 },
   connectors: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   connector: {
     fontSize: 11,

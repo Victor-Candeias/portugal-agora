@@ -8,6 +8,7 @@ import {
   createComboiosClient,
   createMetroPortoClient,
   createOpenChargeMapClient,
+  createOsmChargersClient,
   createPublicServicesClient,
   createSnsClient,
   createTmlClient,
@@ -46,3 +47,6 @@ export const openChargeMapClient = createOpenChargeMapClient({
   apiKey: (Constants.expoConfig?.extra?.openChargeMapKey as string | undefined) ?? '',
   userAgent: 'PortugalHoje/1.0',
 })
+
+// Postos EV do OpenStreetMap via Overpass (WEB-047). O overpass-api.de responde 406 ao User-Agent do OkHttp.
+export const osmChargersClient = createOsmChargersClient({ userAgent: 'PortugalHoje/1.0' })

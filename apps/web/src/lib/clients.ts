@@ -9,6 +9,7 @@ import {
   createComboiosClient,
   createMetroPortoClient,
   createOpenChargeMapClient,
+  createOsmChargersClient,
   createPublicServicesClient,
   createSnsClient,
   createTmlClient,
@@ -45,6 +46,9 @@ export const anpcClient = createAnpcClient({ apiKey: import.meta.env.VITE_APIABE
 
 // Postos de carregamento EV (WEB-040). Exposta pelo `envPrefix` do vite.config.ts.
 export const openChargeMapClient = createOpenChargeMapClient({ apiKey: import.meta.env.OPEN_CHARGE_MAP_KEY ?? '' })
+
+// Postos EV do OpenStreetMap via Overpass (WEB-047). Os mirrors têm CORS; o browser envia o seu User-Agent.
+export const osmChargersClient = createOsmChargersClient()
 
 // Sem chave, o cliente falha cada pedido com uma mensagem clara (MOB-008).
 export const apiClient = new ApiAbertaClient({ apiKey: import.meta.env.VITE_APIABERTA_KEY ?? '' })

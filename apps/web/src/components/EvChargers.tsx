@@ -4,6 +4,7 @@ import {
   EV_CHARGER_MIN_POWER_OPTIONS,
   EV_CHARGER_RADII_KM,
   OPEN_CHARGE_MAP_ATTRIBUTION,
+  OSM_ATTRIBUTION,
   formatDate,
   formatEvConnector,
   formatPowerKw,
@@ -18,7 +19,7 @@ import { Pagination } from '@/components/Pagination'
 import { SinglePointMap } from '@/components/SinglePointMap'
 import { useEvChargeSettings, useEvChargers } from '@/hooks/useEv'
 
-// Postos de carregamento perto do utilizador via Open Charge Map (WEB-040).
+// Postos de carregamento perto do utilizador via Open Charge Map (WEB-040) e OpenStreetMap (WEB-047).
 const PAGE_SIZE = 20
 const LISBON = { latitude: 38.7223, longitude: -9.1393 }
 
@@ -47,8 +48,8 @@ export function EvChargers() {
   const [radiusKm, setRadiusKm] = useState<number>(10)
   const [minPower, setMinPower] = useState<string>('')
   const [page, setPage] = useState(1)
-  const [mapId, setMapId] = useState<number | null>(null)
-  const [costId, setCostId] = useState<number | null>(null)
+  const [mapId, setMapId] = useState<string | null>(null)
+  const [costId, setCostId] = useState<string | null>(null)
   const [chargeSettings, updateChargeSettings] = useEvChargeSettings()
 
   useEffect(() => { requestLocation() }, [])
@@ -72,7 +73,7 @@ export function EvChargers() {
   // Sem localização, mostra os postos à volta de Lisboa.
   const center = locationStatus === 'loading' ? null : userLocation ?? LISBON
   const params = center ? { ...center, radiusKm, minPowerKw: minPower ? Number(minPower) : undefined } : null
-  const { data: chargers = [], isLoading, isError, error, isFetching, refetch } = useEvChargers(params)
+  const { data: chargers = [], isLoading, isError, error, isFetching, refetch, sources, ocmError } = useEvChargers(params)
 
   function resetPage() {
     setPage(1)
@@ -83,6 +84,7 @@ export function EvChargers() {
   const totalPages = Math.ceil(chargers.length / PAGE_SIZE)
   const paginated = chargers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const fastCount = chargers.filter(c => c.hasDc).length
+  const osmCount = chargers.filter(c => c.source === 'osm').length
 
   return (
     <div className="space-y-4">
@@ -150,9 +152,24 @@ export function EvChargers() {
             <p className="text-xs text-slate-400 mb-3">
               {chargers.length} posto{chargers.length !== 1 ? 's' : ''} num raio de {radiusKm} km
               {fastCount > 0 && ` · ${fastCount} com carregamento rápido (DC)`}
-              {chargers.length >= 100 && ' · a mostrar os 100 mais próximos'}
+              {osmCount > 0 && ` · ${osmCount} só no OpenStreetMap`}
               {totalPages > 1 && ` · página ${page} de ${totalPages}`}
             </p>
+            {sources.osm === 'loading' && (
+              <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
+                <RefreshCw size={11} className="animate-spin" /> A procurar mais postos no OpenStreetMap…
+              </p>
+            )}
+            {sources.osm === 'error' && (
+              <p className="text-xs text-amber-700 mb-3">
+                OpenStreetMap indisponível de momento: só postos do Open Charge Map. Carrega em Atualizar para tentar outra vez.
+              </p>
+            )}
+            {sources.ocm === 'error' && (
+              <p className="text-xs text-amber-700 mb-3">
+                Open Charge Map indisponível ({(ocmError as Error | null)?.message}): só postos do OpenStreetMap.
+              </p>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {paginated.map(c => (
@@ -180,8 +197,9 @@ export function EvChargers() {
       </Card>
 
       <p className="text-xs text-slate-400">
-        Dados: <a href="https://openchargemap.org" target="_blank" rel="noreferrer" className="underline hover:text-slate-600">{OPEN_CHARGE_MAP_ATTRIBUTION}</a>.
-        O estado de cada posto é o declarado na comunidade, não é em tempo real.
+        Dados: <a href="https://openchargemap.org" target="_blank" rel="noreferrer" className="underline hover:text-slate-600">{OPEN_CHARGE_MAP_ATTRIBUTION}</a> e{' '}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline hover:text-slate-600">{OSM_ATTRIBUTION}</a>.
+        O estado de cada posto é o declarado na comunidade, não é em tempo real; os postos do OpenStreetMap não indicam estado.
       </p>
     </div>
   )
@@ -254,7 +272,7 @@ function ChargerCard({
       <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap mt-2">
         {c.lastVerified && <span className="text-slate-400">Verificado em {formatDate(c.lastVerified)}</span>}
         <a href={c.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-blue-600">
-          <ExternalLink size={11} /> Open Charge Map
+          <ExternalLink size={11} /> {c.source === 'osm' ? 'OpenStreetMap' : 'Open Charge Map'}
         </a>
         <a
           href={`https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}`}

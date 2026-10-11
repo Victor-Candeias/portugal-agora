@@ -1,4 +1,4 @@
-// Open Charge Map — postos de carregamento EV perto de um ponto (WEB-040). Cliente agnóstico de
+// Open Charge Map — postos de carregamento EV perto de um ponto (WEB-040; junta-se ao OpenStreetMap no WEB-047). Cliente agnóstico de
 // plataforma: a chave (`OPEN_CHARGE_MAP_KEY`) é injetada por cada app. Dados CC BY 4.0
 // (Open Charge Map Contributors), por isso a atribuição tem de ser mostrada.
 import { haversineDistance } from '../utils/index.js'
@@ -16,6 +16,30 @@ export const EV_CHARGER_MIN_POWER_OPTIONS = [
 
 export type EvChargerStatus = 'operational' | 'partial' | 'unavailable' | 'planned' | 'unknown'
 
+/** Origem do posto: Open Charge Map ou OpenStreetMap (WEB-047). */
+export type EvChargerSource = 'ocm' | 'osm'
+
+/** O OCM devolve no máximo `maxresults`; Portugal inteiro tem ~3700 postos, por isso nunca corta (WEB-047). */
+export const OPEN_CHARGE_MAP_MAX_RESULTS = 5000
+
+// Códigos Mobi.E (ex.: `LSB-01317`, `IP-LSB-00001`). `LSB-00379/380` dá `LSB-00379` e `LSB-00380`.
+const MOBIE_REF_RE = /\b((?:[A-Z]{2,4}-)?[A-Z]{3})-(\d{5})((?:\/\d{1,5})*)/g
+
+/** Códigos Mobi.E num texto, só para juntar postos repetidos entre fontes (não são mostrados à parte). */
+export function extractMobieRefs(text: string | null | undefined): string[] {
+  if (!text) return []
+  const refs = new Set<string>()
+  for (const m of text.toUpperCase().matchAll(MOBIE_REF_RE)) {
+    const [, prefix, number, extra] = m
+    refs.add(`${prefix}-${number}`)
+    for (const tail of extra.split('/').filter(Boolean)) {
+      // `/380` substitui os últimos dígitos de `00379`.
+      refs.add(`${prefix}-${number.slice(0, number.length - tail.length)}${tail}`)
+    }
+  }
+  return [...refs]
+}
+
 export interface EvConnector {
   /** Rótulo curto (ex.: `Type 2`, `CCS2`, `CHAdeMO`). */
   type: string
@@ -25,7 +49,11 @@ export interface EvConnector {
 }
 
 export interface EvCharger {
-  id: number
+  /** `ocm:<ID>` ou `osm:node/<id>` / `osm:way/<id>`. */
+  id: string
+  source: EvChargerSource
+  /** Códigos Mobi.E do posto, usados só para juntar repetidos entre fontes. */
+  refs: string[]
   name: string
   address: string | null
   town: string | null
@@ -214,9 +242,12 @@ export function normalizeOcmPoi(poi: OcmPoi, from?: { latitude: number; longitud
   const street = [a.AddressLine1, a.AddressLine2].map(s => s?.trim()).filter(Boolean).join(', ')
   const town = [a.Postcode?.trim(), a.Town?.trim()].filter(Boolean).join(' ')
 
+  const title = a.Title?.trim()
   return {
-    id: poi.ID,
-    name: a.Title?.trim() || operatorName(poi.OperatorInfo?.Title) || 'Posto de carregamento',
+    id: `ocm:${poi.ID}`,
+    source: 'ocm',
+    refs: extractMobieRefs(title),
+    name: title || operatorName(poi.OperatorInfo?.Title) || 'Posto de carregamento',
     address: street || null,
     town: town || null,
     latitude: a.Latitude,
@@ -274,7 +305,7 @@ export function createOpenChargeMapClient(options: OpenChargeMapClientOptions) {
       longitude: params.longitude.toFixed(5),
       distance: String(params.radiusKm ?? 10),
       distanceunit: 'KM',
-      maxresults: String(params.maxResults ?? 100),
+      maxresults: String(params.maxResults ?? OPEN_CHARGE_MAP_MAX_RESULTS),
       compact: 'false',
       verbose: 'false',
       client: 'portugal-hoje',

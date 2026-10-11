@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Storage from 'expo-sqlite/kv-store'
 import {
   DEFAULT_EV_CHARGE_SETTINGS,
   EV_CHARGE_STORAGE_KEY,
+  mergeEvChargers,
   parseEvChargeSettings,
   shouldRetryOpenChargeMap,
   type EvChargeSettings,
   type NearbyEvChargersParams,
 } from '@portugal-hoje/core'
 import { apiClient } from '../lib/api'
-import { openChargeMapClient } from '../lib/clients'
+import { openChargeMapClient, osmChargersClient } from '../lib/clients'
 
 // Bateria e percentagens do cálculo de custo por posto (WEB-043), guardadas no expo-sqlite/kv-store.
 function readChargeSettings(): EvChargeSettings {
@@ -51,17 +52,46 @@ export function useCheapestEvTariffs(kwh: number) {
   })
 }
 
-// Postos de carregamento perto de um ponto (Open Charge Map, WEB-040). As coordenadas entram na
-// chave arredondadas (~100 m) para não repetir o pedido por pequenas variações do GPS.
+// Postos de carregamento perto de um ponto: Open Charge Map (WEB-040) + OpenStreetMap (WEB-047).
+// São duas consultas independentes: o OCM responde em menos de 1 s e o Overpass pode demorar vários segundos,
+// por isso a lista aparece com o que chegar primeiro e só há erro se as duas falharem. As coordenadas
+// entram na chave arredondadas (~100 m) para não repetir o pedido por pequenas variações do GPS.
+export type EvChargerSourceState = 'idle' | 'loading' | 'ok' | 'error'
+
+function sourceState(q: { fetchStatus: string; status: string }): EvChargerSourceState {
+  if (q.status === 'success') return 'ok'
+  if (q.fetchStatus === 'fetching') return 'loading'
+  return q.status === 'error' ? 'error' : 'idle'
+}
+
 export function useEvChargers(params: NearbyEvChargersParams | null) {
-  return useQuery({
-    queryKey: [
-      'ev', 'chargers',
-      params?.latitude.toFixed(3), params?.longitude.toFixed(3), params?.radiusKm, params?.minPowerKw ?? 0,
-    ],
+  const key = [params?.latitude.toFixed(3), params?.longitude.toFixed(3), params?.radiusKm, params?.minPowerKw ?? 0]
+  const ocm = useQuery({
+    queryKey: ['ev', 'chargers', 'ocm', ...key],
     queryFn: () => openChargeMapClient.getNearbyChargers(params!),
     enabled: params !== null,
     staleTime: 10 * 60 * 1000,
     retry: shouldRetryOpenChargeMap,
   })
+  const osm = useQuery({
+    queryKey: ['ev', 'chargers', 'osm', ...key],
+    queryFn: ({ signal }) => osmChargersClient.getNearbyChargers(params!, signal),
+    enabled: params !== null,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  })
+  const data = useMemo(
+    () => (ocm.data || osm.data ? mergeEvChargers(ocm.data ?? [], osm.data ?? []) : undefined),
+    [ocm.data, osm.data],
+  )
+  return {
+    data,
+    isLoading: data === undefined && (ocm.isLoading || osm.isLoading),
+    isError: ocm.isError && osm.isError,
+    error: ocm.error ?? osm.error,
+    isFetching: ocm.isFetching || osm.isFetching,
+    refetch: () => Promise.all([ocm.refetch(), osm.refetch()]),
+    sources: { ocm: sourceState(ocm), osm: sourceState(osm) },
+    ocmError: ocm.error,
+  }
 }

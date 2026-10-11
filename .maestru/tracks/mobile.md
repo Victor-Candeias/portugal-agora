@@ -82,4 +82,5 @@ status: active
 | WEB-044 | EV (web e mobile): tempo previsto de carregamento por posto e carga por omissão de 10% a 80% | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
 | WEB-045 | Combustível (web e mobile): custo de atestar o depósito (50 L por omissão, editável) | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
 | WEB-046 | EV (web e mobile): tempo de carregamento em AC e DC em separado e cálculo do tempo e do custo | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
+| WEB-047 | EV (web e mobile): postos do OpenStreetMap além do Open Charge Map e sem o limite de 100 resultados | done | 2026-10-11 | developer | high | 2026-10-12 |  |  | [WEB-047](../specs/mobile/web-047-spec.md) |
 <!-- /maestru:work-items-list -->
