@@ -56,12 +56,24 @@ export function BoundaryMap({
         attributionPosition={{ bottom: 4, right: 4 }}
       >
         <Camera bounds={selectedBounds ?? bounds} padding={PADDING} duration={400} easing="ease" />
-        {/* Fronteira por baixo: os toques chegam sempre à camada das freguesias. */}
+        {/* Fronteira por baixo: os toques chegam sempre à camada das freguesias.
+            O GeoJSONSource descarta filhos `false` e reindexa os restantes; sem `key`, o React reutilizaria
+            a instância do `boundary-fill` para o `boundary-line` e o MapLibre rebenta ("`id` cannot be changed"). */}
         <GeoJSONSource id="boundary" data={boundary as GeoJSON.Feature}>
           {!collection && (
-            <Layer id="boundary-fill" type="fill" paint={{ 'fill-color': color, 'fill-opacity': 0.12 }} />
+            <Layer
+              key="boundary-fill"
+              id="boundary-fill"
+              type="fill"
+              paint={{ 'fill-color': color, 'fill-opacity': 0.12 }}
+            />
           )}
-          <Layer id="boundary-line" type="line" paint={{ 'line-color': color, 'line-width': collection ? 3 : 2 }} />
+          <Layer
+            key="boundary-line"
+            id="boundary-line"
+            type="line"
+            paint={{ 'line-color': color, 'line-width': collection ? 3 : 2 }}
+          />
         </GeoJSONSource>
         {collection && (
           <GeoJSONSource
