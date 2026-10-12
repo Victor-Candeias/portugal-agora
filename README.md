@@ -131,6 +131,12 @@ Fora do Início, todos os headers têm à direita o botão "🏠 Início"
 (`apps/mobile/components/HomeHeaderButton.tsx`). No web, o header (`apps/web/src/components/Layout.tsx`)
 tem o mesmo botão e o logótipo também leva ao Início.
 
+### Navegação no web
+
+As secções do web estão num menu lateral (`apps/web/src/components/Layout.tsx`). Em ecrãs largos
+(`lg`, ≥ 1024 px) o menu fica sempre visível à esquerda; em ecrãs mais pequenos abre como gaveta pelo
+botão ☰ do header e fecha ao escolher uma secção, ao tocar fora ou com Esc.
+
 ### Android Auto no mobile
 
 A app mobile (`pt.portugalhoje.app`) também funciona no Android Auto (categoria POI). O Android Auto
