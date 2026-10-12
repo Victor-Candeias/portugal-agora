@@ -84,4 +84,5 @@ status: active
 | WEB-046 | EV (web e mobile): tempo de carregamento em AC e DC em separado e cálculo do tempo e do custo | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  |  |
 | WEB-047 | EV (web e mobile): postos do OpenStreetMap além do Open Charge Map e sem o limite de 100 resultados | done | 2026-10-11 | developer | high | 2026-10-12 |  |  | [WEB-047](../specs/mobile/web-047-spec.md) |
 | WEB-048 | Web: menu lateral em vez da barra de navegação horizontal | done | 2026-10-12 | developer | medium | 2026-10-12 |  |  |  |
+| WEB-049 | Concelhos (web e mobile): freguesias do concelho na ficha e no mapa | done | 2026-10-12 | developer | medium | 2026-10-12 |  |  | [WEB-049](../specs/mobile/web-049-spec.md) |
 <!-- /maestru:work-items-list -->

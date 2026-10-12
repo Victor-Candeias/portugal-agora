@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import Storage from 'expo-sqlite/kv-store'
-import { loadMunicipalitiesCached, MUNICIPALITIES_CACHE_TTL_MS } from '@portugal-hoje/core'
+import {
+  loadMunicipalitiesCached,
+  loadMunicipalityParishesCached,
+  MUNICIPALITIES_CACHE_TTL_MS,
+  PARISHES_CACHE_TTL_MS,
+  shouldRetryGeoApi,
+} from '@portugal-hoje/core'
 import { apiClient } from '../lib/api'
 
 // Concelhos da API Aberta (WEB-042): lista em cache persistente (expo-sqlite/kv-store) durante 30 dias.
@@ -24,5 +30,16 @@ export function useMunicipality(slug: string | undefined) {
     queryFn: () => apiClient.getMunicipality(slug!),
     enabled: !!slug,
     staleTime: 7 * 24 * 60 * 60 * 1000,
+  })
+}
+
+// Freguesias (geoapi.pt, WEB-049): limites simplificados em cache persistente (kv-store) durante 30 dias.
+export function useMunicipalityParishes(codigoine: string | undefined) {
+  return useQuery({
+    queryKey: ['geoapi', 'parishes', codigoine],
+    queryFn: () => loadMunicipalityParishesCached({ codigoine: codigoine!, storage: Storage }),
+    enabled: !!codigoine,
+    staleTime: PARISHES_CACHE_TTL_MS,
+    retry: shouldRetryGeoApi,
   })
 }

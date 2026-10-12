@@ -77,6 +77,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Código postal (CP7 → distrito/concelho/localidade/artérias) | moradas.dev — `/cp/{cp7}` (o geoapi.pt sem chave só permite 5 pedidos/dia); coordenadas aproximadas via Open-Meteo geocoding | não |
 | Nome e morada de empresas pelo NIF | VIES (Comissão Europeia) — `ec.europa.eu/taxation_customs/vies/rest-api/ms/PT/vat/{nif}`; só NIFs de empresas/entidades; sem CORS (mobile direto, web via proxy do Vite só em dev) | não |
 | Concelhos (contactos da câmara, área, limites) | API Aberta — `/geo/municipalities?limit=400` (lista em cache persistente 30 dias: `localStorage` no web, `expo-sqlite/kv-store` no mobile) e `/geo/municipalities/{slug}` (fronteira GeoJSON). As ilhas vêm sem distrito: a região sai do código INE | sim |
+| Freguesias do concelho (nome, área, limites) | geoapi.pt (dados CAOP da DGT) — `json.geoapi.pt/municipios/freguesias` (índice código INE → nome geoapi, para os homónimos como "Calheta de São Jorge") e `json.geoapi.pt/municipio/{nome}/freguesias` (GeoJSON). Geometria simplificada (Douglas-Peucker ~20 m) e em cache persistente 30 dias; o `json.geoapi.pt` não tem o limite de 5 pedidos/dia do `geoapi.pt/...?json=1` | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -173,7 +174,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
 | 📮 Código Postal | Distrito/concelho/localidade, artérias (moradas.dev) e mapa aproximado da localidade (Open-Meteo geocoding) |
-| 🏛️ Concelhos | Os 308 concelhos (API Aberta), com pesquisa e filtro por distrito/região. A ficha mostra os contactos da câmara (telefone, email, código postal), a área, o código INE e os limites do concelho no mapa |
+| 🏛️ Concelhos | Os 308 concelhos (API Aberta), com pesquisa e filtro por distrito/região. A ficha mostra os contactos da câmara (telefone, email, código postal), a área, o código INE e os limites do concelho no mapa, com as freguesias (lista com a área e limites no mapa; tocar/clicar numa freguesia destaca-a e enquadra-a) |
 | 🪪 Validar NIF | Validação local (`validateNif` no core): 9 dígitos, prefixo atribuído pela AT e dígito de controlo MOD 11, com o tipo de entidade. Para empresas e outras entidades, mostra o nome e a morada do VIES (no web, só em dev, por causa do proxy). Os NIFs de pessoas singulares não são enviados |
 | 📑 Contratos Públicos | Contratos do BASE.gov.pt: mais recentes, pesquisa por texto/entidade/NIF e detalhe (preço, data, procedimento, entidade adjudicante e adjudicatário, link para o portal BASE) (resumo no Início, no web) |
 | 🇪🇺 Fundos PRR / PT2030 | Resumo do PRR (período, 9 componentes, 61 investimentos), investimentos agrupados por componente com filtro e pesquisa sem acentos (no cliente), e resumo do PT2030 (período e orçamento). Fonte: transparencia.gov.pt via API Aberta |

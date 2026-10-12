@@ -1,5 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { loadMunicipalitiesCached, MUNICIPALITIES_CACHE_TTL_MS, type KeyValueStorage } from '@portugal-hoje/core'
+import {
+  loadMunicipalitiesCached,
+  loadMunicipalityParishesCached,
+  MUNICIPALITIES_CACHE_TTL_MS,
+  PARISHES_CACHE_TTL_MS,
+  shouldRetryGeoApi,
+  type KeyValueStorage,
+} from '@portugal-hoje/core'
 import { apiClient } from '@/lib/clients'
 
 // localStorage pode não existir ou falhar (modo privado); nesse caso a lista vem sempre da API.
@@ -32,5 +39,16 @@ export function useMunicipality(slug: string | undefined) {
     queryFn: () => apiClient.getMunicipality(slug!),
     enabled: !!slug,
     staleTime: 7 * 24 * 60 * 60 * 1000,
+  })
+}
+
+// Freguesias (geoapi.pt, WEB-049): limites simplificados em cache persistente durante 30 dias.
+export function useMunicipalityParishes(codigoine: string | undefined) {
+  return useQuery({
+    queryKey: ['geoapi', 'parishes', codigoine],
+    queryFn: () => loadMunicipalityParishesCached({ codigoine: codigoine!, storage: browserStorage() }),
+    enabled: !!codigoine,
+    staleTime: PARISHES_CACHE_TTL_MS,
+    retry: shouldRetryGeoApi,
   })
 }

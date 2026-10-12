@@ -1,24 +1,40 @@
 import { useMemo } from 'react'
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Camera, GeoJSONSource, Layer, Map } from '@maplibre/maplibre-react-native'
-import { boundaryBounds, type GeoBoundary } from '@portugal-hoje/core'
+import { boundaryBounds, parishesFeatureCollection, type GeoBoundary, type MunicipalityParish } from '@portugal-hoje/core'
 import { OSM_STYLE } from '../lib/maps'
 
 const PADDING = { top: 24, right: 24, bottom: 24, left: 24 }
+const PARISH_LINE = '#15803d'
+const SELECTED_FILL = '#f97316'
+const SELECTED_LINE = '#c2410c'
 
 // Fronteira de um concelho (GeoJSON) no mapa nativo, enquadrada nos seus limites (WEB-042).
+// Com `parishes`, desenha também os limites das freguesias (WEB-049): o toque seleciona a freguesia,
+// que fica destacada e enquadrada; sem seleção, a câmara volta ao concelho.
 export function BoundaryMap({
   boundary,
+  parishes,
+  selectedParish = null,
+  onSelectParish,
   height = 280,
   color = '#16a34a',
   style,
 }: {
   boundary: GeoBoundary
+  parishes?: MunicipalityParish[]
+  selectedParish?: string | null
+  onSelectParish?: (code: string | null) => void
   height?: number
   color?: string
   style?: StyleProp<ViewStyle>
 }) {
   const bounds = useMemo(() => boundaryBounds(boundary), [boundary])
+  const collection = useMemo(() => (parishes?.length ? parishesFeatureCollection(parishes) : null), [parishes])
+  const selectedBounds = useMemo(() => {
+    const parish = selectedParish ? parishes?.find(p => p.code === selectedParish) : null
+    return parish ? boundaryBounds(parish.boundary) : null
+  }, [parishes, selectedParish])
 
   if (!bounds) {
     return (
@@ -39,11 +55,39 @@ export function BoundaryMap({
         attribution
         attributionPosition={{ bottom: 4, right: 4 }}
       >
-        <Camera bounds={bounds} padding={PADDING} />
+        <Camera bounds={selectedBounds ?? bounds} padding={PADDING} duration={400} easing="ease" />
+        {/* Fronteira por baixo: os toques chegam sempre à camada das freguesias. */}
         <GeoJSONSource id="boundary" data={boundary as GeoJSON.Feature}>
-          <Layer id="boundary-fill" type="fill" paint={{ 'fill-color': color, 'fill-opacity': 0.12 }} />
-          <Layer id="boundary-line" type="line" paint={{ 'line-color': color, 'line-width': 2 }} />
+          {!collection && (
+            <Layer id="boundary-fill" type="fill" paint={{ 'fill-color': color, 'fill-opacity': 0.12 }} />
+          )}
+          <Layer id="boundary-line" type="line" paint={{ 'line-color': color, 'line-width': collection ? 3 : 2 }} />
         </GeoJSONSource>
+        {collection && (
+          <GeoJSONSource
+            id="parishes"
+            data={collection as GeoJSON.FeatureCollection}
+            onPress={(event) => {
+              const code = event.nativeEvent.features?.[0]?.properties?.code
+              if (typeof code === 'string') onSelectParish?.(code === selectedParish ? null : code)
+            }}
+          >
+            <Layer id="parishes-fill" type="fill" paint={{ 'fill-color': color, 'fill-opacity': 0.06 }} />
+            <Layer id="parishes-line" type="line" paint={{ 'line-color': PARISH_LINE, 'line-width': 1 }} />
+            <Layer
+              id="parish-selected-fill"
+              type="fill"
+              filter={['==', ['get', 'code'], selectedParish ?? '']}
+              paint={{ 'fill-color': SELECTED_FILL, 'fill-opacity': 0.3 }}
+            />
+            <Layer
+              id="parish-selected-line"
+              type="line"
+              filter={['==', ['get', 'code'], selectedParish ?? '']}
+              paint={{ 'line-color': SELECTED_LINE, 'line-width': 2.5 }}
+            />
+          </GeoJSONSource>
+        )}
       </Map>
     </View>
   )
