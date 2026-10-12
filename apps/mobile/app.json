@@ -2,7 +2,7 @@
   "expo": {
     "name": "Portugal Hoje",
     "slug": "portugal-hoje",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -33,7 +33,7 @@
     },
     "android": {
       "package": "pt.portugalhoje.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#01163a",
         "foregroundImage": "./assets/android-icon-foreground.png"
