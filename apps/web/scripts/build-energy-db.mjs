@@ -2,6 +2,10 @@
 //   apps/web/public/data/energy/daily.json   — últimos 30 dias (GWh, quota renovável ponderada)
 //   apps/web/public/data/energy/latest.json  — último dia disponível (`freshness: latest_available`)
 //   apps/web/public/data/energy.sqlite       — energy_observation + energy_balance + meta
+// e a série intradiária da ENTSO-E (WEB-057, energy-entsoe.mjs; precisa do token
+// `TRANSPARENCT_ENTSOE_TOKEN`, lido do ambiente ou de apps/web/.env):
+//   apps/web/public/data/energy/intraday-latest.json            — última hora completa (MW)
+//   apps/web/public/data/energy/timeseries-24h.json / -7d.json — séries horárias (MW)
 // Fonte canónica: `ElectricityConsumptionSupplyDaily` (balanço diário oficial, GWh inteiros), ver
 // .maestru/specs/mobile/web-050-spec.md. Regras de cálculo e contrato no core (energy.ts), importado
 // diretamente em Node (type stripping, Node ≥ 22.18).
@@ -26,6 +30,18 @@ import {
   summarizeEnergy,
   taxonomyTag,
 } from '../../../packages/core/src/utils/energy.ts'
+import {
+  ENTSOE_FILES,
+  ENTSOE_INCREMENTAL_DAYS,
+  ENTSOE_TOKEN_ENV,
+  ENTSOE_WINDOW_DAYS,
+  buildEntsoeDatasets,
+  collectEntsoe,
+  entsoeNeedsBackfill,
+  mergeEntsoeIntervals,
+  sanitizeEntsoe,
+  validatePublishedEntsoe,
+} from './energy-entsoe.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DATA_DIR = path.resolve(__dirname, '../public/data')
@@ -404,6 +420,91 @@ export async function buildEnergy({
   now = Date.now(),
   fetchImpl = fetch,
   fallbackBaseUrl = process.env.ENERGY_FALLBACK_BASE_URL || DEFAULT_FALLBACK_BASE_URL,
+  entsoeToken = process.env[ENTSOE_TOKEN_ENV],
+  retryDelayMs = 2000,
+  log = console,
+} = {}) {
+  const ren = await buildRenEnergy({ outDir, now, fetchImpl, fallbackBaseUrl, retryDelayMs, log })
+  const entsoe = await buildEntsoeEnergy({ outDir, now, fetchImpl, fallbackBaseUrl, token: entsoeToken, retryDelayMs, log })
+  return { ren, entsoe }
+}
+
+/** Ficheiros intradiários já publicados no Pages (validados), ou erro. */
+export async function fetchPublishedEntsoe({ fallbackBaseUrl, fetchImpl = fetch }) {
+  const base = fallbackBaseUrl.replace(/\/?$/, '/')
+  const files = {}
+  for (const name of ENTSOE_FILES) {
+    const res = await fetchImpl(`${base}energy/${name}`, { cache: 'no-cache', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+    if (!res.ok) throw new Error(`${base}energy/${name} respondeu ${res.status}`)
+    const json = await res.json()
+    validatePublishedEntsoe(name, json)
+    files[name] = json
+  }
+  return files
+}
+
+/**
+ * Intradiário ENTSO-E. Execuções horárias pedem só as últimas 48 h e juntam-nas à série de 7 dias
+ * publicada; uma vez por dia (ou sem série publicada) pede a janela completa (backfill das
+ * revisões). Sem token, com o token recusado ou com a recolha a falhar, republica os ficheiros já
+ * publicados e nunca afeta os dados REN.
+ */
+export async function buildEntsoeEnergy({ outDir, now = Date.now(), fetchImpl = fetch, fallbackBaseUrl, token, retryDelayMs = 2000, log = console }) {
+  let published = null
+  let publishedError = null
+  try {
+    published = await fetchPublishedEntsoe({ fallbackBaseUrl, fetchImpl })
+  } catch (err) {
+    publishedError = err
+  }
+  let error
+  if (!token) {
+    error = new Error(`${ENTSOE_TOKEN_ENV} não definido`)
+  } else {
+    const backfill = entsoeNeedsBackfill(published?.['timeseries-7d.json'], now)
+    const days = backfill ? ENTSOE_WINDOW_DAYS : ENTSOE_INCREMENTAL_DAYS
+    log.log(`→ energia: a consultar a ENTSO-E (produção por tipo, carga e fluxos, ${days} dias${backfill ? ', backfill' : ''})...`)
+    try {
+      const fetchedAtUtc = new Date(now).toISOString()
+      const collected = await collectEntsoe({ token, days, now, fetchImpl, retryDelayMs: retryDelayMs * 2.5, log })
+      const previous = published?.['timeseries-7d.json']
+      const intervals = backfill ? collected.intervals : mergeEntsoeIntervals(previous.points, collected.intervals, collected.fromMs)
+      const datasets = buildEntsoeDatasets({
+        intervals,
+        fetchedAtUtc,
+        generatedAtUtc: new Date().toISOString(),
+        backfillUtc: backfill ? fetchedAtUtc : previous.backfillUtc,
+      })
+      const texts = Object.entries(datasets).map(([name, json]) => [name, serialize(name, json)])
+      writeOutputs(outDir, Object.fromEntries(texts.map(([name, text]) => [name, file => fs.writeFileSync(file, text)])))
+      const latest = datasets['intraday-latest.json'].latest
+      const complete = intervals.filter(i => i.quality === 'complete').length
+      log.log(`✔ energia ENTSO-E: ${intervals.length} hora(s) (${complete} completas); última completa ` +
+        `${latest.intervalStartUtc} (renovável ${latest.renewable} MW, não renovável ${latest.nonRenewable} MW); ` +
+        texts.map(([name, text]) => `${name} ${(Buffer.byteLength(text) / 1024).toFixed(1)} KB`).join(', ') + '.')
+      return { status: 'fresh', backfill, intervals, warnings: collected.warnings, datasets }
+    } catch (err) {
+      error = new Error(sanitizeEntsoe(err.message, token))
+    }
+  }
+  log.warn(`⚠ energia: intradiário ENTSO-E não atualizado (${error.message}); a republicar o último publicado...`)
+  if (!published) {
+    log.warn(`⚠ energia: sem intradiário ENTSO-E neste build (${publishedError.message}).`)
+    return { status: 'failed', error, fallbackError: publishedError }
+  }
+  writeOutputs(outDir, Object.fromEntries(
+    Object.entries(published).map(([name, json]) => [name, file => fs.writeFileSync(file, serialize(name, json))]),
+  ))
+  log.warn(`⚠ energia: republicado o intradiário de ${fallbackBaseUrl}`)
+  return { status: 'republished', error, datasets: published }
+}
+
+/** Balanço diário REN (WEB-053). */
+export async function buildRenEnergy({
+  outDir = PUBLIC_DATA_DIR,
+  now = Date.now(),
+  fetchImpl = fetch,
+  fallbackBaseUrl = DEFAULT_FALLBACK_BASE_URL,
   retryDelayMs = 2000,
   log = console,
 } = {}) {

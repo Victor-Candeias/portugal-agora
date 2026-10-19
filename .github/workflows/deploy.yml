@@ -4,8 +4,11 @@ on:
   workflow_dispatch:
   # Deploy diário (WEB-054): reconstrói os dados estáticos, incluindo a energia REN do dia anterior
   # (publicado pela REN até ~12:30 de Lisboa). O cron do GitHub não garante hora exata.
+  # Horário (WEB-057): atualiza o intradiário ENTSO-E (a hora H sai ~65 min depois do fim) e
+  # reutiliza os .sqlite já publicados das outras secções.
   schedule:
     - cron: '0 13 * * *'
+    - cron: '20 * * * *'
 
 permissions:
   contents: read
@@ -42,9 +45,33 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build static data (Carris, Metro do Porto, Serviços Públicos, Energia)
-        # A energia (scripts/build-energy-db.mjs) usa type stripping do Node ≥ 22.18; se a REN falhar
-        # republica o último dataset publicado e nunca falha este passo.
-        run: pnpm --filter web build:db
+        # A energia (scripts/build-energy-db.mjs) usa type stripping do Node ≥ 22.18; se a REN ou a
+        # ENTSO-E falharem republica o último dataset publicado e nunca falha este passo.
+        # Na execução horária reutiliza os .sqlite publicados (Carris, Metro, Serviços Públicos) e
+        # só refaz a energia; se o download falhar, reconstrói tudo.
+        env:
+          # Token da ENTSO-E Transparency Platform (WEB-057); só usado no build, nunca no bundle.
+          TRANSPARENCT_ENTSOE_TOKEN: ${{ secrets.TRANSPARENCT_ENTSOE_TOKEN }}
+          HOURLY: ${{ github.event.schedule == '20 * * * *' }}
+        run: |
+          reuse=false
+          if [ "$HOURLY" = "true" ]; then
+            reuse=true
+            mkdir -p apps/web/public/data
+            for f in carris.sqlite metro-porto.sqlite public-services.sqlite; do
+              if ! curl -fsSL --retry 3 -o "apps/web/public/data/$f" "https://victor-candeias.github.io/portugal-agora/data/$f" \
+                || [ "$(head -c 15 "apps/web/public/data/$f")" != "SQLite format 3" ]; then
+                echo "::warning::$f publicado indisponível; a reconstruir todos os dados."
+                reuse=false
+                break
+              fi
+            done
+          fi
+          if [ "$reuse" = "true" ]; then
+            pnpm --filter web build:energy
+          else
+            pnpm --filter web build:db
+          fi
 
       - name: Build
         run: pnpm --filter web build

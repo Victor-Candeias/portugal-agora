@@ -92,7 +92,7 @@ status: active
 | WEB-054 | Energia: workflow GitHub Actions de atualização dos dados de energia | done | 2026-10-19 | developer | medium | 2026-10-19 |  | WEB-053 |  |
 | WEB-055 | Energia (web e mobile): cliente de dados no core + cache | done | 2026-10-19 | developer | high | 2026-10-19 |  | WEB-052, WEB-053 | [WEB-055](../specs/mobile/web-055-spec.md) |
 | WEB-056 | Energia (web e mobile): página/ecrã MVP diário (produção, consumo, mix, 30 dias) | done | 2026-10-19 | developer | high | 2026-10-19 |  | WEB-055 | [WEB-056](../specs/mobile/web-056-spec.md) |
-| WEB-057 | Energia: série intradiária ENTSO-E no pipeline (latest.json, 24h, 7d) | backlog | 2026-10-19 | developer | low |  |  | WEB-051, WEB-052, WEB-054 |  |
+| WEB-057 | Energia: série intradiária ENTSO-E no pipeline (latest.json, 24h, 7d) | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-051, WEB-052, WEB-054 | [WEB-057](../specs/mobile/web-057-spec.md) |
 | WEB-058 | Energia (web e mobile): indicador «mais renovável do que não renovável agora?» + gráfico 24h | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
 | WEB-059 | Energia (web e mobile): análise 7d/30d, consumo vs produção, trocas, preços e CSV | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
 | WEB-060 | Energia: operação — monitorização, avisos de desatualização, reconciliação e documentação | backlog | 2026-10-19 | developer | low |  |  | WEB-054, WEB-057 |  |

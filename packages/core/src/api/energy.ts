@@ -1,5 +1,7 @@
-// Cliente dos dados de energia publicados pelo pipeline (WEB-053) no GitHub Pages: `energy/daily.json`
-// e `energy/latest.json` (contrato em utils/energy.ts). As apps só releem os ficheiros publicados
+// Cliente dos dados de energia publicados pelo pipeline (WEB-053, WEB-057) no GitHub Pages:
+// `energy/daily.json` e `energy/latest.json` (REN, diário), `energy/intraday-latest.json` e
+// `energy/timeseries-24h.json`/`timeseries-7d.json` (ENTSO-E, horário em MW). Contrato em
+// utils/energy.ts. As apps só releem os ficheiros publicados
 // (o refresh não cria dados novos). Sem dependências de plataforma: `fetch`, a URL base e o
 // armazenamento da cache (localStorage no web, expo-sqlite/kv-store no mobile) são injetados.
 import { z } from 'zod'
@@ -7,6 +9,8 @@ import type { KeyValueStorage } from './geo.js'
 import {
   ENERGY_CONTRACT_VERSION,
   type EnergyDaily,
+  type EnergyIntradayLatest,
+  type EnergyIntradayRange,
   type EnergyLatest,
   type EnergyRange,
   type EnergyTimeseries,
@@ -47,7 +51,7 @@ const energyMetaSchema = z.object({
   taxonomy: z.string(),
   fetchedAtUtc: z.string(),
   generatedAtUtc: z.string(),
-  freshness: z.literal('latest_available'),
+  freshness: z.enum(['latest_available', 'near_real_time']),
   maxAgeMinutes: z.number().positive(),
 })
 
@@ -58,6 +62,18 @@ export const energyLatestSchema = energyMetaSchema.extend({
 export const energyDailySchema = energyMetaSchema.extend({
   days: z.array(energyDaySchema).min(1),
   total: energyIntervalSchema,
+})
+
+/** `intraday-latest.json` (ENTSO-E, MW). */
+export const energyIntradayLatestSchema = energyMetaSchema.extend({
+  latest: energyIntervalSchema,
+})
+
+/** `timeseries-24h.json` / `timeseries-7d.json` (ENTSO-E, MW horários; horas sem dados omitidas). */
+export const energyTimeseriesSchema = energyMetaSchema.extend({
+  range: z.enum(['24h', '7d', '30d']),
+  points: z.array(energyIntervalSchema),
+  backfillUtc: z.string().optional(),
 })
 
 // ── Erros ─────────────────────────────────────────────────────────────────
@@ -142,6 +158,11 @@ export function createEnergyClient(options: EnergyClientOptions) {
     async getEnergyTimeseries(range: EnergyRange): Promise<EnergyTimeseries> {
       return energyTimeseriesFromDaily(await getEnergyDaily(), range)
     },
+    /** Última hora completa ENTSO-E (`intraday-latest.json`). */
+    getIntradayLatest: () => get<EnergyIntradayLatest>('intraday-latest.json', energyIntradayLatestSchema),
+    /** Série horária ENTSO-E das últimas 24 h ou 7 dias (`timeseries-24h.json` / `timeseries-7d.json`). */
+    getIntradayTimeseries: (range: EnergyIntradayRange) =>
+      get<EnergyTimeseries>(`timeseries-${range}.json`, energyTimeseriesSchema),
   }
 }
 
@@ -217,4 +238,24 @@ export function loadEnergyDailyCached(client: EnergyClient, storage?: KeyValueSt
 /** `latest.json` com cache persistente (ver `loadEnergyCached`). */
 export function loadEnergyLatestCached(client: EnergyClient, storage?: KeyValueStorage | null, now?: () => number) {
   return loadEnergyCached<EnergyLatest>({ key: 'latest', fetch: client.getLatestEnergy, storage, schema: energyLatestSchema, now })
+}
+
+/** Cache do intradiário abaixo disto não faz pedido (o pipeline publica de hora a hora). */
+export const ENERGY_INTRADAY_CACHE_FRESH_MS = 10 * 60 * 1000
+
+/** `timeseries-24h.json` / `timeseries-7d.json` com cache persistente (ver `loadEnergyCached`). */
+export function loadEnergyIntradayCached(
+  client: EnergyClient,
+  range: EnergyIntradayRange,
+  storage?: KeyValueStorage | null,
+  now?: () => number,
+) {
+  return loadEnergyCached<EnergyTimeseries>({
+    key: `intraday-${range}`,
+    fetch: () => client.getIntradayTimeseries(range),
+    storage,
+    schema: energyTimeseriesSchema,
+    now,
+    freshMs: ENERGY_INTRADAY_CACHE_FRESH_MS,
+  })
 }

@@ -26,6 +26,7 @@ export type EnergyTechnology =
   | 'oil'
   | 'nuclear'
   | 'other_thermal'
+  | 'other_renewable'
   | 'storage'
 
 export const ENERGY_TECHNOLOGY_CLASSIFICATION: Record<EnergyTechnology, EnergyClassification> = {
@@ -40,6 +41,7 @@ export const ENERGY_TECHNOLOGY_CLASSIFICATION: Record<EnergyTechnology, EnergyCl
   oil: 'non_renewable',
   nuclear: 'non_renewable',
   other_thermal: 'non_renewable',
+  other_renewable: 'renewable',
   storage: 'storage',
 }
 
@@ -55,6 +57,7 @@ export const ENERGY_TECHNOLOGY_LABELS: Record<EnergyTechnology, string> = {
   oil: 'Petróleo',
   nuclear: 'Nuclear',
   other_thermal: 'Outra térmica',
+  other_renewable: 'Outra renovável',
   storage: 'Armazenamento',
 }
 
@@ -122,6 +125,42 @@ export const REN_DAILY_TAXONOMY: EnergyTaxonomy = {
     'OUTRA_TERMICA_COGERACAO',
     'OUTRA_TERMICA_OUTROS',
   ],
+}
+
+/**
+ * Códigos PSR da ENTSO-E (A75, produção real por tipo; ver web-051-spec), valores em MW. Os
+ * resíduos (B17) e «Other» (B20) contam como não renováveis (conservador: em PT a REN publica-os
+ * como `OUTRA_TERMICA`). O consumo das unidades (séries `outBiddingZone_Domain`, p. ex. bombagem)
+ * não é produção e é filtrado no pipeline antes da taxonomia.
+ */
+export const ENTSOE_PSR_TAXONOMY: EnergyTaxonomy = {
+  id: 'entsoe-psr',
+  version: 1,
+  technologies: {
+    B01: 'biomass',
+    B02: 'coal',
+    B03: 'other_thermal',
+    B04: 'natural_gas',
+    B05: 'coal',
+    B06: 'oil',
+    B07: 'oil',
+    B08: 'other_thermal',
+    B09: 'geothermal',
+    B10: 'storage',
+    B11: 'hydro',
+    B12: 'hydro',
+    B13: 'wave',
+    B14: 'nuclear',
+    B15: 'other_renewable',
+    B16: 'solar',
+    B17: 'other_thermal',
+    B18: 'wind',
+    B19: 'wind',
+    B20: 'other_thermal',
+    B25: 'storage',
+  },
+  balance: {},
+  ignored: [],
 }
 
 /** `ren-daily@1` */
@@ -385,6 +424,12 @@ export const ENERGY_LATEST_LABEL = 'Últimos dados disponíveis'
 /** Balanço diário REN: o dia D sai em D+1; 48 h depois do fim do dia toleram o cron diário. */
 export const REN_DAILY_MAX_AGE_MINUTES = 2880
 
+/**
+ * ENTSO-E intradiário: publica a hora H cerca de 65 min depois do fim; com recolha horária (cron
+ * a :20) e o atraso do cron/deploy, a idade normal chega a ~140 min (web-051-spec).
+ */
+export const ENTSOE_MAX_AGE_MINUTES = 180
+
 /** Resolução máxima (min) com que se responde «agora». Séries diárias nunca respondem. */
 export const ENERGY_VERDICT_MAX_RESOLUTION_MINUTES = 60
 
@@ -578,14 +623,24 @@ export interface EnergyDatasetMeta {
   taxonomy: string
   fetchedAtUtc: string
   generatedAtUtc: string
-  /** Nunca «agora» com séries diárias. */
-  freshness: 'latest_available'
+  /** `latest_available` nas séries diárias (nunca «agora»); `near_real_time` no intradiário ENTSO-E. */
+  freshness: EnergyFreshnessKind
   maxAgeMinutes: number
 }
+
+export type EnergyFreshnessKind = 'latest_available' | 'near_real_time'
 
 export interface EnergyLatest extends EnergyDatasetMeta {
   latest: EnergyDay
 }
+
+/** `intraday-latest.json`: última hora completa ENTSO-E (MW). */
+export interface EnergyIntradayLatest extends EnergyDatasetMeta {
+  latest: EnergyInterval
+}
+
+/** Ficheiros intradiários publicados (MW, horários). */
+export type EnergyIntradayRange = '24h' | '7d'
 
 export interface EnergyDaily extends EnergyDatasetMeta {
   /** Dias por ordem crescente (até 30). */
@@ -599,6 +654,8 @@ export type EnergyRange = '24h' | '7d' | '30d'
 export interface EnergyTimeseries extends EnergyDatasetMeta {
   range: EnergyRange
   points: EnergyInterval[]
+  /** Intradiário ENTSO-E: último backfill completo (as execuções horárias só revêm as últimas 48 h). */
+  backfillUtc?: string
 }
 
 /** Produção renovável face ao consumo (pode passar 100% quando há exportação). */
@@ -628,6 +685,7 @@ export const ENERGY_TECHNOLOGY_COLORS: Record<EnergyTechnology, string> = {
   oil: '#78350f',
   nuclear: '#a855f7',
   other_thermal: '#94a3b8',
+  other_renewable: '#4ade80',
   storage: '#8b5cf6',
 }
 
