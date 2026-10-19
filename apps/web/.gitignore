@@ -16,6 +16,9 @@ dist-ssr
 # nunca versionada, é regenerada a cada deploy/dia (ver WEB-010/011/016).
 public/data/*.sqlite
 public/data/*.sqlite-*
+# Dados de energia gerados em build/CI (scripts/build-energy-db.mjs, WEB-053).
+public/data/energy/
+public/data/.energy.tmp/
 
 # Editor directories and files
 .vscode/*

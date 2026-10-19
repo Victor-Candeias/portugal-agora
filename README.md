@@ -78,6 +78,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Nome e morada de empresas pelo NIF | VIES (Comissão Europeia) — `ec.europa.eu/taxation_customs/vies/rest-api/ms/PT/vat/{nif}`; só NIFs de empresas/entidades; sem CORS (mobile direto, web via proxy do Vite só em dev) | não |
 | Concelhos (contactos da câmara, área, limites) | API Aberta — `/geo/municipalities?limit=400` (lista em cache persistente 30 dias: `localStorage` no web, `expo-sqlite/kv-store` no mobile) e `/geo/municipalities/{slug}` (fronteira GeoJSON). As ilhas vêm sem distrito: a região sai do código INE | sim |
 | Freguesias do concelho (nome, área, limites) | geoapi.pt (dados CAOP da DGT) — `json.geoapi.pt/municipios/freguesias` (índice código INE → nome geoapi, para os homónimos como "Calheta de São Jorge") e `json.geoapi.pt/municipio/{nome}/freguesias` (GeoJSON). Geometria simplificada (Douglas-Peucker ~20 m) e em cache persistente 30 dias; o `json.geoapi.pt` não tem o limite de 5 pedidos/dia do `geoapi.pt/...?json=1` | não |
+| Energia elétrica (Portugal continental: renovável vs não renovável, consumo, importação/exportação; últimos 30 dias) | REN Data Hub — `servicebus.ren.pt/datahubapi/electricity/ElectricityConsumptionSupplyDaily` (balanço diário em GWh inteiros; o dia D só fica disponível em D+1). Recolhido no build (sem CORS) por `apps/web/scripts/build-energy-db.mjs` e publicado no GitHub Pages; só agregados diários, com atribuição à REN (o aviso legal da REN não tem licença aberta) | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -109,6 +110,16 @@ segundo plano, no máximo a cada 6 h, verifica o ETag do ficheiro publicado; uma
 `meta.generated_at` mais recente fica pendente e é aplicada no próximo arranque (ou em `reload()`).
 A origem pode ser alterada com `EXPO_PUBLIC_STATIC_DATA_URL` (por omissão
 `https://victor-candeias.github.io/portugal-agora/data/`).
+
+### Dados de energia (`data/energy/*.json`)
+
+`pnpm --filter web build:db` corre também `scripts/build-energy-db.mjs`, que consulta a REN (últimos
+30 dias publicados, de ontem para trás em hora de Lisboa), valida cada dia (formato, tipos
+duplicados, soma das tecnologias vs totais oficiais da REN) e escreve, de forma atómica,
+`public/data/energy/daily.json`, `public/data/energy/latest.json` (contrato `EnergyDaily`/`EnergyLatest`
+de `packages/core/src/utils/energy.ts`) e `public/data/energy.sqlite`. Se a REN falhar, republica o
+último dataset já publicado no Pages (`ENERGY_FALLBACK_BASE_URL`); se nem isso for possível, avisa e
+não parte o build das outras secções.
 
 ### Mapas no mobile
 

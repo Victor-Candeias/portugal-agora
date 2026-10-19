@@ -88,7 +88,7 @@ status: active
 | WEB-050 | Energia: Fase 0 — prova de dados REN Data Hub (endpoints, granularidade, licença) | done | 2026-10-19 | developer | high | 2026-10-19 |  |  | [WEB-050](../specs/mobile/web-050-spec.md) |
 | WEB-051 | Energia: Fase 0 — prova de dados ENTSO-E (token, A75/A65, EIC de Portugal, latência) | backlog | 2026-10-19 | developer | low |  |  |  |  |
 | WEB-052 | Energia (core): taxonomia versionada e regras de cálculo (renovável, MWh, veredicto, atualidade) | done | 2026-10-19 | developer | high | 2026-10-19 |  | WEB-050 |  |
-| WEB-053 | Energia: pipeline diário REN → energy.sqlite + JSON (MVP) | backlog | 2026-10-19 | developer | high |  |  | WEB-050, WEB-052 |  |
+| WEB-053 | Energia: pipeline diário REN → energy.sqlite + JSON (MVP) | done | 2026-10-19 | developer | high | 2026-10-19 |  | WEB-050, WEB-052 | [WEB-053](../specs/mobile/web-053-spec.md) |
 | WEB-054 | Energia: workflow GitHub Actions de atualização dos dados de energia | backlog | 2026-10-19 | developer | medium |  |  | WEB-053 |  |
 | WEB-055 | Energia (web e mobile): cliente de dados no core + cache | backlog | 2026-10-19 | developer | high |  |  | WEB-052, WEB-053 |  |
 | WEB-056 | Energia (web e mobile): página/ecrã MVP diário (produção, consumo, mix, 30 dias) | backlog | 2026-10-19 | developer | high |  |  | WEB-055 |  |
