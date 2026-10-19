@@ -69,7 +69,7 @@ status: active
 | WEB-031 | Contratos Públicos: nova secção com dados BASE (/base/contracts) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  | [WEB-031](../specs/mobile/web-031-spec.md) |
 | WEB-032 | Fundos PRR/PT2030: nova secção (/prr, /pt2030) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | WEB-033 | Ferramenta: validador de NIF (/nif/validate) | done | 2026-10-09 | developer | low | 2026-10-09 |  |  |  |
-| WEB-034 | Geo: filtro por freguesia (/geo/parishes) | backlog | 2026-10-09 | developer | low |  |  |  |  |
+| WEB-034 | Geo: filtro por freguesia (/geo/parishes) | archived | 2026-10-09 | developer | low | 2026-10-19 |  |  |  |
 | WEB-035 | Combustível: preços por posto com raio a partir do GPS (/fuel/stations) | archived | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | WEB-036 | Combustível (web e mobile): corrigir ordenação por distância (título, destaque, seletor Preço/Distância e raio) | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
 | WEB-037 | Web e mobile: botão no header para voltar ao Início, fora do ecrã Início | done | 2026-10-09 | developer | medium | 2026-10-09 |  |  |  |
