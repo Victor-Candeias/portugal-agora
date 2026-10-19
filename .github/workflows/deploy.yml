@@ -2,11 +2,20 @@ name: Deploy Pages V2
 
 on:
   workflow_dispatch:
+  # Deploy diário (WEB-054): reconstrói os dados estáticos, incluindo a energia REN do dia anterior
+  # (publicado pela REN até ~12:30 de Lisboa). O cron do GitHub não garante hora exata.
+  schedule:
+    - cron: '0 13 * * *'
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+# Um deploy de cada vez (o agendado e o manual não se sobrepõem).
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -25,12 +34,16 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
+          # Node ≥ 22.18 (type stripping) para o build-energy-db.mjs importar o core em TypeScript.
+          check-latest: true
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Carris static DB
+      - name: Build static data (Carris, Metro do Porto, Serviços Públicos, Energia)
+        # A energia (scripts/build-energy-db.mjs) usa type stripping do Node ≥ 22.18; se a REN falhar
+        # republica o último dataset publicado e nunca falha este passo.
         run: pnpm --filter web build:db
 
       - name: Build
