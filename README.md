@@ -78,7 +78,8 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Nome e morada de empresas pelo NIF | VIES (Comissão Europeia) — `ec.europa.eu/taxation_customs/vies/rest-api/ms/PT/vat/{nif}`; só NIFs de empresas/entidades; sem CORS (mobile direto, web via proxy do Vite só em dev) | não |
 | Concelhos (contactos da câmara, área, limites) | API Aberta — `/geo/municipalities?limit=400` (lista em cache persistente 30 dias: `localStorage` no web, `expo-sqlite/kv-store` no mobile) e `/geo/municipalities/{slug}` (fronteira GeoJSON). As ilhas vêm sem distrito: a região sai do código INE | sim |
 | Freguesias do concelho (nome, área, limites) | geoapi.pt (dados CAOP da DGT) — `json.geoapi.pt/municipios/freguesias` (índice código INE → nome geoapi, para os homónimos como "Calheta de São Jorge") e `json.geoapi.pt/municipio/{nome}/freguesias` (GeoJSON). Geometria simplificada (Douglas-Peucker ~20 m) e em cache persistente 30 dias; o `json.geoapi.pt` não tem o limite de 5 pedidos/dia do `geoapi.pt/...?json=1` | não |
-| Energia elétrica (Portugal continental: renovável vs não renovável, consumo, importação/exportação; últimos 30 dias) | REN Data Hub — `servicebus.ren.pt/datahubapi/electricity/ElectricityConsumptionSupplyDaily` (balanço diário em GWh inteiros; o dia D só fica disponível em D+1). Recolhido no build (sem CORS) por `apps/web/scripts/build-energy-db.mjs` e publicado no GitHub Pages; só agregados diários, com atribuição à REN (o aviso legal da REN não tem licença aberta) | não |
+| Energia elétrica — balanço diário oficial (Portugal continental: renovável vs não renovável, consumo, importação/exportação; últimos 30 dias) | REN Data Hub — `servicebus.ren.pt/datahubapi/electricity/ElectricityConsumptionSupplyDaily` (balanço diário em GWh inteiros; o dia D só fica disponível em D+1). Recolhido no build (sem CORS) por `apps/web/scripts/build-energy-db.mjs` e publicado no GitHub Pages; só agregados diários, com atribuição à REN (o aviso legal da REN não tem licença aberta) | não |
+| Energia elétrica — produção horária (quase tempo real, ~1 h de atraso; últimas 24 h e 7 dias) | ENTSO-E Transparency Platform — `web-api.tp.entsoe.eu/api`: produção real por tipo (A75), carga total (A65) e fluxos físicos com Espanha (A11), zona `10YPT-REN------W`, em MW horários. Recolhido no build por `apps/web/scripts/energy-entsoe.mjs`; os termos de reutilização não foram confirmados (WEB-051), por isso só se publicam produção, carga e fluxos agregados a 60 min, com atribuição «ENTSO-E Transparency Platform», e os preços de mercado ficam de fora | sim, só no build (`TRANSPARENCT_ENTSOE_TOKEN`) |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -120,6 +121,26 @@ duplicados, soma das tecnologias vs totais oficiais da REN) e escreve, de forma 
 de `packages/core/src/utils/energy.ts`) e `public/data/energy.sqlite`. Se a REN falhar, republica o
 último dataset já publicado no Pages (`ENERGY_FALLBACK_BASE_URL`); se nem isso for possível, avisa e
 não parte o build das outras secções.
+
+A série horária vem da ENTSO-E (`scripts/energy-entsoe.mjs`, precisa de `TRANSPARENCT_ENTSOE_TOKEN`
+no ambiente ou em `apps/web/.env`; o relatório `Documents/relatorio_energia_portugal.md` chama-lhe
+`ENTSOE_TOKEN`). Escreve `energy/intraday-latest.json` (última hora completa) e
+`energy/timeseries-24h.json`/`timeseries-7d.json` (MW horários, contrato `EnergyTimeseries`). As
+execuções horárias pedem só as últimas 48 h e juntam-nas à série publicada; uma vez por dia refaz os
+8 dias (backfill das revisões). Sem token, com o token recusado ou com a ENTSO-E em baixo, republica
+a última série publicada, e as apps avisam que a série horária não está disponível.
+
+| Fonte | Frequência | Granularidade | Latência | Limitações |
+|---|---|---|---|---|
+| REN (balanço diário) | 1×/dia (cron 13:00 UTC) | dia civil de Lisboa, GWh inteiros | D+1 | sem licença aberta; a hídrica é líquida da bombagem (pode ser negativa) |
+| ENTSO-E (produção, carga, fluxos) | de hora a hora (cron `:20`; o GitHub não garante a hora) | 60 min, MW | ~1 h | termos de reutilização por confirmar; armazenamento = turbinagem da bombagem e baterias; preços excluídos |
+
+Cada execução escreve também `energy/status.json` (WEB-060): o estado de cada fonte (`fresh`,
+`republished` ou `failed`), a recolha dos dados em uso, o último período, o erro (sem o token) e a
+reconciliação diária REN × ENTSO-E dos dias cobertos por inteiro pelas duas fontes (produção total,
+não renovável e consumo, tolerância máx(1 GWh; 5%); o renovável é só informativo porque a REN
+desconta a bombagem na hídrica). No GitHub Actions as falhas e divergências dão `::warning` e uma
+tabela no resumo do job; nas apps aparecem no cartão «Estado das fontes» do ecrã de Energia.
 
 ### Mapas no mobile
 
@@ -177,6 +198,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | ⛽ Combustível | Preços DGEG por distrito/município e tipo. Com localização: seletor Preço/Distância, raio de 10/25/50 km/Todos e distância a cada posto. Custo de atestar o depósito em cada posto e nos resumos (por omissão 50 L, editável de 1 a 200 L e guardado no dispositivo) |
 | 🌤️ Tempo | Previsão IPMA a 5 dias por cidade + tempo atual (Open-Meteo) + avisos meteorológicos IPMA do distrito (resumo no Início) |
 | ⚡ EV | Tab "Postos perto de mim": postos de carregamento (Open Charge Map + OpenStreetMap, sem repetidos) ordenados por distância, com raio, potência mínima, tomadas, estado, mapa e direções (fallback Lisboa sem localização). Em cada posto, "Custo e tempo" calcula o preço de carregar a bateria de X% a Y% por CEME e o tempo previsto em AC e em DC em separado (por tipo de tomada, ou com o máximo do carro se o posto não tiver esse tipo), limitado pela potência máxima AC/DC do carro, mostrando o cálculo de cada tempo e de cada custo (por omissão 60 kWh, 10% → 80%, 11 kW AC, 120 kW DC; editáveis e guardados no dispositivo). Tab "Tarifas CEME": tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) | tarifas dos CEME (filtro fixa/indexada OMIE) + simulador do custo por carregamento (resumo "CEME mais barato" no Início, no web) |
+| 🔌 Energia | Portugal continental. «Agora»: renovável vs não renovável na última hora completa (ENTSO-E, ~1 h de atraso), com veredicto, armazenamento, consumo e as últimas 24 h hora a hora. Análise 24 h / 7 dias (ENTSO-E, MW horários) e 30 dias (REN, GWh diários) com gráficos e exportação CSV. Balanço diário oficial da REN (último dia disponível, mix por tecnologia, histórico de 30 dias, qualidade dos dados) e estado das fontes com a reconciliação REN × ENTSO-E. Sem preços de mercado |
 | 🔥 Proteção Civil | Ocorrências ANPC + comunicados ANPC (`/anpc/warnings`, mais recentes primeiro) + risco de incêndio por distrito (RCM IPMA) + mapa de focos de calor por satélite (NASA FIRMS, 1–7 dias) |
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat, cada um com gráfico da série histórica e seletor de intervalo de anos (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
@@ -261,6 +283,7 @@ Secrets do repositório:
 |---|---|
 | `APIABERTA_KEY` | `EXPO_PUBLIC_APIABERTA_KEY` embutida no bundle |
 | `OPEN_CHARGE_MAP_KEY` | chave do Open Charge Map (postos EV), embutida no APK (`extra.openChargeMapKey`) e no bundle do Pages |
+| `TRANSPARENCT_ENTSOE_TOKEN` | token da ENTSO-E Transparency Platform, usado só no workflow do Pages (`deploy.yml`) para recolher a série horária de energia; nunca entra no bundle |
 | `ANDROID_KEYSTORE_BASE64` | upload keystore em base64 (`base64 -w0 upload.jks`) |
 | `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | credenciais da upload key |
 | `PLAY_SERVICE_ACCOUNT_JSON` | service account com acesso à app na Play Console (só para publicar) |

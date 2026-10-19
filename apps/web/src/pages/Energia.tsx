@@ -16,6 +16,7 @@ import {
   energyNowInfo,
   energyRangeSummary,
   energyQualityInfo,
+  energyStatusInfo,
   formatEnergy,
   formatEnergyDate,
   formatLisbonDateTime,
@@ -26,17 +27,19 @@ import {
   type EnergyDay,
   type EnergyInterval,
   type EnergyRange,
+  type EnergyStatus,
   type EnergyTimeseries,
 } from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
-import { useEnergy, useEnergyIntraday } from '@/hooks/useEnergy'
+import { useEnergy, useEnergyIntraday, useEnergyStatus } from '@/hooks/useEnergy'
 
 // Painel de energia elétrica: indicador «agora» com a série horária ENTSO-E (WEB-058), análise 24h/7d/30d
-// com CSV (WEB-059) e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
+// com CSV (WEB-059), balanço diário oficial da REN (WEB-056) e estado das fontes/reconciliação (WEB-060). O diário é sempre «último dia disponível», nunca «agora».
 export function Energia() {
   const energy = useEnergy()
   const intraday = useEnergyIntraday('24h')
+  const status = useEnergyStatus()
   const result = energy.data
   const daily = result?.data
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -55,6 +58,7 @@ export function Energia() {
           onClick={() => {
             void energy.refetch()
             void intraday.refetch()
+            void status.refetch()
           }}
           disabled={energy.isFetching || intraday.isFetching}
           className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 shrink-0"
@@ -90,6 +94,8 @@ export function Energia() {
           <QualityCard daily={daily} />
         </>
       )}
+
+      {status.data && <SourcesCard status={status.data} />}
     </div>
   )
 }
@@ -531,6 +537,77 @@ function QualityCard({ daily }: { daily: EnergyDaily }) {
         <a href={q.sourceUrl} target="_blank" rel="noreferrer" className="text-green-700 underline">{q.source}</a>.
         A REN publica cada dia no dia seguinte. A quota renovável é da produção nacional (inclui exportação; exclui importação).
       </p>
+    </Card>
+  )
+}
+
+function SourcesCard({ status }: { status: EnergyStatus }) {
+  const info = energyStatusInfo(status)
+  return (
+    <Card>
+      <CardTitle>Estado das fontes</CardTitle>
+      {info.problems && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-sm mb-3">
+          ⚠️ A última recolha não atualizou todas as fontes: os dados abaixo podem estar atrasados.
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {info.sources.map(s => (
+          <div key={s.source} className="rounded-lg border border-slate-200 p-3 text-sm space-y-1">
+            <p className="font-semibold text-slate-800">
+              {s.ok ? '🟢' : s.status === 'failed' ? '🔴' : '🟠'} {s.name}
+            </p>
+            <p className={s.ok ? 'text-slate-600' : 'text-amber-800'}>
+              {s.statusLabel}
+              {s.status === 'fresh' && s.stale ? ' · dados fora do prazo' : ''}
+            </p>
+            <dl className="space-y-1">
+              <Row label="Recolhido em" value={s.fetchedAt} />
+              <Row label="Último período" value={`${s.latestEnd} (há ${s.delay})`} />
+              <Row label="Períodos" value={s.completeness} />
+              {s.error && <Row label="Erro" value={s.error} />}
+            </dl>
+          </div>
+        ))}
+      </div>
+      {info.reconciliation.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-slate-800">
+            Reconciliação diária REN → ENTSO-E{' '}
+            <span className="font-normal text-slate-500">
+              (tolerância {info.tolerance}; {info.divergentDays ? `${info.divergentDays} dia(s) com divergência` : 'sem divergências'})
+            </span>
+          </p>
+          <div className="overflow-x-auto mt-2">
+            <table className="w-full text-xs tabular-nums">
+              <thead className="text-slate-500 text-left">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Dia</th>
+                  <th className="py-1 pr-3 font-medium">Produção</th>
+                  <th className="py-1 pr-3 font-medium">Não renovável</th>
+                  <th className="py-1 pr-3 font-medium">Consumo</th>
+                  <th className="py-1 pr-3 font-medium">Renovável*</th>
+                  <th className="py-1 font-medium" aria-label="Resultado" />
+                </tr>
+              </thead>
+              <tbody className="text-slate-700">
+                {info.reconciliation.map(r => (
+                  <tr key={r.date} className={`border-t border-slate-100${r.ok ? '' : ' bg-amber-50'}`}>
+                    <td className="py-1 pr-3 whitespace-nowrap">{r.date}</td>
+                    <td className="py-1 pr-3 whitespace-nowrap">{r.production}</td>
+                    <td className="py-1 pr-3 whitespace-nowrap">{r.nonRenewable}</td>
+                    <td className="py-1 pr-3 whitespace-nowrap">{r.consumption}</td>
+                    <td className="py-1 pr-3 whitespace-nowrap text-slate-500">{r.renewable}</td>
+                    <td className="py-1">{r.ok ? '✔' : '⚠'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">* {info.note}</p>
+        </div>
+      )}
+      <p className="text-xs text-slate-500 mt-3">Verificado em {info.checkedAt} (hora de Lisboa), na última execução da recolha.</p>
     </Card>
   )
 }

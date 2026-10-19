@@ -43,3 +43,14 @@ export function useEnergyIntraday(range: EnergyIntradayRange, enabled = true) {
     enabled,
   })
 }
+
+// Estado do pipeline e reconciliação REN × ENTSO-E (WEB-060, `status.json`). Sem cache persistente:
+// só interessa o estado atual; sem ficheiro (404) ou offline o cartão não aparece.
+export function useEnergyStatus() {
+  return useQuery({
+    queryKey: ['energy', 'status'],
+    queryFn: () => energyClient.getStatus(),
+    staleTime: ENERGY_INTRADAY_CACHE_FRESH_MS,
+    retry: shouldRetryEnergy,
+  })
+}

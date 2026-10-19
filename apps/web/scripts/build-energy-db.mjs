@@ -6,6 +6,9 @@
 // `TRANSPARENCT_ENTSOE_TOKEN`, lido do ambiente ou de apps/web/.env):
 //   apps/web/public/data/energy/intraday-latest.json            — última hora completa (MW)
 //   apps/web/public/data/energy/timeseries-24h.json / -7d.json — séries horárias (MW)
+// e o estado do pipeline (WEB-060):
+//   apps/web/public/data/energy/status.json — estado de cada fonte, último sucesso, erro e
+//   reconciliação diária REN × ENTSO-E (no GitHub Actions também em anotações e no resumo do job)
 // Fonte canónica: `ElectricityConsumptionSupplyDaily` (balanço diário oficial, GWh inteiros), ver
 // .maestru/specs/mobile/web-050-spec.md. Regras de cálculo e contrato no core (energy.ts), importado
 // diretamente em Node (type stripping, Node ≥ 22.18).
@@ -19,10 +22,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import Database from 'better-sqlite3'
 import {
   ENERGY_CONTRACT_VERSION,
+  ENERGY_RECONCILIATION_NOTE,
+  ENERGY_RECONCILIATION_TOLERANCE,
+  ENTSOE_MAX_AGE_MINUTES,
   REN_DAILY_MAX_AGE_MINUTES,
   REN_DAILY_TAXONOMY,
   addCalendarDays,
   aggregateEnergy,
+  energyReconciliation,
   lisbonDate,
   lisbonDayBoundsUtc,
   mapEnergyCode,
@@ -33,6 +40,7 @@ import {
 import {
   ENTSOE_FILES,
   ENTSOE_INCREMENTAL_DAYS,
+  ENTSOE_SOURCE,
   ENTSOE_TOKEN_ENV,
   ENTSOE_WINDOW_DAYS,
   buildEntsoeDatasets,
@@ -404,15 +412,18 @@ export async function republishPublished({ outDir, fallbackBaseUrl, fetchImpl = 
     return res
   }
   const contents = {}
+  const published = {}
   for (const name of ['daily.json', 'latest.json']) {
     const json = await (await get(`${base}energy/${name}`)).json()
     validatePublished(name, json)
+    published[name] = json
     contents[name] = file => fs.writeFileSync(file, serialize(name, json))
   }
   const sqlite = Buffer.from(await (await get(`${base}energy.sqlite`)).arrayBuffer())
   if (sqlite.subarray(0, 16).toString('latin1') !== 'SQLite format 3\u0000') throw new Error('energy.sqlite publicado inválido')
   contents['energy.sqlite'] = file => fs.writeFileSync(file, sqlite)
   writeOutputs(outDir, contents)
+  return { daily: published['daily.json'] }
 }
 
 export async function buildEnergy({
@@ -426,7 +437,105 @@ export async function buildEnergy({
 } = {}) {
   const ren = await buildRenEnergy({ outDir, now, fetchImpl, fallbackBaseUrl, retryDelayMs, log })
   const entsoe = await buildEntsoeEnergy({ outDir, now, fetchImpl, fallbackBaseUrl, token: entsoeToken, retryDelayMs, log })
-  return { ren, entsoe }
+  const status = buildEnergyStatus({ ren, entsoe, now })
+  try {
+    writeOutputs(outDir, { 'status.json': file => fs.writeFileSync(file, serialize('status.json', status)) })
+  } catch (err) {
+    log.warn(`⚠ energia: status.json não escrito (${err.message}).`)
+  }
+  reportEnergyStatus(status, { log })
+  return { ren, entsoe, status }
+}
+
+const STATUS_ERROR_MAX_CHARS = 300
+
+function sourceStatus({ source, sourceName, result, dataset, points, maxAgeMinutes, now }) {
+  const error = result.error ? String(result.error.message ?? result.error).replace(/\s+/g, ' ').slice(0, STATUS_ERROR_MAX_CHARS) : null
+  return {
+    source,
+    sourceName: dataset?.sourceName ?? sourceName,
+    status: result.status,
+    lastAttemptUtc: new Date(now).toISOString(),
+    lastSuccessUtc: dataset?.fetchedAtUtc ?? null,
+    latestIntervalEndUtc: points.length ? points[points.length - 1].intervalEndUtc : null,
+    maxAgeMinutes: dataset?.maxAgeMinutes ?? maxAgeMinutes,
+    periods: points.length,
+    completePeriods: points.filter(p => p.quality === 'complete').length,
+    error,
+  }
+}
+
+/**
+ * `status.json` (WEB-060): estado de cada fonte nesta execução (`fresh`/`republished`/`failed`), dados
+ * em uso e reconciliação diária REN × ENTSO-E. Os erros já vêm sem o token (`sanitizeEntsoe`).
+ */
+export function buildEnergyStatus({ ren, entsoe, now = Date.now(), generatedAtUtc = new Date().toISOString() }) {
+  const daily = ren.status === 'failed' ? null : (ren.daily ?? null)
+  const series = entsoe.status === 'failed' ? null : (entsoe.datasets?.['timeseries-7d.json'] ?? null)
+  return {
+    version: ENERGY_CONTRACT_VERSION,
+    generatedAtUtc,
+    sources: [
+      sourceStatus({ source: SOURCE, sourceName: SOURCE_NAME, result: ren, dataset: daily, points: daily?.days ?? [], maxAgeMinutes: REN_DAILY_MAX_AGE_MINUTES, now }),
+      sourceStatus({ source: ENTSOE_SOURCE, sourceName: 'ENTSO-E Transparency Platform', result: entsoe, dataset: series, points: series?.points ?? [], maxAgeMinutes: ENTSOE_MAX_AGE_MINUTES, now }),
+    ],
+    reconciliation: {
+      tolerancePct: ENERGY_RECONCILIATION_TOLERANCE.pct,
+      toleranceGWh: ENERGY_RECONCILIATION_TOLERANCE.gwh,
+      days: daily && series ? energyReconciliation(daily.days, series.points) : [],
+    },
+  }
+}
+
+const fmtMetric = m => `${m.ren} vs ${m.entsoe} GWh (${m.diffPct === null ? '—' : `${m.diffPct > 0 ? '+' : ''}${m.diffPct}%`})`
+
+/** Log da execução; no GitHub Actions também anotações `::warning` e uma tabela no resumo do job. */
+export function reportEnergyStatus(status, { log = console, env = process.env } = {}) {
+  const ci = env.GITHUB_ACTIONS === 'true'
+  const warnings = []
+  for (const s of status.sources) {
+    if (s.status !== 'fresh') warnings.push(`${s.source} ${s.status}${s.error ? ` (${s.error})` : ''}`)
+  }
+  for (const d of status.reconciliation.days) {
+    const line = `${d.date}: produção ${fmtMetric(d.production)}, não renovável ${fmtMetric(d.nonRenewable)}` +
+      (d.consumption ? `, consumo ${fmtMetric(d.consumption)}` : '') + ` (renovável ${fmtMetric(d.renewable)}, informativo)`
+    if (d.ok) log.log(`✔ energia: REN × ENTSO-E ${line}`)
+    else warnings.push(`divergência REN × ENTSO-E acima da tolerância em ${line}`)
+  }
+  for (const w of warnings) {
+    log.warn(`⚠ energia: ${w}`)
+    if (ci) log.log(`::warning title=Energia::${w.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`)
+  }
+  if (ci && env.GITHUB_STEP_SUMMARY) {
+    const cell = v => String(v ?? '—').replace(/\|/g, '\\|')
+    const lines = [
+      '### Energia',
+      '',
+      '| Fonte | Estado | Dados recolhidos | Último intervalo | Completos | Erro |',
+      '|---|---|---|---|---|---|',
+      ...status.sources.map(s =>
+        `| ${s.source} | ${s.status} | ${cell(s.lastSuccessUtc)} | ${cell(s.latestIntervalEndUtc)} | ${s.completePeriods}/${s.periods} | ${cell(s.error)} |`),
+      '',
+    ]
+    if (status.reconciliation.days.length) {
+      lines.push(
+        `Reconciliação REN × ENTSO-E (tolerância max(${status.reconciliation.toleranceGWh} GWh, ${status.reconciliation.tolerancePct}%)):`,
+        '',
+        '| Dia | Produção | Não renovável | Consumo | Renovável (informativo) | OK |',
+        '|---|---|---|---|---|---|',
+        ...status.reconciliation.days.map(d =>
+          `| ${d.date} | ${fmtMetric(d.production)} | ${fmtMetric(d.nonRenewable)} | ${d.consumption ? fmtMetric(d.consumption) : '—'} | ${fmtMetric(d.renewable)} | ${d.ok ? '✔' : '⚠'} |`),
+        '',
+        ENERGY_RECONCILIATION_NOTE,
+        '',
+      )
+    }
+    try {
+      fs.appendFileSync(env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n')
+    } catch (err) {
+      log.warn(`⚠ energia: resumo do job não escrito (${err.message}).`)
+    }
+  }
 }
 
 /** Ficheiros intradiários já publicados no Pages (validados), ou erro. */
@@ -528,9 +637,9 @@ export async function buildRenEnergy({
   } catch (err) {
     log.warn(`⚠ energia: recolha REN falhou (${err.message}); a republicar o último dataset publicado...`)
     try {
-      await republishPublished({ outDir, fallbackBaseUrl, fetchImpl })
+      const { daily } = await republishPublished({ outDir, fallbackBaseUrl, fetchImpl })
       log.warn(`⚠ energia: republicado o dataset de ${fallbackBaseUrl}`)
-      return { status: 'republished', error: err }
+      return { status: 'republished', error: err, daily }
     } catch (fallbackErr) {
       log.warn(`⚠ energia: sem dados de energia neste build (${fallbackErr.message}).`)
       return { status: 'failed', error: err, fallbackError: fallbackErr }

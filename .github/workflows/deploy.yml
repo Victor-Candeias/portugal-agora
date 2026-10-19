@@ -46,7 +46,9 @@ jobs:
 
       - name: Build static data (Carris, Metro do Porto, Serviços Públicos, Energia)
         # A energia (scripts/build-energy-db.mjs) usa type stripping do Node ≥ 22.18; se a REN ou a
-        # ENTSO-E falharem republica o último dataset publicado e nunca falha este passo.
+        # ENTSO-E falharem republica o último dataset publicado e nunca falha este passo. O estado de
+        # cada fonte e a reconciliação REN × ENTSO-E vão para energy/status.json, para avisos
+        # (::warning) e para o resumo do job (WEB-060).
         # Na execução horária reutiliza os .sqlite publicados (Carris, Metro, Serviços Públicos) e
         # só refaz a energia; se o download falhar, reconstrói tudo.
         env:

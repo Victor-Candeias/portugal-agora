@@ -387,15 +387,17 @@ O limite `maxAgeMinutes` deve ser configurado por fonte depois de confirmar a la
 
 ## 15. Critérios de aceitação
 
-- [ ] Cada métrica apresenta fonte, unidade e período.
-- [ ] Produção renovável e não renovável são calculadas com taxonomia validada.
-- [ ] Consumo e produção não são tratados como equivalentes.
-- [ ] Vista 24h só aparece quando existe granularidade intradiária real.
-- [ ] Histórico 7d/30d agrega energia corretamente.
-- [ ] `SIM/NÃO` nunca é mostrado com dados incompletos ou desatualizados.
-- [ ] Frontend funciona no GitHub Pages sem segredos no bundle.
-- [ ] Falha na atualização preserva último dataset válido e assinala antiguidade.
-- [ ] Todos os exemplos com dados fictícios são identificados como demonstração.
+Revistos no WEB-060 (2026-10-19); evidência em `.maestru/specs/mobile/web-060-spec.md`.
+
+- [x] Cada métrica apresenta fonte, unidade e período.
+- [x] Produção renovável e não renovável são calculadas com taxonomia validada.
+- [x] Consumo e produção não são tratados como equivalentes.
+- [x] Vista 24h só aparece quando existe granularidade intradiária real.
+- [x] Histórico 7d/30d agrega energia corretamente.
+- [x] `SIM/NÃO` nunca é mostrado com dados incompletos ou desatualizados.
+- [x] Frontend funciona no GitHub Pages sem segredos no bundle.
+- [x] Falha na atualização preserva último dataset válido e assinala antiguidade.
+- [x] Todos os exemplos com dados fictícios são identificados como demonstração.
 
 ## 16. Recomendação final
 

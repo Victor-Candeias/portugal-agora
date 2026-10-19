@@ -16,6 +16,7 @@ import {
   energyNowInfo,
   energyRangeSummary,
   energyQualityInfo,
+  energyStatusInfo,
   formatEnergy,
   formatEnergyDate,
   formatLisbonDateTime,
@@ -26,17 +27,19 @@ import {
   type EnergyInterval,
   type EnergyDay,
   type EnergyRange,
+  type EnergyStatus,
   type EnergyTimeseries,
 } from '@portugal-hoje/core'
-import { useEnergy, useEnergyIntraday } from '../hooks/useEnergy'
+import { useEnergy, useEnergyIntraday, useEnergyStatus } from '../hooks/useEnergy'
 import { Card, COLORS, ErrorView, LinkText, LoadingView, Notice, ScreenHeader, SectionTitle, uiStyles } from '../components/ui'
 
 // Painel de energia elétrica: indicador «agora» com a série horária ENTSO-E (WEB-058), análise 24h/7d/30d
-// com CSV (WEB-059) e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
+// com CSV (WEB-059), balanço diário oficial da REN (WEB-056) e estado das fontes/reconciliação (WEB-060). O diário é sempre «último dia disponível», nunca «agora».
 // Não entra no Android Auto.
 export default function EnergiaScreen() {
   const energy = useEnergy()
   const intraday = useEnergyIntraday('24h')
+  const status = useEnergyStatus()
   const result = energy.data
   const daily = result?.data
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -51,6 +54,7 @@ export default function EnergiaScreen() {
         onRefresh={() => {
           void energy.refetch()
           void intraday.refetch()
+          void status.refetch()
         }}
         refreshing={energy.isFetching || intraday.isFetching}
       />
@@ -94,6 +98,8 @@ export default function EnergiaScreen() {
           <QualityCard daily={daily} />
         </>
       )}
+
+      {status.data && <SourcesCard status={status.data} />}
     </ScrollView>
   )
 }
@@ -484,6 +490,52 @@ function QualityCard({ daily }: { daily: EnergyDaily }) {
   )
 }
 
+function SourcesCard({ status }: { status: EnergyStatus }) {
+  const info = energyStatusInfo(status)
+  return (
+    <Card>
+      <SectionTitle>Estado das fontes</SectionTitle>
+      {info.problems && <Notice>⚠️ A última recolha não atualizou todas as fontes: os dados podem estar atrasados.</Notice>}
+      {info.sources.map(s => (
+        <View key={s.source} style={styles.sourceBlock}>
+          <Text style={styles.sourceName}>
+            {s.ok ? '🟢' : s.status === 'failed' ? '🔴' : '🟠'} {s.name}
+          </Text>
+          <Text style={[uiStyles.small, styles.note]}>
+            {s.statusLabel}
+            {s.status === 'fresh' && s.stale ? ' · dados fora do prazo' : ''}
+          </Text>
+          <Row label="Recolhido em" value={s.fetchedAt} />
+          <Row label="Último período" value={`${s.latestEnd} (há ${s.delay})`} />
+          <Row label="Períodos" value={s.completeness} />
+          {s.error && <Row label="Erro" value={s.error} />}
+        </View>
+      ))}
+      {info.reconciliation.length > 0 && (
+        <>
+          <Text style={styles.chartTitle}>
+            Reconciliação REN → ENTSO-E · {info.divergentDays ? `${info.divergentDays} dia(s) com divergência` : 'sem divergências'}
+          </Text>
+          <Text style={[uiStyles.small, styles.hint]}>Tolerância {info.tolerance}.</Text>
+          {info.reconciliation.map(r => (
+            <View key={r.date} style={[styles.sourceBlock, !r.ok && styles.divergent]}>
+              <Text style={styles.sourceName}>
+                {r.ok ? '✔' : '⚠'} {r.date}
+              </Text>
+              <Row label="Produção" value={r.production} />
+              <Row label="Não renovável" value={r.nonRenewable} />
+              <Row label="Consumo" value={r.consumption} />
+              <Row label="Renovável*" value={r.renewable} />
+            </View>
+          ))}
+          <Text style={[uiStyles.small, styles.note]}>* {info.note}</Text>
+        </>
+      )}
+      <Text style={[uiStyles.small, styles.note]}>Verificado em {info.checkedAt} (Lisboa), na última execução da recolha.</Text>
+    </Card>
+  )
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.qualityRow}>
@@ -537,4 +589,7 @@ const styles = StyleSheet.create({
   qualityRow: { flexDirection: 'row', gap: 8, paddingVertical: 3 },
   qualityLabel: { width: 96, fontSize: 12, color: COLORS.muted },
   qualityValue: { flex: 1, fontSize: 12, color: COLORS.text },
+  sourceBlock: { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
+  sourceName: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  divergent: { backgroundColor: '#fffbeb' },
 })

@@ -1009,3 +1009,210 @@ export function energyCsv(points: readonly EnergyInterval[], meta: Pick<EnergyDa
 export function energyCsvFileName(source: string, range: EnergyRange, nowMs: number = Date.now()): string {
   return `energia-${source}-${range}-${lisbonDate(nowMs)}.csv`
 }
+// ── Operação: estado das fontes e reconciliação REN × ENTSO-E (WEB-060) ───
+
+/** `fresh`: recolhido nesta execução; `republished`: recolha falhou, mantém-se o último válido; `failed`: sem dados. */
+export type EnergyRunStatus = 'fresh' | 'republished' | 'failed'
+
+export const ENERGY_RUN_STATUS_LABELS: Record<EnergyRunStatus, string> = {
+  fresh: 'Atualizado',
+  republished: 'Recolha falhou — mantém-se o último dataset válido',
+  failed: 'Sem dados (recolha e último dataset indisponíveis)',
+}
+
+export interface EnergySourceStatus {
+  /** `REN`, `ENTSOE` */
+  source: string
+  sourceName: string
+  status: EnergyRunStatus
+  /** Início da última execução do pipeline. */
+  lastAttemptUtc: string
+  /** Recolha do dataset em uso (`fetchedAtUtc`); `null` se não houver nenhum. */
+  lastSuccessUtc: string | null
+  latestIntervalEndUtc: string | null
+  maxAgeMinutes: number
+  periods: number
+  completePeriods: number
+  /** Erro da última tentativa, sem segredos. */
+  error: string | null
+}
+
+export interface EnergyReconciliationMetric {
+  ren: number
+  entsoe: number
+  diffGWh: number
+  diffPct: number | null
+  ok: boolean
+}
+
+export interface EnergyReconciliationDay {
+  /** Dia civil de Lisboa. */
+  date: string
+  production: EnergyReconciliationMetric
+  nonRenewable: EnergyReconciliationMetric
+  consumption: EnergyReconciliationMetric | null
+  /** Informativo, fora do `ok`: ver {@link ENERGY_RECONCILIATION_NOTE}. */
+  renewable: EnergyReconciliationMetric
+  /** Produção total, não renovável e consumo dentro da tolerância. */
+  ok: boolean
+}
+
+export interface EnergyReconciliation {
+  tolerancePct: number
+  toleranceGWh: number
+  days: EnergyReconciliationDay[]
+}
+
+export interface EnergyStatus {
+  version: typeof ENERGY_CONTRACT_VERSION
+  generatedAtUtc: string
+  sources: EnergySourceStatus[]
+  reconciliation: EnergyReconciliation
+}
+
+/** Tolerância da reconciliação: max(1 GWh, 5%); a REN publica GWh inteiros (±0,5 GWh de arredondamento). */
+export const ENERGY_RECONCILIATION_TOLERANCE = { pct: 5, gwh: 1 } as const
+
+/**
+ * Porque é que o renovável não entra no `ok`: a REN desconta o consumo da bombagem na hídrica (que
+ * pode ficar negativa) e a ENTSO-E publica a hídrica bruta e a turbinagem das albufeiras com bombagem
+ * à parte; a soma hídrica + armazenamento, a produção total, o não renovável e o consumo coincidem.
+ */
+export const ENERGY_RECONCILIATION_NOTE =
+  'O renovável é só informativo: a REN desconta a bombagem na hídrica e a ENTSO-E não, por isso a divisão entre hídrica e armazenamento difere; a produção total, o não renovável e o consumo têm de coincidir.'
+
+function reconciliationMetric(ren: number, entsoe: number, tolerance: { pct: number; gwh: number }): EnergyReconciliationMetric {
+  const diffGWh = roundEnergyValue(entsoe - ren, 2)
+  return {
+    ren,
+    entsoe: roundEnergyValue(entsoe, 2),
+    diffGWh,
+    diffPct: ren !== 0 ? roundEnergyValue((100 * (entsoe - ren)) / Math.abs(ren), 2) : null,
+    ok: Math.abs(entsoe - ren) <= Math.max(tolerance.gwh, (tolerance.pct / 100) * Math.abs(ren)),
+  }
+}
+
+/**
+ * Compara o balanço diário REN (fonte canónica do diário) com a soma horária ENTSO-E de cada dia civil de Lisboa coberto por
+ * inteiro (todas as horas presentes e completas; 23/25 h nas mudanças de hora). Dias parciais ficam
+ * de fora: uma diferença por falta de horas não é uma divergência das fontes.
+ */
+export function energyReconciliation(
+  days: readonly EnergyDay[],
+  points: readonly EnergyInterval[],
+  tolerance: { pct: number; gwh: number } = ENERGY_RECONCILIATION_TOLERANCE,
+): EnergyReconciliationDay[] {
+  const byStart = new Map(points.map(p => [Date.parse(p.intervalStartUtc), p]))
+  const out: EnergyReconciliationDay[] = []
+  for (const day of days) {
+    if (day.quality !== 'complete') continue
+    const bounds = lisbonDayBoundsUtc(day.date)
+    const start = Date.parse(bounds.intervalStartUtc)
+    const hours: EnergyInterval[] = []
+    for (let t = start; t < Date.parse(bounds.intervalEndUtc); t += 3600000) {
+      const p = byStart.get(t)
+      if (!p || p.quality !== 'complete' || p.resolutionMinutes !== 60) break
+      hours.push(p)
+    }
+    if (hours.length * 60 !== bounds.minutes) continue
+    const gwh = (f: (p: EnergyInterval) => number) => hours.reduce((s, p) => s + toEnergyMwh(f(p), p.unit, p.resolutionMinutes), 0) / 1000
+    const production = reconciliationMetric(day.production, gwh(p => p.production), tolerance)
+    const nonRenewable = reconciliationMetric(day.nonRenewable, gwh(p => p.nonRenewable), tolerance)
+    const consumption =
+      day.consumption !== null && hours.every(p => p.consumption !== null)
+        ? reconciliationMetric(day.consumption, gwh(p => p.consumption ?? 0), tolerance)
+        : null
+    const renewable = reconciliationMetric(day.renewable, gwh(p => p.renewable), tolerance)
+    out.push({
+      date: day.date,
+      production,
+      nonRenewable,
+      consumption,
+      renewable,
+      ok: production.ok && nonRenewable.ok && (consumption?.ok ?? true),
+    })
+  }
+  return out
+}
+export interface EnergySourceStatusInfo {
+  source: string
+  name: string
+  status: EnergyRunStatus
+  statusLabel: string
+  /** Recolha atualizada e dados dentro do `maxAgeMinutes`. */
+  ok: boolean
+  stale: boolean
+  /** Recolha dos dados em uso (hora de Lisboa). */
+  fetchedAt: string
+  latestEnd: string
+  delay: string
+  completeness: string
+  error: string | null
+}
+
+export interface EnergyReconciliationRow {
+  date: string
+  ok: boolean
+  production: string
+  nonRenewable: string
+  consumption: string
+  renewable: string
+}
+
+export interface EnergyStatusInfo {
+  checkedAt: string
+  sources: EnergySourceStatusInfo[]
+  /** Alguma fonte falhou, foi republicada ou tem dados fora do prazo. */
+  problems: boolean
+  reconciliation: EnergyReconciliationRow[]
+  divergentDays: number
+  tolerance: string
+  note: string
+}
+
+/** `130 → 132,1 GWh (+1,6%)` (REN → ENTSO-E). */
+export function formatReconciliationMetric(m: EnergyReconciliationMetric | null): string {
+  if (!m) return '—'
+  // Arredonda antes do sinal para não mostrar «-0%».
+  const pct = m.diffPct === null ? null : Math.round(m.diffPct * 10) / 10 || 0
+  const pctText = pct === null ? '' : ` (${pct > 0 ? '+' : ''}${formatSharePct(pct)})`
+  return `${formatEnergy(m.ren, 'GWh')} → ${formatEnergy(m.entsoe, 'GWh')}${pctText}`
+}
+
+/** Cartão «Estado das fontes» (WEB-060): uma linha por fonte e uma por dia reconciliado (mais recente primeiro). */
+export function energyStatusInfo(status: EnergyStatus, nowMs: number = Date.now()): EnergyStatusInfo {
+  const sources = status.sources.map(s => {
+    const freshness = s.latestIntervalEndUtc ? energyFreshness(s.latestIntervalEndUtc, s.maxAgeMinutes, nowMs) : null
+    const stale = freshness?.stale ?? true
+    return {
+      source: s.source,
+      name: s.sourceName.split(' — ')[0],
+      status: s.status,
+      statusLabel: ENERGY_RUN_STATUS_LABELS[s.status],
+      ok: s.status === 'fresh' && !stale,
+      stale,
+      fetchedAt: s.lastSuccessUtc ? formatLisbonDateTime(s.lastSuccessUtc) : '—',
+      latestEnd: s.latestIntervalEndUtc ? formatLisbonDateTime(s.latestIntervalEndUtc) : '—',
+      delay: freshness?.ageMinutes == null ? '—' : formatEnergyDelay(freshness.ageMinutes),
+      completeness: s.periods ? `${s.completePeriods}/${s.periods} completos` : '—',
+      error: s.error,
+    }
+  })
+  const reconciliation = [...status.reconciliation.days].reverse().map(d => ({
+    date: formatEnergyDate(d.date),
+    ok: d.ok,
+    production: formatReconciliationMetric(d.production),
+    nonRenewable: formatReconciliationMetric(d.nonRenewable),
+    consumption: formatReconciliationMetric(d.consumption),
+    renewable: formatReconciliationMetric(d.renewable),
+  }))
+  return {
+    checkedAt: formatLisbonDateTime(status.generatedAtUtc),
+    sources,
+    problems: sources.some(s => !s.ok),
+    reconciliation,
+    divergentDays: reconciliation.filter(r => !r.ok).length,
+    tolerance: `máx(${formatEnergy(status.reconciliation.toleranceGWh, 'GWh')}; ${formatSharePct(status.reconciliation.tolerancePct)})`,
+    note: ENERGY_RECONCILIATION_NOTE,
+  }
+}

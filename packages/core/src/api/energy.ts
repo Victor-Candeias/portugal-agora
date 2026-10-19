@@ -1,6 +1,6 @@
 // Cliente dos dados de energia publicados pelo pipeline (WEB-053, WEB-057) no GitHub Pages:
 // `energy/daily.json` e `energy/latest.json` (REN, diário), `energy/intraday-latest.json` e
-// `energy/timeseries-24h.json`/`timeseries-7d.json` (ENTSO-E, horário em MW). Contrato em
+// `energy/timeseries-24h.json`/`timeseries-7d.json` (ENTSO-E, horário em MW) e `energy/status.json`. Contrato em
 // utils/energy.ts. As apps só releem os ficheiros publicados
 // (o refresh não cria dados novos). Sem dependências de plataforma: `fetch`, a URL base e o
 // armazenamento da cache (localStorage no web, expo-sqlite/kv-store no mobile) são injetados.
@@ -13,6 +13,7 @@ import {
   type EnergyIntradayRange,
   type EnergyLatest,
   type EnergyRange,
+  type EnergyStatus,
   type EnergyTimeseries,
 } from '../utils/energy.js'
 
@@ -74,6 +75,48 @@ export const energyTimeseriesSchema = energyMetaSchema.extend({
   range: z.enum(['24h', '7d', '30d']),
   points: z.array(energyIntervalSchema),
   backfillUtc: z.string().optional(),
+})
+
+const reconciliationMetricSchema = z.object({
+  ren: z.number(),
+  entsoe: z.number(),
+  diffGWh: z.number(),
+  diffPct: z.number().nullable(),
+  ok: z.boolean(),
+})
+
+/** `status.json`: estado de cada fonte na última execução do pipeline e reconciliação REN × ENTSO-E. */
+export const energyStatusSchema = z.object({
+  version: z.literal(ENERGY_CONTRACT_VERSION),
+  generatedAtUtc: z.string(),
+  sources: z.array(
+    z.object({
+      source: z.string(),
+      sourceName: z.string(),
+      status: z.enum(['fresh', 'republished', 'failed']),
+      lastAttemptUtc: z.string(),
+      lastSuccessUtc: z.string().nullable(),
+      latestIntervalEndUtc: z.string().nullable(),
+      maxAgeMinutes: z.number().positive(),
+      periods: z.number(),
+      completePeriods: z.number(),
+      error: z.string().nullable(),
+    }),
+  ),
+  reconciliation: z.object({
+    tolerancePct: z.number(),
+    toleranceGWh: z.number(),
+    days: z.array(
+      z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        production: reconciliationMetricSchema,
+        nonRenewable: reconciliationMetricSchema,
+        consumption: reconciliationMetricSchema.nullable(),
+        renewable: reconciliationMetricSchema,
+        ok: z.boolean(),
+      }),
+    ),
+  }),
 })
 
 // ── Erros ─────────────────────────────────────────────────────────────────
@@ -163,6 +206,8 @@ export function createEnergyClient(options: EnergyClientOptions) {
     /** Série horária ENTSO-E das últimas 24 h ou 7 dias (`timeseries-24h.json` / `timeseries-7d.json`). */
     getIntradayTimeseries: (range: EnergyIntradayRange) =>
       get<EnergyTimeseries>(`timeseries-${range}.json`, energyTimeseriesSchema),
+    /** Estado do pipeline e reconciliação REN × ENTSO-E (`status.json`). */
+    getStatus: () => get<EnergyStatus>('status.json', energyStatusSchema),
   }
 }
 
