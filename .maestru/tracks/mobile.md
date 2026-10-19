@@ -85,7 +85,7 @@ status: active
 | WEB-047 | EV (web e mobile): postos do OpenStreetMap além do Open Charge Map e sem o limite de 100 resultados | done | 2026-10-11 | developer | high | 2026-10-12 |  |  | [WEB-047](../specs/mobile/web-047-spec.md) |
 | WEB-048 | Web: menu lateral em vez da barra de navegação horizontal | done | 2026-10-12 | developer | medium | 2026-10-12 |  |  |  |
 | WEB-049 | Concelhos (web e mobile): freguesias do concelho na ficha e no mapa | done | 2026-10-12 | developer | medium | 2026-10-12 |  |  | [WEB-049](../specs/mobile/web-049-spec.md) |
-| WEB-050 | Energia: Fase 0 — prova de dados REN Data Hub (endpoints, granularidade, licença) | backlog | 2026-10-19 | developer | high |  |  |  |  |
+| WEB-050 | Energia: Fase 0 — prova de dados REN Data Hub (endpoints, granularidade, licença) | done | 2026-10-19 | developer | high | 2026-10-19 |  |  | [WEB-050](../specs/mobile/web-050-spec.md) |
 | WEB-051 | Energia: Fase 0 — prova de dados ENTSO-E (token, A75/A65, EIC de Portugal, latência) | backlog | 2026-10-19 | developer | low |  |  |  |  |
 | WEB-052 | Energia (core): taxonomia versionada e regras de cálculo (renovável, MWh, veredicto, atualidade) | backlog | 2026-10-19 | developer | high |  |  | WEB-050 |  |
 | WEB-053 | Energia: pipeline diário REN → energy.sqlite + JSON (MVP) | backlog | 2026-10-19 | developer | high |  |  | WEB-050, WEB-052 |  |
