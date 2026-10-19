@@ -7,6 +7,7 @@ import {
   createCarrisClient,
   createCodigoPostalClient,
   createComboiosClient,
+  createEnergyClient,
   createMetroPortoClient,
   createOpenChargeMapClient,
   createOsmChargersClient,
@@ -56,3 +57,6 @@ export const apiClient = new ApiAbertaClient({ apiKey: import.meta.env.VITE_APIA
 // VIES sem cabeçalhos CORS (WEB-041). Dev: proxy do Vite (/api/vies). Prod (GitHub Pages): sem proxy,
 // por isso `null` e a página NIF mostra um link para o formulário do VIES.
 export const viesClient = import.meta.env.DEV ? createViesClient({ baseUrl: '/api/vies' }) : null
+
+// Energia (WEB-055): JSON gerados por scripts/build-energy-db.mjs e servidos pelo próprio site.
+export const energyClient = createEnergyClient({ baseUrl: `${import.meta.env.BASE_URL}data/` })

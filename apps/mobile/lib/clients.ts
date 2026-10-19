@@ -6,6 +6,7 @@ import {
   createCarrisClient,
   createCodigoPostalClient,
   createComboiosClient,
+  createEnergyClient,
   createMetroPortoClient,
   createOpenChargeMapClient,
   createOsmChargersClient,
@@ -19,7 +20,7 @@ import Constants from 'expo-constants'
 // Mapa CP → distrito/município dos hospitais: o mesmo ficheiro estático servido pelo web,
 // empacotado na app (funciona offline, sem pedido extra).
 import postalCodeGeoMap from '../../web/public/cp-distrito.json'
-import { carrisDb, metroPortoDb, publicServicesDb } from './staticDb'
+import { carrisDb, metroPortoDb, publicServicesDb, STATIC_DATA_BASE_URL } from './staticDb'
 
 export const carrisClient = createCarrisClient({ queryAll: carrisDb.queryAll })
 
@@ -50,3 +51,6 @@ export const openChargeMapClient = createOpenChargeMapClient({
 
 // Postos EV do OpenStreetMap via Overpass (WEB-047). O overpass-api.de responde 406 ao User-Agent do OkHttp.
 export const osmChargersClient = createOsmChargersClient({ userAgent: 'PortugalHoje/1.0' })
+
+// Energia (WEB-055): JSON publicados no GitHub Pages ao lado dos `.sqlite` (EXPO_PUBLIC_STATIC_DATA_URL).
+export const energyClient = createEnergyClient({ baseUrl: STATIC_DATA_BASE_URL })
