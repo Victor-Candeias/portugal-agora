@@ -1,14 +1,20 @@
 import { useState } from 'react'
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import {
   ENERGY_CLASSIFICATION_COLORS,
   ENERGY_CLASSIFICATION_LABELS,
   ENERGY_CONSUMPTION_COLOR,
+  ENERGY_NOT_INCLUDED_NOTE,
   ENERGY_NOW_QUESTION,
+  ENERGY_RANGE_INFO,
+  ENERGY_RANGE_LABELS,
   ENERGY_VERDICT_STYLES,
+  energyCsv,
+  energyCsvFileName,
   energyHourlySlots,
   energyMix,
   energyNowInfo,
+  energyRangeSummary,
   energyQualityInfo,
   formatEnergy,
   formatEnergyDate,
@@ -16,14 +22,17 @@ import {
   formatSharePct,
   renewableToConsumptionPct,
   type EnergyDaily,
+  type EnergyDatasetMeta,
+  type EnergyInterval,
   type EnergyDay,
+  type EnergyRange,
   type EnergyTimeseries,
 } from '@portugal-hoje/core'
 import { useEnergy, useEnergyIntraday } from '../hooks/useEnergy'
 import { Card, COLORS, ErrorView, LinkText, LoadingView, Notice, ScreenHeader, SectionTitle, uiStyles } from '../components/ui'
 
-// Painel de energia elétrica: indicador «agora» e gráfico de 24 h com a série horária ENTSO-E (WEB-058)
-// e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
+// Painel de energia elétrica: indicador «agora» com a série horária ENTSO-E (WEB-058), análise 24h/7d/30d
+// com CSV (WEB-059) e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
 // Não entra no Android Auto.
 export default function EnergiaScreen() {
   const energy = useEnergy()
@@ -49,7 +58,6 @@ export default function EnergiaScreen() {
       {intraday.data ? (
         <>
           <NowCard series={intraday.data.data} offline={intraday.data.offline} savedAt={intraday.data.savedAt} />
-          <IntradayCard series={intraday.data.data} />
         </>
       ) : (
         intraday.isError && (
@@ -59,6 +67,8 @@ export default function EnergiaScreen() {
           </Notice>
         )
       )}
+
+      {(intraday.data || daily) && <AnalysisCard series24={intraday.data?.data} daily={daily} />}
 
       {energy.isLoading && <LoadingView />}
       {energy.isError && <ErrorView error={energy.error} onRetry={() => void energy.refetch()} />}
@@ -121,47 +131,138 @@ function NowCard({ series, offline, savedAt }: { series: EnergyTimeseries; offli
   )
 }
 
-const INTRADAY_HEIGHT = 130
+type AnalysisDataset = EnergyDatasetMeta & { points: EnergyInterval[] }
 
-function IntradayCard({ series }: { series: EnergyTimeseries }) {
-  const slots = energyHourlySlots(series.points)
-  if (slots.length === 0) return null
-  const hi = Math.max(1, ...slots.map(s => (s.point ? Math.max(s.point.renewable, s.point.nonRenewable, s.point.storage, s.point.consumption ?? 0) : 0))) * 1.05
-  const y = (v: number) => (Math.max(0, v) / hi) * INTRADAY_HEIGHT
-  const gaps = slots.filter(s => !s.point || s.point.quality !== 'complete').length
+function AnalysisCard({ series24, daily }: { series24: EnergyTimeseries | undefined; daily: EnergyDaily | undefined }) {
+  const [chosen, setChosen] = useState<EnergyRange | null>(null)
+  const range: EnergyRange = chosen ?? (series24 ? '24h' : '30d')
+  const series7d = useEnergyIntraday('7d', range === '7d')
+  const dataset: AnalysisDataset | null =
+    range === '24h' ? series24 ?? null : range === '7d' ? series7d.data?.data ?? null : daily ? { ...daily, points: daily.days } : null
+  const available: Record<EnergyRange, boolean> = { '24h': !!series24, '7d': !!series24, '30d': !!daily }
+
+  const share = () => {
+    if (!dataset) return
+    // Partilha como texto (Share do React Native): evita juntar expo-sharing (módulo nativo) só para isto.
+    void Share.share({ title: energyCsvFileName(dataset.source, range), message: energyCsv(dataset.points, dataset) })
+  }
+
   return (
     <Card>
-      <SectionTitle>Últimas 24 horas · produção horária</SectionTitle>
-      <View style={[styles.chart, { height: INTRADAY_HEIGHT }]}>
-        {slots.map(s => {
-          // Horas incompletas ficam em branco (valores por defeito); o consumo mostra-se se existir.
-          const complete = s.point?.quality === 'complete'
+      <SectionTitle>Análise · {ENERGY_RANGE_LABELS[range]}</SectionTitle>
+      <View style={styles.rangeRow}>
+        {(Object.keys(ENERGY_RANGE_LABELS) as EnergyRange[]).map(r => (
+          <Pressable
+            key={r}
+            onPress={() => setChosen(r)}
+            disabled={!available[r]}
+            style={[styles.rangeButton, r === range && styles.rangeButtonActive, !available[r] && styles.disabled]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: r === range, disabled: !available[r] }}
+          >
+            <Text style={[styles.rangeText, r === range && styles.rangeTextActive]}>{ENERGY_RANGE_LABELS[r]}</Text>
+          </Pressable>
+        ))}
+        <Pressable onPress={share} disabled={!dataset} style={[styles.rangeButton, !dataset && styles.disabled]} accessibilityLabel="Partilhar CSV">
+          <Text style={styles.rangeText}>📤 CSV</Text>
+        </Pressable>
+      </View>
+      <Text style={[uiStyles.small, styles.hint]}>
+        {ENERGY_RANGE_INFO[range].source} · {ENERGY_RANGE_INFO[range].detail}
+      </Text>
+      {range === '7d' && series7d.isLoading && <Text style={uiStyles.small}>A carregar 7 dias…</Text>}
+      {range === '7d' && series7d.isError && <Text style={uiStyles.small}>Série de 7 dias indisponível.</Text>}
+      {dataset && <AnalysisBody dataset={dataset} range={range} />}
+    </Card>
+  )
+}
+
+const ANALYSIS_HEIGHT = 130
+const EXCHANGE_HEIGHT = 80
+
+function AnalysisBody({ dataset, range }: { dataset: AnalysisDataset; range: EnergyRange }) {
+  const hourly = range !== '30d'
+  const unit = dataset.points[0]?.unit ?? 'MW'
+  const slots = hourly
+    ? energyHourlySlots(dataset.points).map(s => ({ key: s.intervalStartUtc, tick: range === '24h' ? s.time : s.label.slice(0, 5), label: s.label, point: s.point }))
+    : dataset.points.map(p => {
+        const label = formatEnergyDate((p as EnergyDay).date)
+        return { key: p.intervalStartUtc, tick: label.slice(0, 5), label, point: p as EnergyInterval | null }
+      })
+  // 24 h: barras lado a lado; 7 d e 30 d: empilhadas (muitos intervalos para o ecrã).
+  const stacked = range !== '24h'
+  const hi =
+    Math.max(
+      1,
+      ...slots.map(({ point: p }) =>
+        p ? Math.max(stacked ? p.renewable + p.nonRenewable + p.storage : Math.max(p.renewable, p.nonRenewable, p.storage), p.consumption ?? 0) : 0,
+      ),
+    ) * 1.05
+  const y = (v: number) => (Math.max(0, v) / hi) * ANALYSIS_HEIGHT
+  const nets = slots.map(({ point: p }) => (p && p.imports !== null && p.exports !== null ? p.imports - p.exports : null))
+  const netHi = Math.max(1, ...nets.map(n => Math.abs(n ?? 0)))
+  const summary = energyRangeSummary(dataset.points)
+  const gaps = slots.filter(s => s.point?.quality !== 'complete').length
+  const per = hourly ? 'horas' : 'dias'
+  const [completeWord, gapWord] = hourly ? ['completas', 'incompletas ou sem dados'] : ['completos', 'incompletos ou sem dados']
+  const middle = slots[Math.floor(slots.length / 2)]
+
+  return (
+    <>
+      <View style={styles.summaryGrid}>
+        <Total label="Renovável" value={formatEnergy(summary.renewableGWh, 'GWh')} style={styles.summaryItem} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+        <Total label="Não renovável" value={formatEnergy(summary.nonRenewableGWh, 'GWh')} style={styles.summaryItem} color={ENERGY_CLASSIFICATION_COLORS.non_renewable} />
+        <Total label="Quota (ponderada)" value={formatSharePct(summary.renewableSharePct)} style={styles.summaryItem} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+        <Total label={`${per[0].toUpperCase()}${per.slice(1)} + renovável`} value={`${summary.renewableAbove} de ${summary.complete}`} style={styles.summaryItem} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+        <Total label="Produção" value={formatEnergy(summary.productionGWh, 'GWh')} style={styles.summaryItem} color={COLORS.text} />
+        <Total label="Consumo" value={formatEnergy(summary.consumptionGWh, 'GWh')} style={styles.summaryItem} color={ENERGY_CONSUMPTION_COLOR} />
+        <Total
+          label={summary.netImportsGWh !== null && summary.netImportsGWh < 0 ? 'Saldo exportador' : 'Saldo importador'}
+          value={formatEnergy(summary.netImportsGWh === null ? null : Math.abs(summary.netImportsGWh), 'GWh')}
+          color="#0369a1"
+          style={styles.summaryItem}
+        />
+        <Total label="Import. / export." value={`${formatEnergy(summary.importsGWh, 'GWh', 0)} / ${formatEnergy(summary.exportsGWh, 'GWh', 0)}`} style={styles.summaryItem} color="#0369a1" />
+      </View>
+
+      <Text style={styles.chartTitle}>Produção por classificação ({unit}{stacked ? ', empilhada' : ''})</Text>
+      <View style={[styles.chart, { height: ANALYSIS_HEIGHT, gap: stacked ? 0 : 1 }]}>
+        {slots.map(({ key, label, point: p }) => {
+          // Intervalos incompletos ficam em branco (valores por defeito); o consumo mostra-se se existir.
+          const ok = p?.quality === 'complete'
           return (
             <View
-              key={s.intervalStartUtc}
-              style={styles.hourSlot}
+              key={key}
+              style={stacked ? styles.stackSlot : styles.hourSlot}
               accessibilityLabel={
-                complete
-                  ? `${s.label}: renovável ${formatEnergy(s.point!.renewable, 'MW', 0)}, não renovável ${formatEnergy(s.point!.nonRenewable, 'MW', 0)}`
-                  : `${s.label}: sem dados completos`
+                ok ? `${label}: renovável ${formatEnergy(p.renewable, unit, 0)}, não renovável ${formatEnergy(p.nonRenewable, unit, 0)}` : `${label}: sem dados completos`
               }
             >
-              {complete && (
-                <>
-                  <View style={[styles.hourBar, { height: y(s.point!.renewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.renewable }]} />
-                  <View style={[styles.hourBar, { height: y(s.point!.nonRenewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.non_renewable }]} />
-                  <View style={[styles.hourBar, { height: y(s.point!.storage), backgroundColor: ENERGY_CLASSIFICATION_COLORS.storage }]} />
-                </>
-              )}
-              {s.point?.consumption != null && <View style={[styles.consumption, { bottom: y(s.point.consumption) - 1 }]} />}
+              {ok &&
+                (stacked ? (
+                  <>
+                    <View style={[styles.bar, { bottom: 0, height: y(p.renewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.renewable }]} />
+                    <View style={[styles.bar, { bottom: y(p.renewable), height: y(p.nonRenewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.non_renewable }]} />
+                    <View
+                      style={[styles.bar, { bottom: y(p.renewable) + y(p.nonRenewable), height: y(p.storage), backgroundColor: ENERGY_CLASSIFICATION_COLORS.storage }]}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <View style={[styles.hourBar, { height: y(p.renewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.renewable }]} />
+                    <View style={[styles.hourBar, { height: y(p.nonRenewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.non_renewable }]} />
+                    <View style={[styles.hourBar, { height: y(p.storage), backgroundColor: ENERGY_CLASSIFICATION_COLORS.storage }]} />
+                  </>
+                ))}
+              {p?.consumption != null && <View style={[styles.consumption, { bottom: y(p.consumption) - 1 }]} />}
             </View>
           )
         })}
       </View>
       <View style={styles.xAxis}>
-        <Text style={uiStyles.small}>{slots[0].time}</Text>
-        {slots.length > 2 && <Text style={uiStyles.small}>{slots[Math.floor(slots.length / 2)].time}</Text>}
-        <Text style={uiStyles.small}>{slots[slots.length - 1].time}</Text>
+        <Text style={uiStyles.small}>{slots[0]?.tick}</Text>
+        {slots.length > 2 && <Text style={uiStyles.small}>{middle.tick}</Text>}
+        <Text style={uiStyles.small}>{slots[slots.length - 1]?.tick}</Text>
       </View>
       <View style={styles.legend}>
         <Legend color={ENERGY_CLASSIFICATION_COLORS.renewable} label="Renovável" />
@@ -169,13 +270,37 @@ function IntradayCard({ series }: { series: EnergyTimeseries }) {
         <Legend color={ENERGY_CLASSIFICATION_COLORS.storage} label="Armazenamento" />
         <Legend color={ENERGY_CONSUMPTION_COLOR} label="Consumo" line />
       </View>
-      <Text style={uiStyles.small}>
-        MW, média de cada hora (Lisboa), lado a lado. O armazenamento (bombagem e baterias) não é renovável nem não renovável.{gaps > 0 ? ` ${gaps} hora(s) sem dados completos em branco.` : ''} Fonte: {series.sourceName}.
+
+      <Text style={styles.chartTitle}>Saldo de trocas ({unit}): ▲ importador · ▼ exportador</Text>
+      <View style={[styles.chart, { height: EXCHANGE_HEIGHT, gap: stacked ? 0 : 1 }]}>
+        <View style={styles.zeroLine} />
+        {slots.map(({ key }, i) => {
+          const n = nets[i]
+          const h = n === null ? 0 : (Math.abs(n) / netHi) * (EXCHANGE_HEIGHT / 2)
+          return (
+            <View key={key} style={styles.stackSlot}>
+              {n !== null && (
+                <View
+                  style={[
+                    styles.bar,
+                    n >= 0 ? { bottom: EXCHANGE_HEIGHT / 2, height: h, backgroundColor: '#0369a1' } : { bottom: EXCHANGE_HEIGHT / 2 - h, height: h, backgroundColor: '#ea580c' },
+                  ]}
+                />
+              )}
+            </View>
+          )
+        })}
+      </View>
+      <Text style={[uiStyles.small, styles.note]}>
+        Totais em GWh só com {per} {completeWord} ({summary.complete} de {slots.length}
+        {gaps > 0 ? `; ${gaps} ${gapWord} em branco` : ''}
+        {summary.balanceMissing > 0 ? `; ${summary.balanceMissing} sem consumo ou trocas fora desses totais` : ''}). Consumo e produção não coincidem: a
+        diferença é o saldo de trocas com Espanha. O armazenamento não é renovável nem não renovável. Fonte: {dataset.sourceName}.
       </Text>
-    </Card>
+      <Text style={[uiStyles.small, styles.note]}>{ENERGY_NOT_INCLUDED_NOTE}</Text>
+    </>
   )
 }
-
 function Stat({ title, value, detail, color }: { title: string; value: string; detail?: string; color: string }) {
   return (
     <View style={styles.stat}>
@@ -319,9 +444,9 @@ function HistoryCard({ daily, selectedDate, onSelect }: {
   )
 }
 
-function Total({ label, value, color }: { label: string; value: string; color: string }) {
+function Total({ label, value, color, style }: { label: string; value: string; color: string; style?: StyleProp<ViewStyle> }) {
   return (
-    <View style={styles.total}>
+    <View style={[styles.total, style]}>
       <Text style={uiStyles.small}>{label}</Text>
       <Text style={[styles.totalValue, { color }]}>{value}</Text>
     </View>
@@ -380,6 +505,17 @@ const styles = StyleSheet.create({
   verdictText: { fontSize: 26, fontWeight: '800' },
   hourSlot: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 1, position: 'relative' },
   hourBar: { flex: 1 },
+  stackSlot: { flex: 1, position: 'relative' },
+  zeroLine: { position: 'absolute', left: 0, right: 0, top: EXCHANGE_HEIGHT / 2, height: 1, backgroundColor: '#cbd5e1' },
+  summaryItem: { flex: 0, width: '50%' },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, marginBottom: 10 },
+  chartTitle: { fontSize: 12, fontWeight: '700', color: '#334155', marginTop: 8, marginBottom: 4 },
+  rangeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  rangeButton: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  rangeButtonActive: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
+  rangeText: { fontSize: 13, color: '#334155' },
+  rangeTextActive: { color: 'white', fontWeight: '700' },
+  disabled: { opacity: 0.4 },
   mixBar: { flexDirection: 'row', height: 22, borderRadius: 6, overflow: 'hidden', marginBottom: 10 },
   mixRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   swatch: { width: 12, height: 12, borderRadius: 3 },

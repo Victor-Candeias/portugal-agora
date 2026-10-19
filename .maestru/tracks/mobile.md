@@ -94,7 +94,7 @@ status: active
 | WEB-056 | Energia (web e mobile): página/ecrã MVP diário (produção, consumo, mix, 30 dias) | done | 2026-10-19 | developer | high | 2026-10-19 |  | WEB-055 | [WEB-056](../specs/mobile/web-056-spec.md) |
 | WEB-057 | Energia: série intradiária ENTSO-E no pipeline (latest.json, 24h, 7d) | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-051, WEB-052, WEB-054 | [WEB-057](../specs/mobile/web-057-spec.md) |
 | WEB-058 | Energia (web e mobile): indicador «mais renovável do que não renovável agora?» + gráfico 24h | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-056, WEB-057 | [WEB-058](../specs/mobile/web-058-spec.md) |
-| WEB-059 | Energia (web e mobile): análise 7d/30d, consumo vs produção, trocas, preços e CSV | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
+| WEB-059 | Energia (web e mobile): análise 7d/30d, consumo vs produção, trocas, preços e CSV | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-056, WEB-057 | [WEB-059](../specs/mobile/web-059-spec.md) |
 | WEB-060 | Energia: operação — monitorização, avisos de desatualização, reconciliação e documentação | backlog | 2026-10-19 | developer | low |  |  | WEB-054, WEB-057 |  |
 | WEB-061 | Energia: falha da REN num só dia (HTTP 500) não deve anular a recolha toda | done | 2026-10-19 | developer | high | 2026-10-19 |  |  |  |
 <!-- /maestru:work-items-list -->

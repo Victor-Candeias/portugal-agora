@@ -4,11 +4,17 @@ import {
   ENERGY_CLASSIFICATION_COLORS,
   ENERGY_CLASSIFICATION_LABELS,
   ENERGY_CONSUMPTION_COLOR,
+  ENERGY_NOT_INCLUDED_NOTE,
   ENERGY_NOW_QUESTION,
+  ENERGY_RANGE_INFO,
+  ENERGY_RANGE_LABELS,
   ENERGY_VERDICT_STYLES,
+  energyCsv,
+  energyCsvFileName,
   energyHourlySlots,
   energyMix,
   energyNowInfo,
+  energyRangeSummary,
   energyQualityInfo,
   formatEnergy,
   formatEnergyDate,
@@ -16,16 +22,18 @@ import {
   formatSharePct,
   renewableToConsumptionPct,
   type EnergyDaily,
+  type EnergyDatasetMeta,
   type EnergyDay,
   type EnergyInterval,
+  type EnergyRange,
   type EnergyTimeseries,
 } from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
 import { useEnergy, useEnergyIntraday } from '@/hooks/useEnergy'
 
-// Painel de energia elétrica: indicador «agora» e gráfico de 24 h com a série horária ENTSO-E (WEB-058)
-// e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
+// Painel de energia elétrica: indicador «agora» com a série horária ENTSO-E (WEB-058), análise 24h/7d/30d
+// com CSV (WEB-059) e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
 export function Energia() {
   const energy = useEnergy()
   const intraday = useEnergyIntraday('24h')
@@ -58,7 +66,6 @@ export function Energia() {
       {intraday.data ? (
         <>
           <NowCard series={intraday.data.data} offline={intraday.data.offline} savedAt={intraday.data.savedAt} />
-          <IntradayCard series={intraday.data.data} />
         </>
       ) : (
         intraday.isError && (
@@ -68,6 +75,8 @@ export function Energia() {
           </div>
         )
       )}
+
+      {(intraday.data || daily) && <AnalysisCard series24={intraday.data?.data} daily={daily} />}
 
       {energy.isLoading && <LoadingBox />}
       {energy.isError && <ErrorBox message={(energy.error as Error).message} />}
@@ -139,71 +148,160 @@ function NowCard({ series, offline, savedAt }: { series: EnergyTimeseries; offli
   )
 }
 
-function IntradayCard({ series }: { series: EnergyTimeseries }) {
-  const slots = energyHourlySlots(series.points)
-  // Horas incompletas (faltam tecnologias) não entram nas linhas de produção: seriam valores por defeito.
-  const data = slots.map(s => {
-    const complete = s.point?.quality === 'complete'
-    return {
-      label: s.label,
-      time: s.time,
-      renewable: complete ? s.point!.renewable : null,
-      nonRenewable: complete ? s.point!.nonRenewable : null,
-      storage: complete ? s.point!.storage : null,
-      consumption: s.point?.consumption ?? null,
-    }
-  })
-  const missing = slots.filter(s => !s.point).length
-  const incomplete = slots.filter(s => s.point && s.point.quality !== 'complete').length
-  if (data.length === 0) return null
+type AnalysisDataset = EnergyDatasetMeta & { points: EnergyInterval[] }
+
+function AnalysisCard({ series24, daily }: { series24: EnergyTimeseries | undefined; daily: EnergyDaily | undefined }) {
+  const [chosen, setChosen] = useState<EnergyRange | null>(null)
+  const range: EnergyRange = chosen ?? (series24 ? '24h' : '30d')
+  const series7d = useEnergyIntraday('7d', range === '7d')
+  const dataset: AnalysisDataset | null =
+    range === '24h' ? series24 ?? null : range === '7d' ? series7d.data?.data ?? null : daily ? { ...daily, points: daily.days } : null
+  const available: Record<EnergyRange, boolean> = { '24h': !!series24, '7d': !!series24, '30d': !!daily }
+
   return (
     <Card>
-      <CardTitle>Últimas 24 horas · produção horária</CardTitle>
-      <ResponsiveContainer width="100%" height={260}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-          <XAxis dataKey="time" tick={{ fontSize: 11 }} minTickGap={16} />
-          <YAxis tick={{ fontSize: 11 }} width={52} />
-          <Tooltip
-            formatter={(v, name) => [v === null || v === undefined ? 'sem dados' : formatEnergy(Number(v), 'MW', 0), name]}
-            labelFormatter={(_, payload) => {
-              const p = payload?.[0]?.payload as (typeof data)[number] | undefined
-              return p ? `${p.label} (Lisboa)` : ''
-            }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Area
-            type="monotone"
-            dataKey="renewable"
-            name={ENERGY_CLASSIFICATION_LABELS.renewable}
-            stroke={ENERGY_CLASSIFICATION_COLORS.renewable}
-            fill={ENERGY_CLASSIFICATION_COLORS.renewable}
-            fillOpacity={0.15}
-            strokeWidth={2}
-          />
-          <Area
-            type="monotone"
-            dataKey="nonRenewable"
-            name={ENERGY_CLASSIFICATION_LABELS.non_renewable}
-            stroke={ENERGY_CLASSIFICATION_COLORS.non_renewable}
-            fill={ENERGY_CLASSIFICATION_COLORS.non_renewable}
-            fillOpacity={0.15}
-            strokeWidth={2}
-          />
-          <Line type="monotone" dataKey="storage" name={ENERGY_CLASSIFICATION_LABELS.storage} stroke={ENERGY_CLASSIFICATION_COLORS.storage} strokeWidth={1.5} dot={false} />
-          <Line type="monotone" dataKey="consumption" name="Consumo" stroke={ENERGY_CONSUMPTION_COLOR} strokeWidth={2} strokeDasharray="4 3" dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
-      <p className="text-xs text-slate-500 mt-2">
-        MW, média de cada hora (hora de Lisboa). Séries separadas, não empilhadas; o armazenamento (bombagem e baterias) não é
-        renovável nem não renovável. A diferença para o consumo é coberta pelo saldo de trocas com Espanha.
-        {missing + incomplete > 0 && ` ${missing + incomplete} hora(s) sem dados ou incompletas ficam em branco.`}
-        {' '}Fonte: {series.sourceName}.
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <CardTitle>Análise · {ENERGY_RANGE_LABELS[range]}</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden" role="tablist" aria-label="Intervalo">
+            {(Object.keys(ENERGY_RANGE_LABELS) as EnergyRange[]).map(r => (
+              <button
+                key={r}
+                role="tab"
+                aria-selected={r === range}
+                disabled={!available[r]}
+                onClick={() => setChosen(r)}
+                className={`text-sm px-3 py-1 disabled:opacity-40 ${r === range ? 'bg-green-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
+              >
+                {ENERGY_RANGE_LABELS[r]}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => dataset && downloadCsv(dataset, range)}
+            disabled={!dataset}
+            className="text-sm border border-slate-300 text-slate-700 px-3 py-1 rounded-lg hover:bg-slate-50 disabled:opacity-40"
+          >
+            ⬇️ CSV
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-slate-500 mb-3">
+        {ENERGY_RANGE_INFO[range].source} · {ENERGY_RANGE_INFO[range].detail}
       </p>
+      {range === '7d' && series7d.isLoading && <p className="text-sm text-slate-500">A carregar 7 dias…</p>}
+      {range === '7d' && series7d.isError && <p className="text-sm text-red-700">Série de 7 dias indisponível: {(series7d.error as Error).message}</p>}
+      {dataset && <AnalysisBody dataset={dataset} range={range} />}
     </Card>
   )
 }
 
+function downloadCsv(dataset: AnalysisDataset, range: EnergyRange) {
+  // BOM para o Excel reconhecer UTF-8.
+  const blob = new Blob(['\uFEFF', energyCsv(dataset.points, dataset)], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = energyCsvFileName(dataset.source, range)
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function AnalysisBody({ dataset, range }: { dataset: AnalysisDataset; range: EnergyRange }) {
+  const hourly = range !== '30d'
+  const unit = dataset.points[0]?.unit ?? 'MW'
+  const slots = hourly
+    ? energyHourlySlots(dataset.points).map(s => ({ tick: range === '24h' ? s.time : s.label.slice(0, 5), label: `${s.label} (Lisboa)`, point: s.point }))
+    : dataset.points.map(p => ({ tick: formatEnergyDate((p as EnergyDay).date).slice(0, 5), label: formatEnergyDate((p as EnergyDay).date), point: p }))
+  // Intervalos incompletos (faltam tecnologias) ficam em branco: seriam valores por defeito.
+  const data = slots.map(({ tick, label, point }) => {
+    const ok = point?.quality === 'complete'
+    return {
+      tick,
+      label,
+      renewable: ok ? point.renewable : null,
+      nonRenewable: ok ? point.nonRenewable : null,
+      storage: ok ? point.storage : null,
+      production: ok ? point.production : null,
+      consumption: point?.consumption ?? null,
+      net: point && point.imports !== null && point.exports !== null ? point.imports - point.exports : null,
+    }
+  })
+  const summary = energyRangeSummary(dataset.points)
+  const gaps = slots.filter(s => s.point?.quality !== 'complete').length
+  const per = hourly ? 'horas' : 'dias'
+  const [completeWord, gapWord] = hourly ? ['completas', 'sem dados ou incompletas ficam'] : ['completos', 'sem dados ou incompletos ficam']
+  const tooltip = (
+    <Tooltip
+      formatter={(v, name) => [v === null || v === undefined ? 'sem dados' : formatEnergy(Number(v), unit, hourly ? 0 : 1), name]}
+      labelFormatter={(_, payload) => (payload?.[0]?.payload as (typeof data)[number] | undefined)?.label ?? ''}
+    />
+  )
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
+        <Summary label="Renovável" value={formatEnergy(summary.renewableGWh, 'GWh')} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+        <Summary label="Não renovável" value={formatEnergy(summary.nonRenewableGWh, 'GWh')} color={ENERGY_CLASSIFICATION_COLORS.non_renewable} />
+        <Summary label="Quota renovável (ponderada)" value={formatSharePct(summary.renewableSharePct)} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+        <Summary label={`${per[0].toUpperCase()}${per.slice(1)} com mais renovável`} value={`${summary.renewableAbove} de ${summary.complete}`} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+        <Summary label="Produção" value={formatEnergy(summary.productionGWh, 'GWh')} color="#334155" />
+        <Summary label="Consumo" value={formatEnergy(summary.consumptionGWh, 'GWh')} color={ENERGY_CONSUMPTION_COLOR} />
+        <Summary
+          label={summary.netImportsGWh !== null && summary.netImportsGWh < 0 ? 'Saldo exportador' : 'Saldo importador'}
+          value={formatEnergy(summary.netImportsGWh === null ? null : Math.abs(summary.netImportsGWh), 'GWh')}
+          color="#0369a1"
+        />
+        <Summary label="Importação / exportação" value={`${formatEnergy(summary.importsGWh, 'GWh', 0)} / ${formatEnergy(summary.exportsGWh, 'GWh', 0)}`} color="#0369a1" />
+      </div>
+
+      <h3 className="text-sm font-semibold text-slate-700 mb-1">Produção por classificação ({unit})</h3>
+      <ResponsiveContainer width="100%" height={240}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+          <XAxis dataKey="tick" tick={{ fontSize: 11 }} minTickGap={16} />
+          <YAxis tick={{ fontSize: 11 }} width={52} />
+          {tooltip}
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Area type="monotone" dataKey="renewable" name={ENERGY_CLASSIFICATION_LABELS.renewable} stroke={ENERGY_CLASSIFICATION_COLORS.renewable} fill={ENERGY_CLASSIFICATION_COLORS.renewable} fillOpacity={0.15} strokeWidth={2} />
+          <Area type="monotone" dataKey="nonRenewable" name={ENERGY_CLASSIFICATION_LABELS.non_renewable} stroke={ENERGY_CLASSIFICATION_COLORS.non_renewable} fill={ENERGY_CLASSIFICATION_COLORS.non_renewable} fillOpacity={0.15} strokeWidth={2} />
+          <Line type="monotone" dataKey="storage" name={ENERGY_CLASSIFICATION_LABELS.storage} stroke={ENERGY_CLASSIFICATION_COLORS.storage} strokeWidth={1.5} dot={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+
+      <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Consumo vs produção e saldo de trocas ({unit})</h3>
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+          <XAxis dataKey="tick" tick={{ fontSize: 11 }} minTickGap={16} />
+          <YAxis tick={{ fontSize: 11 }} width={52} />
+          {tooltip}
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Bar dataKey="net" name="Saldo de trocas (+ importador, − exportador)" fill="#0369a1" fillOpacity={0.6} />
+          <Line type="monotone" dataKey="production" name="Produção nacional" stroke="#334155" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="consumption" name="Consumo" stroke={ENERGY_CONSUMPTION_COLOR} strokeWidth={2} strokeDasharray="4 3" dot={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+
+      <p className="text-xs text-slate-500 mt-2">
+        Totais em GWh só com {per} {completeWord} ({summary.complete} de {slots.length}
+        {gaps > 0 ? `; ${gaps} ${gapWord} em branco` : ''}
+        {summary.balanceMissing > 0 ? `; ${summary.balanceMissing} sem consumo ou trocas fora desses totais` : ''}). Consumo e produção não
+        coincidem: a diferença é o saldo de trocas com Espanha (e perdas/consumo da bombagem). O armazenamento não é renovável nem não
+        renovável. Fonte: {dataset.sourceName}.
+      </p>
+      <p className="text-xs text-slate-400 mt-1">{ENERGY_NOT_INCLUDED_NOTE}</p>
+    </>
+  )
+}
+
+function Summary({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="font-bold tabular-nums" style={{ color }}>{value}</p>
+    </div>
+  )
+}
 function StatusNotices({ daily, offline, savedAt }: { daily: EnergyDaily; offline: boolean; savedAt: number }) {
   const quality = energyQualityInfo(daily)
   return (

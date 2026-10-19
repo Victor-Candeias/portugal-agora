@@ -885,3 +885,127 @@ export function energyHourlySlots(points: readonly EnergyInterval[]): EnergySlot
   }
   return slots
 }
+// ── Análise 24h / 7d / 30d e CSV (WEB-059) ────────────────────────────────
+
+export const ENERGY_RANGE_LABELS: Record<EnergyRange, string> = { '24h': '24 horas', '7d': '7 dias', '30d': '30 dias' }
+
+/** Fonte, unidade e resolução de cada intervalo de análise (MW e GWh nunca no mesmo eixo). */
+export const ENERGY_RANGE_INFO: Record<EnergyRange, { source: string; detail: string }> = {
+  '24h': { source: 'ENTSO-E', detail: 'potência média horária (MW)' },
+  '7d': { source: 'ENTSO-E', detail: 'potência média horária (MW)' },
+  '30d': { source: 'REN', detail: 'energia por dia civil de Lisboa (GWh)' },
+}
+
+export const ENERGY_NOT_INCLUDED_NOTE =
+  'Não incluídos: preços de mercado (termos de reutilização da ENTSO-E por confirmar; o endpoint de preços diários da REN não está disponível), potência instalada e comparações anuais.'
+
+export interface EnergyRangeSummary {
+  periods: number
+  /** Intervalos completos: só estes entram nos totais (base comum a produção, consumo e trocas). */
+  complete: number
+  renewableGWh: number
+  nonRenewableGWh: number
+  storageGWh: number
+  productionGWh: number
+  /** Quota renovável ponderada pela energia (não é a média das percentagens). */
+  renewableSharePct: number | null
+  /** Intervalos completos com renovável > não renovável. */
+  renewableAbove: number
+  consumptionGWh: number | null
+  importsGWh: number | null
+  exportsGWh: number | null
+  /** Importação − exportação (positivo = saldo importador). */
+  netImportsGWh: number | null
+  /** Intervalos completos sem consumo ou trocas (ficam fora desses totais). */
+  balanceMissing: number
+}
+
+/** Totais de energia (GWh) de uma série, em MW (× duração) ou já em energia (MWh/GWh). */
+export function energyRangeSummary(points: readonly EnergyInterval[]): EnergyRangeSummary {
+  const complete = points.filter(p => p.quality === 'complete')
+  const gwh = (p: EnergyInterval, v: number) => toEnergyMwh(v, p.unit, p.resolutionMinutes) / 1000
+  const sum = (f: (p: EnergyInterval) => number) => complete.reduce((s, p) => s + gwh(p, f(p)), 0)
+  const balance = complete.filter(p => p.consumption !== null && p.imports !== null && p.exports !== null)
+  const sumBalance = (f: (p: EnergyInterval) => number) => (balance.length ? balance.reduce((s, p) => s + gwh(p, f(p)), 0) : null)
+  const renewableGWh = sum(p => p.renewable)
+  const productionGWh = sum(p => p.production)
+  const importsGWh = sumBalance(p => p.imports ?? 0)
+  const exportsGWh = sumBalance(p => p.exports ?? 0)
+  return {
+    periods: points.length,
+    complete: complete.length,
+    renewableGWh,
+    nonRenewableGWh: sum(p => p.nonRenewable),
+    storageGWh: sum(p => p.storage),
+    productionGWh,
+    renewableSharePct: energySharePct(renewableGWh, productionGWh),
+    renewableAbove: complete.filter(p => p.renewable > p.nonRenewable).length,
+    consumptionGWh: sumBalance(p => p.consumption ?? 0),
+    importsGWh,
+    exportsGWh,
+    netImportsGWh: importsGWh !== null && exportsGWh !== null ? importsGWh - exportsGWh : null,
+    balanceMissing: complete.length - balance.length,
+  }
+}
+
+const CSV_NUMBER = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 3, useGrouping: false })
+
+function csvCell(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  const text = typeof value === 'number' ? (Number.isFinite(value) ? CSV_NUMBER.format(value) : '') : value
+  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+/**
+ * CSV (separador `;`, decimal `,`, para abrir no Excel em pt-PT) com uma linha por intervalo e uma
+ * coluna por tecnologia. Valores em falta ficam vazios (nunca zero).
+ */
+export function energyCsv(points: readonly EnergyInterval[], meta: Pick<EnergyDatasetMeta, 'sourceName'>): string {
+  const technologies = [...new Set(points.flatMap(p => Object.keys(p.technology)))].sort()
+  const header = [
+    'inicio_utc',
+    'fim_utc',
+    'inicio_lisboa',
+    'resolucao_min',
+    'unidade',
+    'qualidade',
+    'cobertura_pct',
+    'renovavel',
+    'nao_renovavel',
+    'armazenamento',
+    'desconhecida',
+    'producao',
+    'quota_renovavel_pct',
+    'consumo',
+    'importacao',
+    'exportacao',
+    ...technologies.map(t => `tec_${t}`),
+    'fonte',
+  ]
+  const rows = points.map(p => [
+    p.intervalStartUtc,
+    p.intervalEndUtc,
+    formatLisbonDateTime(p.intervalStartUtc),
+    p.resolutionMinutes,
+    p.unit,
+    p.quality === 'complete' ? 'completo' : 'incompleto',
+    p.coveragePct,
+    p.renewable,
+    p.nonRenewable,
+    p.storage,
+    p.unknown,
+    p.production,
+    p.renewableSharePct,
+    p.consumption,
+    p.imports,
+    p.exports,
+    ...technologies.map(t => p.technology[t]),
+    meta.sourceName,
+  ])
+  return [header, ...rows].map(r => r.map(csvCell).join(';')).join('\r\n') + '\r\n'
+}
+
+/** `energia-ENTSOE-7d-2026-10-19.csv` */
+export function energyCsvFileName(source: string, range: EnergyRange, nowMs: number = Date.now()): string {
+  return `energia-${source}-${range}-${lisbonDate(nowMs)}.csv`
+}
