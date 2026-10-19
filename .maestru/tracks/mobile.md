@@ -85,4 +85,15 @@ status: active
 | WEB-047 | EV (web e mobile): postos do OpenStreetMap além do Open Charge Map e sem o limite de 100 resultados | done | 2026-10-11 | developer | high | 2026-10-12 |  |  | [WEB-047](../specs/mobile/web-047-spec.md) |
 | WEB-048 | Web: menu lateral em vez da barra de navegação horizontal | done | 2026-10-12 | developer | medium | 2026-10-12 |  |  |  |
 | WEB-049 | Concelhos (web e mobile): freguesias do concelho na ficha e no mapa | done | 2026-10-12 | developer | medium | 2026-10-12 |  |  | [WEB-049](../specs/mobile/web-049-spec.md) |
+| WEB-050 | Energia: Fase 0 — prova de dados REN Data Hub (endpoints, granularidade, licença) | backlog | 2026-10-19 | developer | high |  |  |  |  |
+| WEB-051 | Energia: Fase 0 — prova de dados ENTSO-E (token, A75/A65, EIC de Portugal, latência) | backlog | 2026-10-19 | developer | low |  |  |  |  |
+| WEB-052 | Energia (core): taxonomia versionada e regras de cálculo (renovável, MWh, veredicto, atualidade) | backlog | 2026-10-19 | developer | high |  |  | WEB-050 |  |
+| WEB-053 | Energia: pipeline diário REN → energy.sqlite + JSON (MVP) | backlog | 2026-10-19 | developer | high |  |  | WEB-050, WEB-052 |  |
+| WEB-054 | Energia: workflow GitHub Actions de atualização dos dados de energia | backlog | 2026-10-19 | developer | medium |  |  | WEB-053 |  |
+| WEB-055 | Energia (web e mobile): cliente de dados no core + cache | backlog | 2026-10-19 | developer | high |  |  | WEB-052, WEB-053 |  |
+| WEB-056 | Energia (web e mobile): página/ecrã MVP diário (produção, consumo, mix, 30 dias) | backlog | 2026-10-19 | developer | high |  |  | WEB-055 |  |
+| WEB-057 | Energia: série intradiária ENTSO-E no pipeline (latest.json, 24h, 7d) | backlog | 2026-10-19 | developer | low |  |  | WEB-051, WEB-052, WEB-054 |  |
+| WEB-058 | Energia (web e mobile): indicador «mais renovável do que não renovável agora?» + gráfico 24h | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
+| WEB-059 | Energia (web e mobile): análise 7d/30d, consumo vs produção, trocas, preços e CSV | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
+| WEB-060 | Energia: operação — monitorização, avisos de desatualização, reconciliação e documentação | backlog | 2026-10-19 | developer | low |  |  | WEB-054, WEB-057 |  |
 <!-- /maestru:work-items-list -->
