@@ -606,3 +606,121 @@ export function renewableToConsumptionPct(interval: Pick<EnergyInterval, 'renewa
   if (interval.consumption === null || !(interval.consumption > 0)) return null
   return roundEnergyValue((100 * interval.renewable) / interval.consumption, 1)
 }
+
+// ── Apresentação (web e mobile, WEB-056) ──────────────────────────────────
+
+export const ENERGY_CLASSIFICATION_COLORS: Record<EnergyClassification, string> = {
+  renewable: '#16a34a',
+  non_renewable: '#64748b',
+  storage: '#8b5cf6',
+  unknown: '#cbd5e1',
+}
+
+export const ENERGY_TECHNOLOGY_COLORS: Record<EnergyTechnology, string> = {
+  wind: '#0ea5e9',
+  solar: '#facc15',
+  hydro: '#2563eb',
+  biomass: '#65a30d',
+  wave: '#06b6d4',
+  geothermal: '#b45309',
+  natural_gas: '#f97316',
+  coal: '#334155',
+  oil: '#78350f',
+  nuclear: '#a855f7',
+  other_thermal: '#94a3b8',
+  storage: '#8b5cf6',
+}
+
+export const ENERGY_CONSUMPTION_COLOR = '#0f172a'
+
+export function technologyColor(technology: string): string {
+  return ENERGY_TECHNOLOGY_COLORS[technology as EnergyTechnology] ?? ENERGY_CLASSIFICATION_COLORS.unknown
+}
+
+export interface EnergyMixEntry {
+  technology: string
+  label: string
+  classification: EnergyClassification
+  color: string
+  value: number
+  /** Percentagem da produção do intervalo (`null` se a produção não for positiva). */
+  sharePct: number | null
+}
+
+const CLASSIFICATION_ORDER: EnergyClassification[] = ['renewable', 'non_renewable', 'storage', 'unknown']
+
+/**
+ * Mix de produção por tecnologia, agrupado por classificação (renovável, não renovável,
+ * armazenamento, desconhecida) e por valor decrescente. Omite as tecnologias a zero. Valores
+ * negativos (ex.: hídrica sem a bombagem) ficam na lista; nas barras empilhadas usar só os positivos.
+ */
+export function energyMix(interval: Pick<EnergyInterval, 'technology' | 'production'>): EnergyMixEntry[] {
+  return Object.entries(interval.technology)
+    .filter(([, value]) => Number.isFinite(value) && value !== 0)
+    .map(([technology, value]) => {
+      const classification = classifyTechnology(technology)
+      return {
+        technology,
+        label: technologyLabel(technology),
+        classification,
+        color: technologyColor(technology),
+        value,
+        sharePct: interval.production > 0 ? roundEnergyValue((100 * value) / interval.production, 1) : null,
+      }
+    })
+    .sort(
+      (a, b) =>
+        CLASSIFICATION_ORDER.indexOf(a.classification) - CLASSIFICATION_ORDER.indexOf(b.classification) || b.value - a.value,
+    )
+}
+
+/** Dias sem dados entre o primeiro e o último dia publicados (lacunas). */
+export function energyMissingDates(days: readonly Pick<EnergyDay, 'date'>[]): string[] {
+  if (days.length === 0) return []
+  const have = new Set(days.map(d => d.date))
+  const missing: string[] = []
+  for (let date = days[0].date; date < days[days.length - 1].date; date = addCalendarDays(date, 1)) {
+    if (!have.has(date)) missing.push(date)
+  }
+  return missing
+}
+
+export interface EnergyQualityInfo {
+  label: typeof ENERGY_LATEST_LABEL
+  /** `18/10/2026` ou `19/09/2026 – 18/10/2026`. */
+  period: string
+  latestDate: string
+  /** Hora de recolha na fonte, em Lisboa. */
+  fetchedAt: string
+  /** Tempo desde o fim do último dia (`1 dia`, `13 h 5 min`). */
+  delay: string
+  stale: boolean
+  missingDates: string[]
+  incompleteDates: string[]
+  source: string
+  sourceUrl: string
+}
+
+/** Bloco «Qualidade dos dados»: período, recolha, atraso, lacunas e fonte. */
+export function energyQualityInfo(
+  dataset: EnergyDatasetMeta & { days?: EnergyDay[]; latest?: EnergyDay },
+  nowMs: number = Date.now(),
+): EnergyQualityInfo | null {
+  const days = dataset.days ?? (dataset.latest ? [dataset.latest] : [])
+  if (days.length === 0) return null
+  const first = days[0]
+  const last = days[days.length - 1]
+  const freshness = energyFreshness(last.intervalEndUtc, dataset.maxAgeMinutes, nowMs)
+  return {
+    label: freshness.label,
+    period: first.date === last.date ? formatEnergyDate(last.date) : `${formatEnergyDate(first.date)} – ${formatEnergyDate(last.date)}`,
+    latestDate: formatEnergyDate(last.date),
+    fetchedAt: formatLisbonDateTime(dataset.fetchedAtUtc),
+    delay: freshness.ageMinutes === null ? '—' : formatEnergyDelay(freshness.ageMinutes),
+    stale: freshness.stale,
+    missingDates: energyMissingDates(days),
+    incompleteDates: days.filter(d => d.quality !== 'complete').map(d => d.date),
+    source: dataset.sourceName,
+    sourceUrl: dataset.sourceUrl,
+  }
+}

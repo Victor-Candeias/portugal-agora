@@ -11,6 +11,7 @@ import { ProtecaoCivil } from '@/pages/ProtecaoCivil'
 import { Hospitais } from '@/pages/Hospitais'
 import { Transportes } from '@/pages/Transportes'
 import { Economia } from '@/pages/Economia'
+import { Energia } from '@/pages/Energia'
 import { CodigoPostal } from '@/pages/CodigoPostal'
 import { Nif } from '@/pages/Nif'
 import { Turismo } from '@/pages/Turismo'
@@ -46,6 +47,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="hospitais"   element={<Hospitais />} />
             <Route path="transportes" element={<Transportes />} />
             <Route path="economia"    element={<Economia />} />
+            <Route path="energia"     element={<Energia />} />
             <Route path="codigo-postal" element={<CodigoPostal />} />
             <Route path="nif" element={<Nif />} />
             <Route path="turismo" element={<Turismo />} />
