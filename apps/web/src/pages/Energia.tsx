@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   ENERGY_CLASSIFICATION_COLORS,
   ENERGY_CLASSIFICATION_LABELS,
   ENERGY_CONSUMPTION_COLOR,
+  ENERGY_NOW_QUESTION,
+  ENERGY_VERDICT_STYLES,
+  energyHourlySlots,
   energyMix,
+  energyNowInfo,
   energyQualityInfo,
   formatEnergy,
   formatEnergyDate,
@@ -14,15 +18,17 @@ import {
   type EnergyDaily,
   type EnergyDay,
   type EnergyInterval,
+  type EnergyTimeseries,
 } from '@portugal-hoje/core'
 import { Card, CardTitle } from '@/components/Card'
 import { ErrorBox, LoadingBox } from '@/components/Feedback'
-import { useEnergy } from '@/hooks/useEnergy'
+import { useEnergy, useEnergyIntraday } from '@/hooks/useEnergy'
 
-// Painel diário de energia elétrica (WEB-056): balanço diário oficial da REN publicado pelo pipeline
-// (WEB-053). São dados do último dia disponível — nunca «agora» nem «tempo real».
+// Painel de energia elétrica: indicador «agora» e gráfico de 24 h com a série horária ENTSO-E (WEB-058)
+// e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
 export function Energia() {
   const energy = useEnergy()
+  const intraday = useEnergyIntraday('24h')
   const result = energy.data
   const daily = result?.data
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -34,17 +40,34 @@ export function Energia() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">🔌 Energia elétrica</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Portugal continental · balanço diário oficial da REN · últimos dados disponíveis (não é tempo real)
+            Portugal continental · produção horária ENTSO-E (quase tempo real, ~1 h de atraso) · balanço diário oficial da REN
           </p>
         </div>
         <button
-          onClick={() => void energy.refetch()}
-          disabled={energy.isFetching}
+          onClick={() => {
+            void energy.refetch()
+            void intraday.refetch()
+          }}
+          disabled={energy.isFetching || intraday.isFetching}
           className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 shrink-0"
         >
-          {energy.isFetching ? 'A atualizar…' : 'Atualizar'}
+          {energy.isFetching || intraday.isFetching ? 'A atualizar…' : 'Atualizar'}
         </button>
       </div>
+
+      {intraday.data ? (
+        <>
+          <NowCard series={intraday.data.data} offline={intraday.data.offline} savedAt={intraday.data.savedAt} />
+          <IntradayCard series={intraday.data.data} />
+        </>
+      ) : (
+        intraday.isError && (
+          <div className="rounded-lg bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 text-sm">
+            ⏱️ A série horária (ENTSO-E) não está disponível de momento: não é possível dizer o que acontece «agora».
+            Mostram-se só os últimos dados disponíveis do balanço diário da REN.
+          </div>
+        )
+      )}
 
       {energy.isLoading && <LoadingBox />}
       {energy.isError && <ErrorBox message={(energy.error as Error).message} />}
@@ -59,6 +82,125 @@ export function Energia() {
         </>
       )}
     </div>
+  )
+}
+
+function NowCard({ series, offline, savedAt }: { series: EnergyTimeseries; offline: boolean; savedAt: number }) {
+  const info = energyNowInfo(series)
+  const style = ENERGY_VERDICT_STYLES[info.verdict]
+  const p = info.interval
+  return (
+    <Card>
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{info.label}</p>
+      <p className="text-sm text-slate-700 mt-1">{ENERGY_NOW_QUESTION}</p>
+      <div className="flex flex-wrap items-center gap-4 mt-3">
+        <span
+          className="text-3xl font-extrabold px-4 py-2 rounded-xl"
+          style={{ color: style.color, backgroundColor: style.background }}
+          aria-live="polite"
+        >
+          {info.verdict}
+        </span>
+        <p className="text-sm text-slate-600 flex-1 min-w-48">{style.description}</p>
+      </div>
+      {p && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
+          <div>
+            <p className="text-xs text-slate-500">Renovável</p>
+            <p className="font-bold tabular-nums" style={{ color: ENERGY_CLASSIFICATION_COLORS.renewable }}>{formatEnergy(p.renewable, p.unit, 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Não renovável</p>
+            <p className="font-bold tabular-nums" style={{ color: ENERGY_CLASSIFICATION_COLORS.non_renewable }}>{formatEnergy(p.nonRenewable, p.unit, 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Armazenamento (bombagem e baterias)</p>
+            <p className="font-bold tabular-nums" style={{ color: ENERGY_CLASSIFICATION_COLORS.storage }}>{formatEnergy(p.storage, p.unit, 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Quota renovável da produção</p>
+            <p className="font-bold tabular-nums text-green-700">{formatSharePct(p.renewableSharePct)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Consumo</p>
+            <p className="font-bold tabular-nums text-slate-900">{formatEnergy(p.consumption, p.unit, 0)}</p>
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-slate-500 mt-3">
+        Observação: {info.observed} (hora de Lisboa, média horária{p && p.quality !== 'complete' ? `, incompleta ${formatSharePct(p.coveragePct)}` : ''}) ·
+        Atualizado às {info.updatedAt} · Atraso {info.delay} · Fonte:{' '}
+        <a href={info.sourceUrl} target="_blank" rel="noreferrer" className="text-green-700 underline">{info.source}</a>
+      </p>
+      {offline && (
+        <p className="text-xs text-amber-700 mt-1">📴 Sem ligação: dados guardados neste dispositivo em {formatLisbonDateTime(new Date(savedAt).toISOString())}.</p>
+      )}
+    </Card>
+  )
+}
+
+function IntradayCard({ series }: { series: EnergyTimeseries }) {
+  const slots = energyHourlySlots(series.points)
+  // Horas incompletas (faltam tecnologias) não entram nas linhas de produção: seriam valores por defeito.
+  const data = slots.map(s => {
+    const complete = s.point?.quality === 'complete'
+    return {
+      label: s.label,
+      time: s.time,
+      renewable: complete ? s.point!.renewable : null,
+      nonRenewable: complete ? s.point!.nonRenewable : null,
+      storage: complete ? s.point!.storage : null,
+      consumption: s.point?.consumption ?? null,
+    }
+  })
+  const missing = slots.filter(s => !s.point).length
+  const incomplete = slots.filter(s => s.point && s.point.quality !== 'complete').length
+  if (data.length === 0) return null
+  return (
+    <Card>
+      <CardTitle>Últimas 24 horas · produção horária</CardTitle>
+      <ResponsiveContainer width="100%" height={260}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+          <XAxis dataKey="time" tick={{ fontSize: 11 }} minTickGap={16} />
+          <YAxis tick={{ fontSize: 11 }} width={52} />
+          <Tooltip
+            formatter={(v, name) => [v === null || v === undefined ? 'sem dados' : formatEnergy(Number(v), 'MW', 0), name]}
+            labelFormatter={(_, payload) => {
+              const p = payload?.[0]?.payload as (typeof data)[number] | undefined
+              return p ? `${p.label} (Lisboa)` : ''
+            }}
+          />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Area
+            type="monotone"
+            dataKey="renewable"
+            name={ENERGY_CLASSIFICATION_LABELS.renewable}
+            stroke={ENERGY_CLASSIFICATION_COLORS.renewable}
+            fill={ENERGY_CLASSIFICATION_COLORS.renewable}
+            fillOpacity={0.15}
+            strokeWidth={2}
+          />
+          <Area
+            type="monotone"
+            dataKey="nonRenewable"
+            name={ENERGY_CLASSIFICATION_LABELS.non_renewable}
+            stroke={ENERGY_CLASSIFICATION_COLORS.non_renewable}
+            fill={ENERGY_CLASSIFICATION_COLORS.non_renewable}
+            fillOpacity={0.15}
+            strokeWidth={2}
+          />
+          <Line type="monotone" dataKey="storage" name={ENERGY_CLASSIFICATION_LABELS.storage} stroke={ENERGY_CLASSIFICATION_COLORS.storage} strokeWidth={1.5} dot={false} />
+          <Line type="monotone" dataKey="consumption" name="Consumo" stroke={ENERGY_CONSUMPTION_COLOR} strokeWidth={2} strokeDasharray="4 3" dot={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <p className="text-xs text-slate-500 mt-2">
+        MW, média de cada hora (hora de Lisboa). Séries separadas, não empilhadas; o armazenamento (bombagem e baterias) não é
+        renovável nem não renovável. A diferença para o consumo é coberta pelo saldo de trocas com Espanha.
+        {missing + incomplete > 0 && ` ${missing + incomplete} hora(s) sem dados ou incompletas ficam em branco.`}
+        {' '}Fonte: {series.sourceName}.
+      </p>
+    </Card>
   )
 }
 

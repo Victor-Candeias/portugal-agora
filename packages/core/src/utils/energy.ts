@@ -574,6 +574,12 @@ export function formatLisbonDateTime(isoUtc: string): string {
   return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
 }
 
+/** `08:35` em hora de Lisboa. */
+export function formatLisbonTime(isoUtc: string): string {
+  const full = formatLisbonDateTime(isoUtc)
+  return full === '—' ? full : full.slice(-5)
+}
+
 /** `18/10/2026` a partir de `2026-10-18` (dia civil, sem fuso). */
 export function formatEnergyDate(date: string): string {
   const [y, m, d] = date.split('-')
@@ -781,4 +787,101 @@ export function energyQualityInfo(
     source: dataset.sourceName,
     sourceUrl: dataset.sourceUrl,
   }
+}
+
+// ── Indicador «agora» e série intradiária (WEB-058) ───────────────────────
+
+export const ENERGY_NOW_QUESTION = 'Portugal está a produzir mais eletricidade renovável do que não renovável agora?'
+
+export const ENERGY_VERDICT_STYLES: Record<EnergyVerdict, { color: string; background: string; description: string }> = {
+  SIM: { color: '#15803d', background: '#dcfce7', description: 'A produção renovável está acima da não renovável.' },
+  NÃO: { color: '#c2410c', background: '#ffedd5', description: 'A produção não renovável está acima da renovável.' },
+  IGUAL: { color: '#0369a1', background: '#e0f2fe', description: 'Produção renovável e não renovável iguais.' },
+  INDETERMINADO: {
+    color: '#475569',
+    background: '#f1f5f9',
+    description: 'Dados incompletos ou sem resolução intradiária: não é possível responder.',
+  },
+  'DADOS DESATUALIZADOS': {
+    color: '#b45309',
+    background: '#fef3c7',
+    description: 'Não há observação recente: mostram-se os últimos dados disponíveis, que não são «agora».',
+  },
+}
+
+export interface EnergyNowInfo {
+  verdict: EnergyVerdict
+  /** Última hora completa (ou a última com dados, se nenhuma estiver completa). */
+  interval: EnergyInterval | null
+  /** `19/10 20:00–21:00` (hora de Lisboa). */
+  observed: string
+  /** Hora de recolha na fonte (`HH:mm`, Lisboa). */
+  updatedAt: string
+  /** Minutos desde o fim do intervalo observado. */
+  delayMinutes: number | null
+  delay: string
+  stale: boolean
+  /** «Agora» só com observação recente; senão «Últimos dados disponíveis». */
+  label: string
+  source: string
+  sourceUrl: string
+}
+
+/** Veredicto «agora» a partir de `intraday-latest.json` ou de uma série intradiária. */
+export function energyNowInfo(
+  dataset: EnergyDatasetMeta & { points?: EnergyInterval[]; latest?: EnergyInterval },
+  nowMs: number = Date.now(),
+): EnergyNowInfo {
+  const points = dataset.points ?? (dataset.latest ? [dataset.latest] : [])
+  const interval = [...points].reverse().find(p => p.quality === 'complete') ?? points[points.length - 1] ?? null
+  const base = {
+    updatedAt: formatLisbonTime(dataset.fetchedAtUtc),
+    source: dataset.sourceName.split(' — ')[0],
+    sourceUrl: dataset.sourceUrl,
+  }
+  if (!interval) {
+    return { ...base, verdict: 'INDETERMINADO', interval: null, observed: '—', delayMinutes: null, delay: '—', stale: true, label: ENERGY_LATEST_LABEL }
+  }
+  const freshness = energyFreshness(interval.intervalEndUtc, dataset.maxAgeMinutes, nowMs)
+  const verdict = energyVerdict(interval, dataset.maxAgeMinutes, nowMs)
+  const start = formatLisbonDateTime(interval.intervalStartUtc)
+  return {
+    ...base,
+    verdict,
+    interval,
+    observed: `${start.slice(0, 5)} ${start.slice(-5)}–${formatLisbonTime(interval.intervalEndUtc)}`,
+    delayMinutes: freshness.ageMinutes,
+    delay: freshness.ageMinutes === null ? '—' : formatEnergyDelay(freshness.ageMinutes),
+    stale: freshness.stale,
+    label: freshness.stale || dataset.freshness !== 'near_real_time' ? ENERGY_LATEST_LABEL : 'Agora',
+  }
+}
+
+export interface EnergySlot {
+  intervalStartUtc: string
+  /** `HH:mm` (Lisboa) */
+  time: string
+  /** `19/10 20:00` (Lisboa) */
+  label: string
+  /** `null` = hora sem dados (lacuna; nunca zero). */
+  point: EnergyInterval | null
+}
+
+/**
+ * Eixo contínuo com a resolução da série, do primeiro ao último ponto: as horas sem dados ficam com
+ * `point: null` para os gráficos mostrarem uma lacuna em vez de zero.
+ */
+export function energyHourlySlots(points: readonly EnergyInterval[]): EnergySlot[] {
+  if (points.length === 0) return []
+  const step = points[0].resolutionMinutes * 60000
+  const byStart = new Map(points.map(p => [Date.parse(p.intervalStartUtc), p]))
+  const first = Date.parse(points[0].intervalStartUtc)
+  const last = Date.parse(points[points.length - 1].intervalStartUtc)
+  const slots: EnergySlot[] = []
+  for (let t = first; t <= last && slots.length < 2000; t += step) {
+    const iso = new Date(t).toISOString()
+    const full = formatLisbonDateTime(iso)
+    slots.push({ intervalStartUtc: iso, time: full.slice(-5), label: `${full.slice(0, 5)} ${full.slice(-5)}`, point: byStart.get(t) ?? null })
+  }
+  return slots
 }

@@ -4,7 +4,11 @@ import {
   ENERGY_CLASSIFICATION_COLORS,
   ENERGY_CLASSIFICATION_LABELS,
   ENERGY_CONSUMPTION_COLOR,
+  ENERGY_NOW_QUESTION,
+  ENERGY_VERDICT_STYLES,
+  energyHourlySlots,
   energyMix,
+  energyNowInfo,
   energyQualityInfo,
   formatEnergy,
   formatEnergyDate,
@@ -13,14 +17,17 @@ import {
   renewableToConsumptionPct,
   type EnergyDaily,
   type EnergyDay,
+  type EnergyTimeseries,
 } from '@portugal-hoje/core'
-import { useEnergy } from '../hooks/useEnergy'
+import { useEnergy, useEnergyIntraday } from '../hooks/useEnergy'
 import { Card, COLORS, ErrorView, LinkText, LoadingView, Notice, ScreenHeader, SectionTitle, uiStyles } from '../components/ui'
 
-// Painel diário de energia elétrica (WEB-056): balanço diário oficial da REN publicado pelo pipeline
-// (WEB-053). São dados do último dia disponível — nunca «agora» nem «tempo real».
+// Painel de energia elétrica: indicador «agora» e gráfico de 24 h com a série horária ENTSO-E (WEB-058)
+// e balanço diário oficial da REN (WEB-056). O diário é sempre «último dia disponível», nunca «agora».
+// Não entra no Android Auto.
 export default function EnergiaScreen() {
   const energy = useEnergy()
+  const intraday = useEnergyIntraday('24h')
   const result = energy.data
   const daily = result?.data
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -31,10 +38,27 @@ export default function EnergiaScreen() {
     <ScrollView style={uiStyles.container} contentContainerStyle={uiStyles.content}>
       <ScreenHeader
         title="🔌 Energia elétrica"
-        subtitle="Portugal continental · balanço diário REN · últimos dados disponíveis"
-        onRefresh={() => void energy.refetch()}
-        refreshing={energy.isFetching}
+        subtitle="Portugal continental · produção horária ENTSO-E (~1 h de atraso) · balanço diário REN"
+        onRefresh={() => {
+          void energy.refetch()
+          void intraday.refetch()
+        }}
+        refreshing={energy.isFetching || intraday.isFetching}
       />
+
+      {intraday.data ? (
+        <>
+          <NowCard series={intraday.data.data} offline={intraday.data.offline} savedAt={intraday.data.savedAt} />
+          <IntradayCard series={intraday.data.data} />
+        </>
+      ) : (
+        intraday.isError && (
+          <Notice>
+            ⏱️ Série horária (ENTSO-E) indisponível: não é possível dizer o que acontece «agora». Mostram-se só os últimos dados
+            disponíveis do balanço diário da REN.
+          </Notice>
+        )
+      )}
 
       {energy.isLoading && <LoadingView />}
       {energy.isError && <ErrorView error={energy.error} onRetry={() => void energy.refetch()} />}
@@ -61,6 +85,94 @@ export default function EnergiaScreen() {
         </>
       )}
     </ScrollView>
+  )
+}
+
+function NowCard({ series, offline, savedAt }: { series: EnergyTimeseries; offline: boolean; savedAt: number }) {
+  const info = energyNowInfo(series)
+  const style = ENERGY_VERDICT_STYLES[info.verdict]
+  const p = info.interval
+  return (
+    <Card>
+      <Text style={styles.statTitle}>{info.label.toUpperCase()}</Text>
+      <Text style={styles.question}>{ENERGY_NOW_QUESTION}</Text>
+      <View style={[styles.verdict, { backgroundColor: style.background }]} accessibilityLiveRegion="polite">
+        <Text style={[styles.verdictText, { color: style.color }]}>{info.verdict}</Text>
+      </View>
+      <Text style={styles.statDetail}>{style.description}</Text>
+      {p && (
+        <View style={styles.totals}>
+          <Total label="Renovável" value={formatEnergy(p.renewable, p.unit, 0)} color={ENERGY_CLASSIFICATION_COLORS.renewable} />
+          <Total label="Não renovável" value={formatEnergy(p.nonRenewable, p.unit, 0)} color={ENERGY_CLASSIFICATION_COLORS.non_renewable} />
+          <Total label="Armazenam." value={formatEnergy(p.storage, p.unit, 0)} color={ENERGY_CLASSIFICATION_COLORS.storage} />
+          <Total label="Consumo" value={formatEnergy(p.consumption, p.unit, 0)} color={ENERGY_CONSUMPTION_COLOR} />
+        </View>
+      )}
+      <Text style={[uiStyles.small, styles.note]}>
+        Observação: {info.observed} (Lisboa, média horária{p && p.quality !== 'complete' ? `, incompleta ${formatSharePct(p.coveragePct)}` : ''}) ·
+        Atualizado às {info.updatedAt} · Atraso {info.delay} · Fonte: {info.source}
+      </Text>
+      {offline && (
+        <Text style={[uiStyles.small, styles.note]}>
+          📴 Sem ligação: dados guardados em {formatLisbonDateTime(new Date(savedAt).toISOString())}.
+        </Text>
+      )}
+    </Card>
+  )
+}
+
+const INTRADAY_HEIGHT = 130
+
+function IntradayCard({ series }: { series: EnergyTimeseries }) {
+  const slots = energyHourlySlots(series.points)
+  if (slots.length === 0) return null
+  const hi = Math.max(1, ...slots.map(s => (s.point ? Math.max(s.point.renewable, s.point.nonRenewable, s.point.storage, s.point.consumption ?? 0) : 0))) * 1.05
+  const y = (v: number) => (Math.max(0, v) / hi) * INTRADAY_HEIGHT
+  const gaps = slots.filter(s => !s.point || s.point.quality !== 'complete').length
+  return (
+    <Card>
+      <SectionTitle>Últimas 24 horas · produção horária</SectionTitle>
+      <View style={[styles.chart, { height: INTRADAY_HEIGHT }]}>
+        {slots.map(s => {
+          // Horas incompletas ficam em branco (valores por defeito); o consumo mostra-se se existir.
+          const complete = s.point?.quality === 'complete'
+          return (
+            <View
+              key={s.intervalStartUtc}
+              style={styles.hourSlot}
+              accessibilityLabel={
+                complete
+                  ? `${s.label}: renovável ${formatEnergy(s.point!.renewable, 'MW', 0)}, não renovável ${formatEnergy(s.point!.nonRenewable, 'MW', 0)}`
+                  : `${s.label}: sem dados completos`
+              }
+            >
+              {complete && (
+                <>
+                  <View style={[styles.hourBar, { height: y(s.point!.renewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.renewable }]} />
+                  <View style={[styles.hourBar, { height: y(s.point!.nonRenewable), backgroundColor: ENERGY_CLASSIFICATION_COLORS.non_renewable }]} />
+                  <View style={[styles.hourBar, { height: y(s.point!.storage), backgroundColor: ENERGY_CLASSIFICATION_COLORS.storage }]} />
+                </>
+              )}
+              {s.point?.consumption != null && <View style={[styles.consumption, { bottom: y(s.point.consumption) - 1 }]} />}
+            </View>
+          )
+        })}
+      </View>
+      <View style={styles.xAxis}>
+        <Text style={uiStyles.small}>{slots[0].time}</Text>
+        {slots.length > 2 && <Text style={uiStyles.small}>{slots[Math.floor(slots.length / 2)].time}</Text>}
+        <Text style={uiStyles.small}>{slots[slots.length - 1].time}</Text>
+      </View>
+      <View style={styles.legend}>
+        <Legend color={ENERGY_CLASSIFICATION_COLORS.renewable} label="Renovável" />
+        <Legend color={ENERGY_CLASSIFICATION_COLORS.non_renewable} label="Não renovável" />
+        <Legend color={ENERGY_CLASSIFICATION_COLORS.storage} label="Armazenamento" />
+        <Legend color={ENERGY_CONSUMPTION_COLOR} label="Consumo" line />
+      </View>
+      <Text style={uiStyles.small}>
+        MW, média de cada hora (Lisboa), lado a lado. O armazenamento (bombagem e baterias) não é renovável nem não renovável.{gaps > 0 ? ` ${gaps} hora(s) sem dados completos em branco.` : ''} Fonte: {series.sourceName}.
+      </Text>
+    </Card>
   )
 }
 
@@ -263,6 +375,11 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: '700', marginVertical: 4 },
   statDetail: { fontSize: 11, color: '#475569' },
   note: { marginTop: 6 },
+  question: { fontSize: 14, color: '#334155', marginTop: 4, marginBottom: 10 },
+  verdict: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },
+  verdictText: { fontSize: 26, fontWeight: '800' },
+  hourSlot: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 1, position: 'relative' },
+  hourBar: { flex: 1 },
   mixBar: { flexDirection: 'row', height: 22, borderRadius: 6, overflow: 'hidden', marginBottom: 10 },
   mixRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   swatch: { width: 12, height: 12, borderRadius: 3 },
