@@ -89,7 +89,7 @@ export function Nif() {
           </div>
           {!viesAvailable && (
             <p className="text-sm text-slate-600">
-              A consulta do VIES só está disponível na app mobile e no web em desenvolvimento.{' '}
+              Nesta versão web, o VIES não responde diretamente ao browser (sem CORS) e não usamos intermediários para não enviar o NIF a terceiros. Consulte o nome e a morada no portal oficial ou na app mobile.{' '}
               <a href={VIES_WEB_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-green-700 underline">
                 Consultar no VIES <ExternalLink size={12} />
               </a>

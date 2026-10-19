@@ -4,11 +4,24 @@ import { useFuelPrices } from '../../hooks/useApi'
 import { DEFAULT_CITY_ID, useIpmaCityForecast, useIpmaWarnings } from '../../hooks/useTempo'
 import { useBdpRates } from '../../hooks/useEconomia'
 import { useAnpcSummary } from '../../hooks/useAnpc'
+import { useCheapestEvTariffs } from '../../hooks/useEv'
+import { useBaseContracts } from '../../hooks/useContratos'
 import { SECTIONS } from '../../lib/sections'
-import { formatPrice, maxWarningLevel, WARNING_LEVEL_COLORS, WARNING_LEVEL_LABELS } from '@portugal-hoje/core'
+import {
+  formatBaseDate,
+  formatContractValue,
+  formatPrice,
+  maxWarningLevel,
+  parseBaseParty,
+  WARNING_LEVEL_COLORS,
+  WARNING_LEVEL_LABELS,
+} from '@portugal-hoje/core'
 
 // Os hrefs vêm de lib/sections.ts e coincidem com ficheiros em app/; as rotas tipadas não estão ativas.
 const go = (href: string) => router.push(href as never)
+
+// Mesmo carregamento de referência do resumo da web (WEB-029).
+const EV_CARD_KWH = 30
 
 function SummaryCard({
   emoji,
@@ -17,6 +30,7 @@ function SummaryCard({
   subtitle,
   color = '#16a34a',
   href,
+  subtitleLines,
 }: {
   emoji: string
   title: string
@@ -24,6 +38,7 @@ function SummaryCard({
   subtitle?: string
   color?: string
   href?: string
+  subtitleLines?: number
 }) {
   return (
     <TouchableOpacity
@@ -35,7 +50,11 @@ function SummaryCard({
       <Text style={styles.cardEmoji}>{emoji}</Text>
       <Text style={styles.cardTitle}>{title}</Text>
       <Text style={[styles.cardValue, { color }]}>{value}</Text>
-      {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
+      {subtitle && (
+        <Text style={styles.cardSubtitle} numberOfLines={subtitleLines}>
+          {subtitle}
+        </Text>
+      )}
     </TouchableOpacity>
   )
 }
@@ -46,6 +65,9 @@ export default function Dashboard() {
   const { data: anpcData } = useAnpcSummary()
   const { data: ratesData } = useBdpRates()
   const { data: warnings } = useIpmaWarnings()
+  const { data: evCost } = useCheapestEvTariffs(EV_CARD_KWH)
+  // Mesma query da 1.ª página do ecrã Contratos (fica em cache ao abrir a secção).
+  const { data: contractsData } = useBaseContracts(null)
 
   const cheapest = fuelData?.[0]
   const today = weatherData?.forecasts[0]
@@ -54,6 +76,9 @@ export default function Dashboard() {
   const ecbDeposit = ratesData?.data.find(r => r.key === 'ecb_deposit')
   const warningLevel = maxWarningLevel(warnings ?? [])
   const topWarning = warnings?.[0]
+  const cheapestEv = evCost?.data[0]
+  const contracts = contractsData?.pages[0]
+  const latestContract = contracts?.data[0]
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -113,6 +138,32 @@ export default function Dashboard() {
           color={WARNING_LEVEL_COLORS[warningLevel].accent}
           href="/tempo"
         />
+        <SummaryCard
+          emoji="⚡"
+          title="CEME mais barato"
+          value={cheapestEv ? `${formatPrice(cheapestEv.price_per_kwh_eur)}/kWh` : '—'}
+          subtitle={
+            cheapestEv
+              ? `${cheapestEv.ceme} · ${EV_CARD_KWH} kWh ≈ ${cheapestEv.total_cost_eur.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })} · ERSE/OMIE, sem OPC/EGME`
+              : 'A carregar...'
+          }
+          subtitleLines={3}
+          color="#d97706"
+          href="/ev"
+        />
+        <SummaryCard
+          emoji="📑"
+          title="Contratos Públicos"
+          value={contracts ? `${contracts.total.toLocaleString('pt-PT')} contratos` : '—'}
+          subtitle={
+            latestContract
+              ? `Mais recente: ${latestContract.description || parseBaseParty(latestContract.awarded)?.name || latestContract.id} · ${formatContractValue(latestContract.value)} · ${formatBaseDate(latestContract.date)}`
+              : 'A carregar...'
+          }
+          subtitleLines={3}
+          color="#475569"
+          href="/contratos"
+        />
       </View>
 
       <Text style={styles.sectionTitle}>Todas as secções</Text>
@@ -136,6 +187,8 @@ export default function Dashboard() {
           { label: 'Avisos IPMA', ok: !!warnings },
           { label: 'ANPC', ok: !!anpcData },
           { label: 'Banco de Portugal', ok: !!ratesData },
+          { label: 'Tarifas CEME', ok: !!evCost },
+          { label: 'Contratos BASE', ok: !!contractsData },
         ].map(({ label, ok }) => (
           <View key={label} style={styles.statusRow}>
             <Text>{ok ? '✅' : '⏳'}</Text>
