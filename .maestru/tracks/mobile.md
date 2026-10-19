@@ -97,4 +97,5 @@ status: active
 | WEB-059 | Energia (web e mobile): análise 7d/30d, consumo vs produção, trocas, preços e CSV | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-056, WEB-057 | [WEB-059](../specs/mobile/web-059-spec.md) |
 | WEB-060 | Energia: operação — monitorização, avisos de desatualização, reconciliação e documentação | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-054, WEB-057 | [WEB-060](../specs/mobile/web-060-spec.md) |
 | WEB-061 | Energia: falha da REN num só dia (HTTP 500) não deve anular a recolha toda | done | 2026-10-19 | developer | high | 2026-10-19 |  |  |  |
+| WEB-062 | Paridade web/mobile: resumos CEME e Contratos no Início do mobile; NIF/VIES no web publicado | backlog | 2026-10-19 | developer | medium |  |  |  |  |
 <!-- /maestru:work-items-list -->
