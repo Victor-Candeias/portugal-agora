@@ -96,4 +96,5 @@ status: active
 | WEB-058 | Energia (web e mobile): indicador «mais renovável do que não renovável agora?» + gráfico 24h | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
 | WEB-059 | Energia (web e mobile): análise 7d/30d, consumo vs produção, trocas, preços e CSV | backlog | 2026-10-19 | developer | low |  |  | WEB-056, WEB-057 |  |
 | WEB-060 | Energia: operação — monitorização, avisos de desatualização, reconciliação e documentação | backlog | 2026-10-19 | developer | low |  |  | WEB-054, WEB-057 |  |
+| WEB-061 | Energia: falha da REN num só dia (HTTP 500) não deve anular a recolha toda | done | 2026-10-19 | developer | high | 2026-10-19 |  |  |  |
 <!-- /maestru:work-items-list -->

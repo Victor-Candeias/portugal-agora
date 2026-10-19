@@ -187,25 +187,36 @@ async function mapLimit(items, limit, fn) {
 
 /**
  * Pede os últimos `DAYS` dias publicados (de ontem para trás, hora de Lisboa). Os dias mais
- * recentes podem ainda não existir (404); um 404 mais antigo fica como dia em falta.
+ * recentes podem ainda não existir (404); um 404 mais antigo fica como dia em falta. Um dia que
+ * falha depois das tentativas (HTTP 5xx, rede, timeout, não-JSON) também fica em falta, para um
+ * erro pontual da REN não anular a recolha toda (WEB-061); a resposta com formato inesperado
+ * continua a anular, porque indica mudança de contrato.
  */
 export async function collectRenDays({ now = Date.now(), fetchImpl = fetch, retryDelayMs = 2000, log = console } = {}) {
   const yesterday = addCalendarDays(lisbonDate(now), -1)
   const dates = Array.from({ length: DAYS + MAX_UNPUBLISHED_RECENT_DAYS }, (_, i) => addCalendarDays(yesterday, -i))
   const results = await mapLimit(dates, CONCURRENCY, async date => {
+    let json
     try {
-      return { date, parsed: parseRenDay(date, await fetchRenDay(date, { fetchImpl, retryDelayMs })) }
+      json = await fetchRenDay(date, { fetchImpl, retryDelayMs })
     } catch (err) {
       if (err instanceof RenNoDataError) return { date, missing: true }
-      throw err
+      return { date, missing: true, error: err }
     }
+    return { date, parsed: parseRenDay(date, json) }
   })
+  const failed = results.filter(r => r.error)
+  if (failed.length > 0) {
+    log.warn(`  ⚠ REN falhou para ${failed.length} dia(s), que ficam em falta: ${failed.map(r => r.date).join(', ')} ` +
+      `(${failed[0].error.message})`)
+  }
   // Descarta os dias recentes ainda por publicar e fica com a janela de DAYS dias a partir do mais recente.
   let start = 0
   while (start < MAX_UNPUBLISHED_RECENT_DAYS && results[start]?.missing) start++
   const window = results.slice(start, start + DAYS)
   const missing = window.filter(r => r.missing).map(r => r.date)
-  if (missing.length > 0) log.warn(`  ⚠ REN sem dados para ${missing.length} dia(s): ${missing.join(', ')}`)
+  const noData = window.filter(r => r.missing && !r.error).map(r => r.date)
+  if (noData.length > 0) log.warn(`  ⚠ REN sem dados para ${noData.length} dia(s): ${noData.join(', ')}`)
   const parsed = window.filter(r => r.parsed).map(r => r.parsed)
   for (const p of parsed) for (const w of p.warnings) log.warn(`  ⚠ ${p.day.date}: ${w}`)
   if (parsed.length < MIN_VALID_DAYS) throw new Error(`Só ${parsed.length} dia(s) válidos da REN (mínimo ${MIN_VALID_DAYS})`)

@@ -28,7 +28,7 @@ Este é o MVP diário do painel de energia. Um script Node no `build:db` recolhe
 | Create | `apps/web/scripts/build-energy-db.mjs` | Importa `packages/core/src/utils/energy.ts` (Node type stripping). Exporta funções puras para teste: `fetchRenDay`, `parseRenDay`, `collectRenDays`, `buildEnergyDatasets`, `republishPublished` e `buildEnergy`. `main` só corre quando o script é invocado diretamente. |
 
 - **Janela:** começa em ontem (hora de Lisboa) e recua 32 dias. Até 2 dos dias mais recentes podem dar 404, porque a REN publica o dia D em D+1. Fica-se com 30 dias a partir do mais recente publicado. Um 404 mais antigo conta como dia em falta e torna o total `incomplete`. Com menos de 7 dias válidos, o dataset não é publicado.
-- **Pedidos:** 3 tentativas com backoff, timeout de 30 s, concorrência de 4 e User-Agent identificável.
+- **Pedidos:** 3 tentativas com backoff, timeout de 30 s, concorrência de 4 e User-Agent identificável. Um dia que continua a falhar depois das 3 tentativas (HTTP 5xx, rede, timeout ou conteúdo que não é JSON) conta como dia em falta e não anula a recolha (WEB-061). Uma resposta JSON com formato inesperado continua a anular a recolha.
 - **Validação por dia:**
   - É erro se a resposta não for um array de `{type: string, daily_Accumulation: number|null}`, se vier HTML ou JSON inesperado, ou se houver tipos duplicados.
   - A soma das tecnologias é comparada com `PRODUCAO_RENOVAVEL`, `PRODUCAO_NAO_RENOVAVEL` e `PRODUCAO_TOTAL`, com tolerância de 0,5 × n + 0,5 (os valores vêm arredondados a 1 GWh). Fora da tolerância, o dia fica `incomplete`, sem veredito, e é registado um aviso.
@@ -37,7 +37,7 @@ Este é o MVP diário do painel de energia. Um script Node no `build:db` recolhe
 - **SQLite:** tabela `energy_observation` (esquema da secção 7 do relatório; o CHECK inclui `storage`; `energy_mwh` = GWh × 1000; `power_mw` NULL), tabela `energy_balance` (consumo, importação, exportação, saldo importador e consumo de armazenamento, em MWh) e tabela `meta` (`generated_at`, `source`, `taxonomy`). No fim corre `VACUUM` e `integrity_check`.
 - **Escrita atómica:** os ficheiros são escritos em `public/data/.energy.tmp/` e depois movidos com rename para `public/data/energy/` e `public/data/energy.sqlite`.
 - **Falha da REN:**
-  1. Descarrega `energy/daily.json`, `energy/latest.json` e `energy.sqlite` de `ENERGY_FALLBACK_BASE_URL` (por omissão, o URL de dados do Pages).
+  1. A REN falha quando há menos de 7 dias válidos, por exemplo se estiver em baixo. Nesse caso, o script descarrega `energy/daily.json`, `energy/latest.json` e `energy.sqlite` de `ENERGY_FALLBACK_BASE_URL` (por omissão, o URL de dados do Pages).
   2. Valida a versão do contrato, a fonte, os dias e o cabeçalho SQLite, e republica os ficheiros.
   3. Se isto também falhar, emite um aviso, não escreve nada e sai com 0.
 
