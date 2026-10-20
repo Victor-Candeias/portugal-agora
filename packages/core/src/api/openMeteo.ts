@@ -1,4 +1,6 @@
 // Open-Meteo (sem chave) — tempo atual e códigos WMO. A API Aberta não tem observações (MOB-008).
+import { OPEN_METEO_GEOCODING_URL } from './codigoPostal.js'
+
 export const OPEN_METEO_FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
 
 // WMO weather interpretation codes → descrição PT + emoji
@@ -88,3 +90,39 @@ export function createOpenMeteoClient(baseUrl: string = OPEN_METEO_FORECAST_URL)
 }
 
 export const openMeteoClient = createOpenMeteoClient()
+
+export interface PtPlace {
+  id: number
+  name: string
+  /** Concelho e distrito/região, quando a fonte os indica. */
+  context: string
+  latitude: number
+  longitude: number
+}
+
+/** Pesquisa de localidades em Portugal (geocoding do Open-Meteo, sem chave). */
+export async function searchPtPlaces(
+  query: string,
+  options: { signal?: AbortSignal; count?: number; url?: string } = {},
+): Promise<PtPlace[]> {
+  const name = query.trim()
+  if (name.length < 2) return []
+  const url = new URL(options.url ?? OPEN_METEO_GEOCODING_URL)
+  url.searchParams.set('name', name)
+  url.searchParams.set('count', String(options.count ?? 8))
+  url.searchParams.set('language', 'pt')
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('countryCode', 'PT')
+  const res = await fetch(url.toString(), { signal: options.signal })
+  if (!res.ok) throw new Error(`Open-Meteo geocoding: ${res.status}`)
+  const json = (await res.json()) as {
+    results?: Array<{ id: number; name: string; latitude: number; longitude: number; admin1?: string; admin2?: string }>
+  }
+  return (json.results ?? []).map(r => ({
+    id: r.id,
+    name: r.name,
+    context: [r.admin2, r.admin1].filter((s, i, arr) => s && arr.indexOf(s) === i).join(', '),
+    latitude: r.latitude,
+    longitude: r.longitude,
+  }))
+}

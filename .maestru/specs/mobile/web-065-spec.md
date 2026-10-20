@@ -43,6 +43,7 @@ Cliente ANACOM partilhado pelo web e pelo mobile, sem backend, seguindo o padrã
 | | | `anacomExportUrl(layerId)` (modelo com `{bbox-epsg-3857}`) |
 | | | `ANACOM_COVERAGE_DISCLAIMER` |
 | Modify | `packages/core/src/index.ts` | Exportar `anacom` |
+| Modify | `packages/core/src/api/openMeteo.ts` | `searchPtPlaces` (pesquisa de localidade para o WEB-066) |
 
 ## Impacted Files
 
@@ -50,4 +51,21 @@ Cliente ANACOM partilhado pelo web e pelo mobile, sem backend, seguindo o padrã
 |------|--------|---------|
 | `packages/core/src/api/anacom.ts` | Create | Cliente, catálogo e normalização |
 | `packages/core/src/index.ts` | Modify | Export |
+| `packages/core/src/api/openMeteo.ts` | Modify | `searchPtPlaces` |
 | `README.md` | Modify | Fonte de dados ANACOM (licença e atribuição) |
+
+## Notas de implementação (2026-10-20)
+
+- **«Global PT».** É o agregado nacional, não uma operadora (WEB-064). Vem em `MobileCoverageResult.aggregate` e fica fora de `operators` e do ranking. `MobileOperator` = `DIGI`, `MEO`, `NOS`, `Vodafone`; `CoverageSubject` acrescenta `Global PT`.
+- **Estados.** O valor `0` («Não disponível») dá `not_covered`. `NoData`, valores inesperados e pontos fora de `ANACOM_COVERAGE_EXTENT` dão `unknown`; nestes pontos não se faz o pedido e `outsideCoverageArea` fica `true`.
+- **Classes.** O 4G e o 5G usam limiares, e as classes vêm com a cor da legenda oficial (`COVERAGE_LEGEND`).
+- **Ranking.** `rankOperators` dá a posição com empates (1, 1, 1, 4). Inclui as operadoras `not_covered` e devolve `null` se houver `unknown` ou `source_unavailable`.
+- **Pedidos.** Timeout de 15 s, combinado com o `signal` de quem chama, sem `AbortSignal.any`, por compatibilidade com o React Native.
+  - Erros HTTP, timeouts e erros do ArcGIS dão `source_unavailable`.
+  - O cancelamento pedido por quem chama é propagado.
+- **Coordenadas.** Arredondadas a 5 casas decimais e nunca registadas em logs.
+- **Catálogo.** `getMobileCoverageCatalog()` confirma o id, o prefixo do nome (`2G`/`4G`/`5G`) e o grupo pai de cada camada.
+- **Pesquisa de localidade.** `searchPtPlaces(query)` em `openMeteo.ts` (geocoding do Open-Meteo, `countryCode=PT`), para o WEB-066.
+- **Validação.**
+  - Testes ao vivo: Lisboa, Montesinho, Corvo, oceano, Madrid, fonte inexistente, timeout, cancelamento e catálogo.
+  - `tsc -b` no web e `tsc --noEmit` no mobile sem erros.
