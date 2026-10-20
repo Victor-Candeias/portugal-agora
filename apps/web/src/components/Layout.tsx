@@ -61,7 +61,7 @@ export function Layout() {
               <Menu size={22} />
             </button>
             <Link to="/" className="flex items-center gap-2" aria-label="Portugal-Hoje — Início">
-              <span className="text-2xl">🇵🇹</span>
+              <img src={`${import.meta.env.BASE_URL}Portugal_Agora.jpg`} alt="" className="h-9 w-9 rounded-lg" />
               <span className="font-bold text-lg text-green-700">Portugal-Hoje</span>
             </Link>
           </div>

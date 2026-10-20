@@ -98,4 +98,5 @@ status: active
 | WEB-060 | Energia: operação — monitorização, avisos de desatualização, reconciliação e documentação | done | 2026-10-19 | developer | low | 2026-10-19 |  | WEB-054, WEB-057 | [WEB-060](../specs/mobile/web-060-spec.md) |
 | WEB-061 | Energia: falha da REN num só dia (HTTP 500) não deve anular a recolha toda | done | 2026-10-19 | developer | high | 2026-10-19 |  |  |  |
 | WEB-062 | Paridade web/mobile: resumos CEME e Contratos no Início do mobile; NIF/VIES no web publicado | done | 2026-10-19 | developer | medium | 2026-10-19 |  |  | [WEB-062](../specs/mobile/web-062-spec.md) |
+| WEB-063 | Web: usar Portugal_Agora.jpg como ícone/logótipo da app web | done | 2026-10-20 | developer | medium | 2026-10-20 |  |  |  |
 <!-- /maestru:work-items-list -->
