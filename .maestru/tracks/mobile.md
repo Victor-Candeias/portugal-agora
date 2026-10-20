@@ -100,7 +100,7 @@ status: active
 | WEB-061 | Energia: falha da REN num só dia (HTTP 500) não deve anular a recolha toda | done | 2026-10-19 | developer | high | 2026-10-19 |  |  |  |
 | WEB-062 | Paridade web/mobile: resumos CEME e Contratos no Início do mobile; NIF/VIES no web publicado | done | 2026-10-19 | developer | medium | 2026-10-19 |  |  | [WEB-062](../specs/mobile/web-062-spec.md) |
 | WEB-063 | Web: usar Portugal_Agora.jpg como ícone/logótipo da app web | done | 2026-10-20 | developer | medium | 2026-10-20 |  |  |  |
-| WEB-064 | Cobertura móvel: Fase 0 — validação ANACOM (classes de velocidade, identify, export, licença) | backlog | 2026-10-20 | developer | medium |  |  |  | [WEB-064](../specs/mobile/web-064-spec.md) |
-| WEB-065 | Cobertura móvel (core): cliente ANACOM, catálogo de camadas e normalização | backlog | 2026-10-20 | developer | medium |  |  | WEB-064 | [WEB-065](../specs/mobile/web-065-spec.md) |
+| WEB-064 | Cobertura móvel: Fase 0 — validação ANACOM (classes de velocidade, identify, export, licença) | done | 2026-10-20 | developer | medium | 2026-10-20 |  |  | [WEB-064](../specs/mobile/web-064-spec.md) |
+| WEB-065 | Cobertura móvel (core): cliente ANACOM, catálogo de camadas e normalização | in-progress | 2026-10-20 | developer | medium |  |  | WEB-064 | [WEB-065](../specs/mobile/web-065-spec.md) |
 | WEB-066 | Cobertura móvel (web): página, mapa de cobertura e comparação de operadoras | backlog | 2026-10-20 | developer | medium |  |  | WEB-065 | [WEB-066](../specs/mobile/web-066-spec.md) |
 <!-- /maestru:work-items-list -->
