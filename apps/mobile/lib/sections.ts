@@ -15,6 +15,7 @@ export const SECTIONS: Section[] = [
     { href: '/economia', title: 'Economia', emoji: '📊', color: '#6366f1', description: 'Taxas BdP e indicadores' },
   { href: '/turismo', title: 'Turismo', emoji: '🏖️', color: '#7c3aed', description: 'Pontos de interesse' },
   { href: '/energia', title: 'Energia', emoji: '🔌', color: '#16a34a', description: 'Renovável vs não renovável' },
+  { href: '/cobertura', title: 'Cobertura móvel', emoji: '📶', color: '#0891b2', description: 'Operadoras · ANACOM' },
   { href: '/protecao-civil', title: 'Proteção Civil', emoji: '🔥', color: '#ea580c', description: 'Ocorrências ANPC' },
   { href: '/hospitais', title: 'Hospitais', emoji: '🏥', color: '#dc2626', description: 'Urgências SNS' },
   { href: '/transportes', title: 'Transportes', emoji: '🚆', color: '#2563eb', description: 'CP · Carris · TML' },
