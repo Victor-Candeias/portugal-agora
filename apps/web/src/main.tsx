@@ -22,6 +22,7 @@ import { ContratoDetalhe } from '@/pages/ContratoDetalhe'
 import { Fundos } from '@/pages/Fundos'
 import { Concelhos } from '@/pages/Concelhos'
 import { ConcelhoDetalhe } from '@/pages/ConcelhoDetalhe'
+import { Cobertura } from '@/pages/Cobertura'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="fundos" element={<Fundos />} />
             <Route path="concelhos" element={<Concelhos />} />
             <Route path="concelhos/:slug" element={<ConcelhoDetalhe />} />
+            <Route path="cobertura" element={<Cobertura />} />
           </Route>
         </Routes>
       </HashRouter>

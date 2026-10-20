@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom'
-import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag, Hospital, Train, MailOpen, Palmtree, TrainFront, Shield, FileText, IdCard, Landmark, MapPinned, Menu, X, PlugZap } from 'lucide-react'
+import { Fuel, CloudSun, Zap, ShieldAlert, BarChart3, Flag, Hospital, Train, MailOpen, Palmtree, TrainFront, Shield, FileText, IdCard, Landmark, MapPinned, Menu, X, PlugZap, Signal } from 'lucide-react'
 import { useAnpcSummary } from '@/hooks/useANPC'
 
 const NAV = [
@@ -15,6 +15,7 @@ const NAV = [
   { to: '/ev',           label: 'EV',             icon: Zap },
   { to: '/economia',     label: 'Economia',       icon: BarChart3 },
   { to: '/energia',      label: 'Energia',        icon: PlugZap },
+  { to: '/cobertura',    label: 'Cobertura móvel', icon: Signal },
   { to: '/contratos',    label: 'Contratos',      icon: FileText },
   { to: '/fundos',       label: 'Fundos PRR',     icon: Landmark },
   { to: '/codigo-postal', label: 'Cód. Postal',   icon: MailOpen },
@@ -142,7 +143,7 @@ export function Layout() {
       </div>
 
       <footer className="border-t border-slate-200 bg-white text-xs text-slate-400 text-center py-3">
-        Dados: API Aberta · DGEG · IPMA · ANPC · REN
+        Dados: API Aberta · DGEG · IPMA · ANPC · REN · ANACOM
       </footer>
     </div>
   )

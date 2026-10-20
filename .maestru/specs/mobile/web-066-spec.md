@@ -46,3 +46,17 @@ Página web «📶 Cobertura móvel» (`/cobertura`) sobre o cliente do WEB-065.
 | `apps/web/src/components/Layout.tsx` | Modify | Menu |
 | `apps/web/src/pages/Dashboard.tsx` | Modify | Atalho |
 | `README.md` | Modify | Tabela de ecrãs |
+
+## Implementation Notes (2026-10-20)
+
+- **Dashboard sem atalho.** O `Dashboard.tsx` não tem lista nem grelha de secções (só cartões de resumo), por isso não se alterou. O acesso faz-se pelo menu lateral («Cobertura móvel», ícone `Signal`). O rodapé passou a citar «ANACOM».
+- **Escolha do ponto.** GPS só ao clicar (estados: recusado / indisponível / sem suporte, com mensagem), pesquisa de localidade via `searchPtPlaces` (core, Open-Meteo geocoding) e clique no mapa. O mapa só se centra quando muda o `focusKey` (GPS ou pesquisa), não em cada clique.
+- **Mapa.** `L.TileLayer.extend({ getTileUrl })` substitui `{bbox-epsg-3857}` pelo bbox do mosaico (z/x/y → metros EPSG:3857) no URL de `anacomExportUrl(layerId)`. A camada só se recria quando muda a operadora ou tecnologia; a opacidade usa `setOpacity`. Fica limitada ao `ANACOM_COVERAGE_EXTENT`. O ponto escolhido é um `circleMarker`, porque o ícone por omissão do `L.marker` parte-se no build do Vite.
+- **Cache.** Chave `['coverage', tech, lat5, lon5]` com `staleTime` de 24 h; 0 se algum resultado for `source_unavailable`. `retry: false`, porque o cliente já converte erros em `source_unavailable` e a página oferece «Tentar de novo».
+- **Verificação (vite preview + Chrome headless):**
+  - Mértola 4G: MEO = NOS ≥ 300 (1.º empate), DIGI = Vodafone ≥ 100 (3.º empate).
+  - Mértola 5G: selo «provisório»; DIGI «Sem cobertura» em 4.º.
+  - Clique a leste (Espanha): «fora da área», sem pedidos `identify`.
+  - Pedidos `identify` bloqueados: «Fonte indisponível» + «Tentar de novo».
+  - GPS recusado: mensagem; a pesquisa e o clique continuam disponíveis.
+  - Mosaicos `export`: 24/24 com HTTP 200. Sem erros na consola.
