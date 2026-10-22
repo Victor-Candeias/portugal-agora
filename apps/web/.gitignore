@@ -19,6 +19,9 @@ public/data/*.sqlite-*
 # Dados de energia gerados em build/CI (scripts/build-energy-db.mjs, WEB-053).
 public/data/energy/
 public/data/.energy.tmp/
+# Indicadores de urgência do SNS gerados em build/CI (scripts/build-sns-urgencias.mjs, WEB-067).
+public/data/sns/
+public/data/.sns.tmp/
 
 # Editor directories and files
 .vscode/*

@@ -81,6 +81,7 @@ nenhum valor `demo`). O mesmo para os postos de carregamento sem `OPEN_CHARGE_MA
 | Energia elétrica — balanço diário oficial (Portugal continental: renovável vs não renovável, consumo, importação/exportação; últimos 30 dias) | REN Data Hub — `servicebus.ren.pt/datahubapi/electricity/ElectricityConsumptionSupplyDaily` (balanço diário em GWh inteiros; o dia D só fica disponível em D+1). Recolhido no build (sem CORS) por `apps/web/scripts/build-energy-db.mjs` e publicado no GitHub Pages; só agregados diários, com atribuição à REN (o aviso legal da REN não tem licença aberta) | não |
 | Energia elétrica — produção horária (quase tempo real, ~1 h de atraso; últimas 24 h e 7 dias) | ENTSO-E Transparency Platform — `web-api.tp.entsoe.eu/api`: produção real por tipo (A75), carga total (A65) e fluxos físicos com Espanha (A11), zona `10YPT-REN------W`, em MW horários. Recolhido no build por `apps/web/scripts/energy-entsoe.mjs`; os termos de reutilização não foram confirmados (WEB-051), por isso só se publicam produção, carga e fluxos agregados a 60 min, com atribuição «ENTSO-E Transparency Platform», e os preços de mercado ficam de fora | sim, só no build (`TRANSPARENCT_ENTSOE_TOKEN`) |
 | Cobertura móvel potencial (2G voz, 4G e 5G provisório; DIGI, MEO, NOS, Vodafone e «Global PT», o agregado nacional) | ANACOM — `geo.anacom.pt/server/rest/services/publico/CoberturaQoS_Pub/MapServer`: camadas raster (grelha de 100 m, trimestral), consultadas por ponto com `identify` (o `query` não funciona em raster) e mostradas no mapa com `export` (PNG). CORS aberto, pedidos diretos. O dataset no dados.gov.pt não tem licença especificada; os termos da ANACOM permitem uso informativo, pessoal e não comercial com atribuição «Fonte: ANACOM · © ANACOM» e sem modificações. Uma publicação pública ou comercial exige notificar a ANACOM (WEB-064) | não |
+| Urgências hospitalares do SNS (episódios, infeção respiratória, prioridade verde/azul e tempo médio entre triagem e médico, por região; últimos 90 dias, ~2 dias de atraso) | Portal da Transparência do SNS (ACSS) — dataset `atividade-sindrome-gripal-csh` (`transparencia.sns.gov.pt/api/explore/v2.1`, export JSON). Recolhido no build por `apps/web/scripts/build-sns-urgencias.mjs` e publicado no GitHub Pages. São dados estatísticos, não a espera atual num hospital. O dataset não indica licença: reutilização ao abrigo da Lei n.º 26/2016, com indicação da fonte e das transformações (WEB-067) | não |
 
 A lista das rotas da API Aberta está na especificação OpenAPI em `https://api.apiaberta.pt/docs/json`.
 
@@ -142,6 +143,34 @@ reconciliação diária REN × ENTSO-E dos dias cobertos por inteiro pelas duas 
 não renovável e consumo, tolerância máx(1 GWh; 5%); o renovável é só informativo porque a REN
 desconta a bombagem na hídrica). No GitHub Actions as falhas e divergências dão `::warning` e uma
 tabela no resumo do job; nas apps aparecem no cartão «Estado das fontes» do ecrã de Energia.
+
+### Dados das urgências do SNS (`data/sns/*.json`)
+
+`pnpm --filter web build:db` (ou só `build:sns`) corre `scripts/build-sns-urgencias.mjs`, que pede ao
+Portal da Transparência do SNS os últimos 90 dias do dataset `atividade-sindrome-gripal-csh` (desde
+hoje − 90 dias em hora de Lisboa), valida o esquema (campos obrigatórios; mais de 5% de registos
+inválidos ou menos de 7 dias distintos anulam a recolha), normaliza (valor em falta nunca vira zero,
+duplicados pela chave dataset+região+indicador+dia) e escreve, de forma atómica, em
+`public/data/sns/`:
+
+- `series.json` — séries compactas por região e indicador (`[[periodo, valor]]`, ~45 KB);
+- `metadata.json` — indicadores, unidades e regiões presentes, datas, fonte, licença e transformações;
+- `status.json` — `fresh`, `republished` ou `failed`, última tentativa, última sincronização com sucesso
+  e `possiblyStale`.
+
+O contrato (versão 1), a normalização e as funções de apresentação estão em
+`packages/core/src/utils/snsUrgencias.ts`; o cliente com validação em `packages/core/src/api/snsUrgencias.ts`
+(testes: `pnpm --filter @portugal-hoje/core test`). Pedidos com timeout de 30 s e até 3 tentativas só em
+falhas transitórias (rede, 408, 429 com `Retry-After`, 5xx). Se a recolha falhar, republica o último
+conjunto publicado no Pages (`SNS_FALLBACK_BASE_URL`) com estado `republished`; sem nada publicado,
+escreve só `status.json` com `failed`. Nunca parte o build; no GitHub Actions dá `::warning` e uma
+linha no resumo do job. A recolha corre no deploy diário (cron das 13:00 UTC) e nos manuais; a execução
+horária só reutiliza os JSON publicados (`SNS_REUSE_PUBLISHED=true`).
+
+A página `/sns-urgencias` mostra a última observação e a última sincronização em separado, avisa quando
+os dados estão atrasados ou possivelmente desatualizados, e mostra «sem dados» onde o SNS não publica
+um indicador (o Algarve só tem episódios). Reutilização: o dataset não indica licença; aplica-se a Lei
+n.º 26/2016, com indicação da fonte, preservação do contexto e identificação das transformações.
 
 ### Mapas no mobile
 

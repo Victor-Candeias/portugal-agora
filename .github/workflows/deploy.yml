@@ -5,7 +5,7 @@ on:
   # Deploy diário (WEB-054): reconstrói os dados estáticos, incluindo a energia REN do dia anterior
   # (publicado pela REN até ~12:30 de Lisboa). O cron do GitHub não garante hora exata.
   # Horário (WEB-057): atualiza o intradiário ENTSO-E (a hora H sai ~65 min depois do fim) e
-  # reutiliza os .sqlite já publicados das outras secções.
+  # reutiliza os .sqlite e os JSON do SNS (WEB-067) já publicados das outras secções.
   schedule:
     - cron: '0 13 * * *'
     - cron: '20 * * * *'
@@ -44,13 +44,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build static data (Carris, Metro do Porto, Serviços Públicos, Energia)
+      - name: Build static data (Carris, Metro do Porto, Serviços Públicos, Energia, SNS)
         # A energia (scripts/build-energy-db.mjs) usa type stripping do Node ≥ 22.18; se a REN ou a
         # ENTSO-E falharem republica o último dataset publicado e nunca falha este passo. O estado de
         # cada fonte e a reconciliação REN × ENTSO-E vão para energy/status.json, para avisos
         # (::warning) e para o resumo do job (WEB-060).
-        # Na execução horária reutiliza os .sqlite publicados (Carris, Metro, Serviços Públicos) e
-        # só refaz a energia; se o download falhar, reconstrói tudo.
+        # Os indicadores de urgência do SNS (scripts/build-sns-urgencias.mjs, WEB-067) são recolhidos
+        # no deploy diário; se a API falhar, republica o último conjunto publicado (sns/status.json).
+        # Na execução horária reutiliza os .sqlite publicados (Carris, Metro, Serviços Públicos) e os
+        # JSON do SNS, e só refaz a energia; se o download falhar, reconstrói tudo.
         env:
           # Token da ENTSO-E Transparency Platform (WEB-057); só usado no build, nunca no bundle.
           TRANSPARENCT_ENTSOE_TOKEN: ${{ secrets.TRANSPARENCT_ENTSOE_TOKEN }}
@@ -71,6 +73,8 @@ jobs:
           fi
           if [ "$reuse" = "true" ]; then
             pnpm --filter web build:energy
+            # Republica os JSON do SNS já publicados; sem eles, recolhe de novo.
+            SNS_REUSE_PUBLISHED=true pnpm --filter web build:sns
           else
             pnpm --filter web build:db
           fi

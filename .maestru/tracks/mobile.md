@@ -37,6 +37,7 @@ status: active
 | MOB-018 | Mobile: APK com o nome da app e versão incrementada a cada build | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [MOB-018](../specs/mobile/mob-018-spec.md) |
 | MOB-019 | Tempo (mobile): previsão a 5 dias por cidade via open-data do IPMA | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [MOB-019](../specs/mobile/mob-019-spec.md) |
 | MOB-020 | Cobertura móvel (mobile): ecrã, mapa MapLibre e localização | done | 2026-10-20 | developer | medium | 2026-10-20 |  | WEB-065 | [MOB-020](../specs/mobile/mob-020-spec.md) |
+| MOB-021 | Saúde (mobile): ecrã de indicadores de urgência hospitalar do SNS | backlog | 2026-10-22 | developer | medium |  |  | WEB-067 |  |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |
 | WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
@@ -103,4 +104,5 @@ status: active
 | WEB-064 | Cobertura móvel: Fase 0 — validação ANACOM (classes de velocidade, identify, export, licença) | done | 2026-10-20 | developer | medium | 2026-10-20 |  |  | [WEB-064](../specs/mobile/web-064-spec.md) |
 | WEB-065 | Cobertura móvel (core): cliente ANACOM, catálogo de camadas e normalização | done | 2026-10-20 | developer | medium | 2026-10-20 |  | WEB-064 | [WEB-065](../specs/mobile/web-065-spec.md) |
 | WEB-066 | Cobertura móvel (web): página, mapa de cobertura e comparação de operadoras | done | 2026-10-20 | developer | medium | 2026-10-20 |  | WEB-065 | [WEB-066](../specs/mobile/web-066-spec.md) |
+| WEB-067 | Saúde (web): indicadores de urgência hospitalar do SNS — coletor, core e página /sns-urgencias | done | 2026-10-22 | developer | medium | 2026-10-22 |  |  | [WEB-067](../specs/mobile/web-067-spec.md) |
 <!-- /maestru:work-items-list -->

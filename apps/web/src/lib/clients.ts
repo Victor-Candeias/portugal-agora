@@ -13,6 +13,7 @@ import {
   createOsmChargersClient,
   createPublicServicesClient,
   createSnsClient,
+  createSnsUrgenciasClient,
   createTmlClient,
   createViesClient,
   type PostalCodeGeoMap,
@@ -60,3 +61,6 @@ export const viesClient = import.meta.env.DEV ? createViesClient({ baseUrl: '/ap
 
 // Energia (WEB-055): JSON gerados por scripts/build-energy-db.mjs e servidos pelo próprio site.
 export const energyClient = createEnergyClient({ baseUrl: `${import.meta.env.BASE_URL}data/` })
+
+// Urgências do SNS (WEB-067): JSON gerados por scripts/build-sns-urgencias.mjs e servidos pelo próprio site.
+export const snsUrgenciasClient = createSnsUrgenciasClient({ baseUrl: `${import.meta.env.BASE_URL}data/` })
