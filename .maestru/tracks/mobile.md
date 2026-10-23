@@ -38,6 +38,7 @@ status: active
 | MOB-019 | Tempo (mobile): previsão a 5 dias por cidade via open-data do IPMA | done | 2026-10-11 | developer | medium | 2026-10-11 |  |  | [MOB-019](../specs/mobile/mob-019-spec.md) |
 | MOB-020 | Cobertura móvel (mobile): ecrã, mapa MapLibre e localização | done | 2026-10-20 | developer | medium | 2026-10-20 |  | WEB-065 | [MOB-020](../specs/mobile/mob-020-spec.md) |
 | MOB-021 | Saúde (mobile): ecrã de indicadores de urgência hospitalar do SNS | done | 2026-10-22 | developer | medium | 2026-10-23 |  | WEB-067 | [MOB-021](../specs/mobile/mob-021-spec.md) |
+| MOB-022 | Tráfego aéreo (mobile): ecrã trafego-aereo com mapa MapLibre | backlog | 2026-10-23 | developer | medium |  |  | WEB-069, WEB-070 |  |
 | WEB-001 | Atualizar identidade do site para Portugal-Hoje | done | 2026-07-13 |  | medium | 2026-07-13 |  |  |  |
 | WEB-002 | Implementar integração CARRIS GTFS + fix favicon | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
 | WEB-003 | Rework Carris: migrar para API Carris Metropolitana REST JSON | done | 2026-07-13 |  | high | 2026-07-13 |  |  |  |
@@ -105,4 +106,8 @@ status: active
 | WEB-065 | Cobertura móvel (core): cliente ANACOM, catálogo de camadas e normalização | done | 2026-10-20 | developer | medium | 2026-10-20 |  | WEB-064 | [WEB-065](../specs/mobile/web-065-spec.md) |
 | WEB-066 | Cobertura móvel (web): página, mapa de cobertura e comparação de operadoras | done | 2026-10-20 | developer | medium | 2026-10-20 |  | WEB-065 | [WEB-066](../specs/mobile/web-066-spec.md) |
 | WEB-067 | Saúde (web): indicadores de urgência hospitalar do SNS — coletor, core e página /sns-urgencias | done | 2026-10-22 | developer | medium | 2026-10-22 |  |  | [WEB-067](../specs/mobile/web-067-spec.md) |
+| WEB-068 | Tráfego aéreo: Fase 0 — validação das fontes ADS-B (termos, quotas, cobertura) e escolha do proxy | backlog | 2026-10-23 | developer | medium |  |  |  |  |
+| WEB-069 | Tráfego aéreo (core): cliente, normalização ADS-B, regiões, deduplicação e testes | backlog | 2026-10-23 | developer | medium |  |  | WEB-068 |  |
+| WEB-070 | Tráfego aéreo: proxy com cache para a adsb.lol (contrato /air-traffic) | backlog | 2026-10-23 | developer | medium |  |  | WEB-068, WEB-069 |  |
+| WEB-071 | Tráfego aéreo (web): página /trafego-aereo com mapa Leaflet | backlog | 2026-10-23 | developer | medium |  |  | WEB-069, WEB-070 |  |
 <!-- /maestru:work-items-list -->
