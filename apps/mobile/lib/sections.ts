@@ -18,6 +18,7 @@ export const SECTIONS: Section[] = [
   { href: '/cobertura', title: 'Cobertura móvel', emoji: '📶', color: '#0891b2', description: 'Operadoras · ANACOM' },
   { href: '/protecao-civil', title: 'Proteção Civil', emoji: '🔥', color: '#ea580c', description: 'Ocorrências ANPC' },
   { href: '/hospitais', title: 'Hospitais', emoji: '🏥', color: '#dc2626', description: 'Urgências SNS' },
+  { href: '/sns-urgencias', title: 'Urgências SNS', emoji: '🚑', color: '#b91c1c', description: 'Indicadores diários' },
   { href: '/transportes', title: 'Transportes', emoji: '🚆', color: '#2563eb', description: 'CP · Carris · TML' },
   { href: '/metro-porto', title: 'Metro do Porto', emoji: '🚇', color: '#9333ea', description: 'Estações e partidas' },
   { href: '/servicos-publicos', title: 'Serviços Públicos', emoji: '🚓', color: '#1d4ed8', description: 'PSP e GNR' },

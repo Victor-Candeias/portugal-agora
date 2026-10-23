@@ -39,6 +39,7 @@ export default function RootLayout() {
           <Stack.Screen name="fundos" options={{ title: 'Fundos PRR / PT2030' }} />
           <Stack.Screen name="energia" options={{ title: 'Energia' }} />
           <Stack.Screen name="cobertura" options={{ title: 'Cobertura móvel' }} />
+          <Stack.Screen name="sns-urgencias" options={{ title: 'Urgências do SNS' }} />
           <Stack.Screen name="concelhos/index" options={{ title: 'Concelhos' }} />
           <Stack.Screen name="concelhos/[slug]" options={{ title: 'Concelho' }} />
         </Stack>

@@ -12,6 +12,7 @@ import {
   createOsmChargersClient,
   createPublicServicesClient,
   createSnsClient,
+  createSnsUrgenciasClient,
   createTmlClient,
   createViesClient,
   type PostalCodeGeoMap,
@@ -54,3 +55,6 @@ export const osmChargersClient = createOsmChargersClient({ userAgent: 'PortugalH
 
 // Energia (WEB-055): JSON publicados no GitHub Pages ao lado dos `.sqlite` (EXPO_PUBLIC_STATIC_DATA_URL).
 export const energyClient = createEnergyClient({ baseUrl: STATIC_DATA_BASE_URL })
+
+// Urgências do SNS (WEB-067/MOB-021): `sns/*.json` publicados no Pages pelo coletor.
+export const snsUrgenciasClient = createSnsUrgenciasClient({ baseUrl: STATIC_DATA_BASE_URL })

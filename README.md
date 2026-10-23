@@ -184,7 +184,7 @@ preciso refazer o development build (`pnpm android`).
 ### Navegação no mobile
 
 A raiz (`apps/mobile/app/_layout.tsx`) é um `Stack`. As tabs (Início, Combustível, Tempo, EV, Economia,
-Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Cobertura móvel (`app/cobertura.tsx`), Hospitais, Transportes (CP,
+Turismo) ficam no grupo `app/(tabs)/`. Os restantes ecrãs — Proteção Civil, Cobertura móvel (`app/cobertura.tsx`), Hospitais, Urgências do SNS (`app/sns-urgencias.tsx`), Transportes (CP,
 Carris, TML), Metro do Porto, Serviços Públicos, Código Postal, Concelhos (`app/concelhos/index.tsx` e a ficha `app/concelhos/[slug].tsx`), Validar NIF (`app/nif.tsx`), Fundos PRR / PT2030 (`app/fundos.tsx`) e Contratos Públicos (`app/contratos/index.tsx`
 e o detalhe `app/contratos/[id].tsx`) — são rotas da stack e abrem
 a partir da grelha "Todas as secções" do Início (`apps/mobile/lib/sections.ts`), com botão Voltar. O
@@ -234,6 +234,7 @@ Os ecrãs abaixo existem no web e no mobile.
 | 📊 Economia | Taxas BCE/€STR/TBA, crédito e depósitos (BdP) + indicadores INE/Eurostat, cada um com gráfico da série histórica e seletor de intervalo de anos (resumo "Taxa BCE" no Início) |
 | 🏖️ Turismo | Pontos de interesse perto de ti |
 | 🏥 Hospitais | Urgências SNS, ordenadas por distância |
+| 🚑 Urgências do SNS | Indicadores diários de urgência hospitalar por região (Portal da Transparência do SNS, ~2 dias de atraso): episódios, infeção respiratória, prioridade verde/azul e tempo médio entre triagem e médico. Última observação por indicador, gráfico de 7/30/90 dias com lacunas visíveis (nunca zero) e lista de valores; última observação e última sincronização em separado, avisos de atraso e «possivelmente desatualizado». Avisos «não é a espera atual num hospital» e 112 / SNS 24 com ligação direta; nota metodológica e fonte. No web /sns-urgencias (Recharts); no mobile pp/sns-urgencias.tsx (gráfico em eact-native-svg) |
 | 🚆 Transportes | Comboios CP, Carris (veículos, linhas, paragens, alertas) e alertas TML |
 | 🚇 Metro do Porto | Estações, linhas e próximas partidas |
 | 🚓 Serviços Públicos | Esquadras e postos policiais (PSP, GNR, Polícia Municipal, Marítima) |
